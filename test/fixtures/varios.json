@@ -1,0 +1,15 @@
+{
+  "titulo": "Ensayo de dureza superficial",
+  "condiciones": "Muestra analizada según procedimiento interno.",
+  "equipamiento": "Durómetro portátil TAG N°MM-812",
+  "resultado_texto": "Los valores obtenidos son satisfactorios.",
+  "tabla": {
+    "headers": ["Zona", "Dureza"],
+    "rows": [
+      { "label": "M1", "cells": ["MB", "195 HB"] },
+      { "label": "M2", "cells": ["ZAC", "210 HB"] }
+    ]
+  },
+  "evaluacion_texto": "Los resultados cumplen con lo especificado.",
+  "oaa": true
+}

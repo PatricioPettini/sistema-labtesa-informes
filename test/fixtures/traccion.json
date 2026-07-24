@@ -1,0 +1,21 @@
+{
+  "norma_astm_e8": true,
+  "norma_astm_e8_year": "2022",
+  "plano_probeta": "Rectangular",
+  "temperatura_probeta": "20",
+  "resultados": [
+    {
+      "probeta": "P1",
+      "ancho": "12.5",
+      "espesor": "10.0",
+      "seccion": "125.0",
+      "carga_maxima": "45000",
+      "resistencia_traccion": "360",
+      "carga_fluencia": "36000",
+      "tension_fluencia": "288",
+      "alargamiento": "22",
+      "estriccion": "58"
+    }
+  ],
+  "oaa": true
+}

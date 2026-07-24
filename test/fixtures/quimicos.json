@@ -1,0 +1,14 @@
+{
+  "metodologia": "Espectrometría de emisión óptica",
+  "norma": "ASTM E415",
+  "resultados": [
+    { "elemento": "C",  "porcentaje": "0.180" },
+    { "elemento": "Si", "porcentaje": "0.250" },
+    { "elemento": "Mn", "porcentaje": "1.450" },
+    { "elemento": "P",  "porcentaje": "0.015" },
+    { "elemento": "S",  "porcentaje": "0.008" }
+  ],
+  "tiene_evaluacion": true,
+  "evaluacion_texto": "La muestra analizada satisface la especificación indicada.",
+  "oaa": true
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Órdenes de Trabajo — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+    <div class="lab-topbar-right">
+      <div style="width:28px;height:28px;border-radius:50%;background:#dde2eb;display:grid;place-items:center;color:var(--ink-2);font-size:12px;font-weight:600">JM</div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-page-head">
+      <div>
+        <h1>Órdenes de trabajo</h1>
+        <div class="lab-page-sub" id="ot-sub">Cargando…</div>
+      </div>
+      <div class="lab-page-head-actions">
+        <button class="btn btn-primary" type="button" onclick="window.location='/forms/nueva-ot.html'" id="btn-nueva-ot"></button>
+      </div>
+    </div>
+
+    <div class="h-stack" style="gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="position:relative;flex:1;min-width:220px;max-width:380px">
+        <span id="search-icon-wrap" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-4);pointer-events:none;display:flex"></span>
+        <input class="input" id="search-input" placeholder="Buscar OT, solicitud, cliente o ID…" style="padding-left:36px">
+      </div>
+      <div class="spacer"></div>
+      <span class="muted" style="font-size:12px;align-self:center" id="filtro-count"></span>
+    </div>
+
+    <div id="ot-container"></div>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script src="/js/dashboard.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-nueva-ot').innerHTML = getIcon('plus') + ' Nueva OT';
+    document.getElementById('search-icon-wrap').innerHTML = getIcon('search');
+  });
+</script>
+</body>
+</html>

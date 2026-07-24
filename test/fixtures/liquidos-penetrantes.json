@@ -1,0 +1,11 @@
+{
+  "metodologia": "ITM interno LP",
+  "norma": "ASME BPVC V Art.6",
+  "penetrante": "Magnaflux SKL-SP2",
+  "revelador": "Magnaflux SKD-S2",
+  "tiempo_penetracion": "10 min",
+  "resultados": [
+    { "muestra": "M1", "observaciones": "Sin indicaciones" }
+  ],
+  "oaa": true
+}

@@ -1,0 +1,36 @@
+Windows Registry Editor Version 5.00
+
+; ─────────────────────────────────────────────────────────────────────────────
+; Protocol handler custom "labopen:" para Lab-Informes.
+; Registra el esquema labopen:// en Windows para que el navegador pueda abrir
+; carpetas del filesystem al hacer click en un link.
+;
+; Instalación (una sola vez por PC):
+;   1. Guardar este archivo como labopen-protocol.reg
+;   2. Doble-click → "Sí" en el diálogo del editor de registro.
+;   3. Refrescar la página del sistema. El botón "Abrir carpeta" abre Explorer.
+;
+; Al hacer click en labopen://<ruta>, se ejecuta un PowerShell corto que:
+;   - Remueve el prefijo labopen://
+;   - Decodifica URL-encoding (%20 → espacio, etc.)
+;   - Convierte / a \
+;   - Si es carpeta existente → abre esa carpeta
+;   - Si es archivo → abre la carpeta padre con el archivo resaltado
+;
+; Alcance: solo el usuario actual. Para todos los usuarios de la PC, cambiar
+; HKEY_CURRENT_USER por HKEY_LOCAL_MACHINE y ejecutar como Administrador.
+; ─────────────────────────────────────────────────────────────────────────────
+
+[HKEY_CURRENT_USER\Software\Classes\labopen]
+@="URL:Lab-Informes Abrir Carpeta"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\labopen\DefaultIcon]
+@="explorer.exe,1"
+
+[HKEY_CURRENT_USER\Software\Classes\labopen\shell]
+
+[HKEY_CURRENT_USER\Software\Classes\labopen\shell\open]
+
+[HKEY_CURRENT_USER\Software\Classes\labopen\shell\open\command]
+@="powershell.exe -WindowStyle Hidden -Command \"$u='%1'; $p = ($u -replace '^labopen:(//)?','') -replace '/','\\'; $p = [uri]::UnescapeDataString($p); if (Test-Path $p -PathType Container) { Start-Process explorer.exe -ArgumentList $p } elseif (Test-Path $p -PathType Leaf) { Start-Process explorer.exe -ArgumentList ('/select,\"' + $p + '\"') } else { $parent = Split-Path $p -Parent; if ($parent -and (Test-Path $parent)) { Start-Process explorer.exe -ArgumentList $parent } }\""

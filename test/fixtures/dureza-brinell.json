@@ -1,0 +1,12 @@
+{
+  "metodologia": "ITM N°061",
+  "norma": "ASTM E10",
+  "diametro_bola": "2.5",
+  "carga_kgf": "187.5",
+  "resultados": [
+    { "muestra": "M1", "zona": "MB",  "dureza": "195" },
+    { "muestra": "M2", "zona": "ZAC", "dureza": "210" },
+    { "muestra": "M3", "zona": "SOL", "dureza": "220" }
+  ],
+  "oaa": true
+}

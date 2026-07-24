@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nueva OT — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main" style="max-width:860px">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <span class="logo-text" id="crumb-titulo">Nueva OT</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1 id="page-title">Nueva orden de trabajo</h1>
+        <div class="lab-page-sub">Cargá los datos manualmente o autocompletá desde una tarjeta de Trello.</div>
+      </div>
+    </div>
+
+    <!-- ── Trello loader ───────────────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-hd">
+        <h3 id="trello-hd-icon" class="h-stack" style="gap:8px">Cargar desde Trello</h3>
+      </div>
+      <div class="card-bd">
+        <div class="field" style="margin-bottom:12px">
+          <label class="field-label" for="trello-url">URL de la tarjeta Trello</label>
+          <div class="input-group">
+            <input type="url" id="trello-url" class="input mono" placeholder="https://trello.com/c/…">
+            <button class="btn btn-primary" id="btn-cargar-trello">Cargar</button>
+          </div>
+        </div>
+        <div id="trello-estado" style="font-size:13px;color:var(--ink-3)">Sin tarjeta cargada.</div>
+        <div id="selector-ot-wrap" style="display:none;margin-top:10px">
+          <div class="field">
+            <label class="field-label" for="selector-ot">Seleccionar OT</label>
+            <select id="selector-ot" class="select"></select>
+          </div>
+        </div>
+        <div id="banner-trello-ok" style="display:none;margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ── Formulario ─────────────────────────────────────────────────────── -->
+    <form id="form-nueva-ot" novalidate>
+      <input type="hidden" name="nro_cliente" id="nro_cliente">
+      <input type="hidden" name="trello_url"  id="trello_url">
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-hd">
+          <h3>Datos de la OT</h3>
+          <span class="card-hd-meta muted">Editá lo que sea necesario</span>
+        </div>
+        <div class="card-bd">
+          <div class="field-grid" style="margin-bottom:16px">
+            <div class="field">
+              <label class="field-label" for="nro_solicitud">N° de solicitud <span class="req">*</span></label>
+              <input type="text" id="nro_solicitud" name="nro_solicitud" class="input mono" placeholder="38070" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label" for="nro_ot">N° de OT <span class="req">*</span></label>
+              <input type="text" id="nro_ot" name="nro_ot" class="input mono" placeholder="534228" data-required>
+            </div>
+
+            <div class="field field-full">
+              <label class="field-label" for="razon_social">
+                Razón social del cliente <span class="req">*</span>
+                <span id="razon-hint" style="font-size:11px;color:var(--ink-3);font-weight:400;margin-left:4px"></span>
+              </label>
+              <input type="text" id="razon_social" name="razon_social" class="input" placeholder="Nombre completo del cliente" data-required>
+            </div>
+
+            <div class="field field-full">
+              <label class="field-label" for="id_muestra">Identificación de la muestra <span class="req">*</span></label>
+              <textarea id="id_muestra" name="id_muestra" class="textarea" rows="3"
+                placeholder="COLADA N°:87000/A16 - CODIGO:GAPT - 25499 CODO RADIO LARGO…" data-required></textarea>
+            </div>
+          </div>
+
+          <div class="field-grid field-grid-3">
+            <div class="field">
+              <label class="field-label" for="fecha_recepcion">Fecha de recepción <span class="req">*</span></label>
+              <input type="date" id="fecha_recepcion" name="fecha_recepcion" class="input" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label" for="fecha_aprobacion">Fecha de aprobación <span class="req">*</span></label>
+              <input type="date" id="fecha_aprobacion" name="fecha_aprobacion" class="input" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label" for="fecha_finalizacion">Fecha de finalización <span class="req">*</span></label>
+              <input type="date" id="fecha_finalizacion" name="fecha_finalizacion" class="input" data-required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Acciones ────────────────────────────────────────────────────── -->
+      <div class="h-stack" style="justify-content:flex-end;gap:8px">
+        <button type="button" class="btn" onclick="window.location='/'">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar">Guardar OT</button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/trello-api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+let otsTarjeta = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('trello-hd-icon').innerHTML = getIcon('trello') + ' Cargar desde Trello';
+  document.getElementById('btn-guardar').innerHTML = getIcon('check') + ' Guardar OT';
+  document.getElementById('fecha_finalizacion').value = hoyISO();
+
+  // ── Validación de fechas (carátula) ─────────────────────────────────────
+  // Reglas: recepcion ≤ hoy, recepcion ≤ aprobacion ≤ finalizacion
+  const fRec = document.getElementById('fecha_recepcion');
+  const fApr = document.getElementById('fecha_aprobacion');
+  const fFin = document.getElementById('fecha_finalizacion');
+  const HOY  = hoyISO();
+  fRec.max = HOY;
+  const sincronizarLimites = () => {
+    // recepcion ≤ hoy
+    fRec.max = HOY;
+    // aprobacion ≥ recepcion
+    fApr.min = fRec.value || '';
+    // finalizacion ≥ aprobacion (o recepcion si aprobacion vacía)
+    fFin.min = fApr.value || fRec.value || '';
+  };
+  [fRec, fApr, fFin].forEach(el => el.addEventListener('change', sincronizarLimites));
+  sincronizarLimites();
+  // ────────────────────────────────────────────────────────────────────────
+
+  const params = new URLSearchParams(location.search);
+  const nroOt  = params.get('nro_ot');
+  if (nroOt) {
+    document.getElementById('crumb-titulo').textContent = `Editar OT ${nroOt}`;
+    document.getElementById('page-title').textContent   = `Editar OT ${nroOt}`;
+    fetch(`/api/ot/${nroOt}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(ot => {
+        if (!ot) return;
+        document.getElementById('nro_ot').value         = ot.nro_ot;
+        document.getElementById('nro_solicitud').value  = ot.nro_solicitud || '';
+        document.getElementById('nro_cliente').value    = ot.nro_cliente   || '';
+        document.getElementById('razon_social').value   = ot.razon_social  || '';
+        document.getElementById('id_muestra').value     = ot.id_muestra    || '';
+        document.getElementById('trello_url').value     = ot.trello_url    || '';
+        if (ot.trello_url) document.getElementById('trello-url').value = ot.trello_url;
+        if (ot.fecha_recepcion)    document.getElementById('fecha_recepcion').value    = isoDesde(ot.fecha_recepcion);
+        if (ot.fecha_aprobacion)   document.getElementById('fecha_aprobacion').value   = isoDesde(ot.fecha_aprobacion);
+        if (ot.fecha_finalizacion) document.getElementById('fecha_finalizacion').value = isoDesde(ot.fecha_finalizacion);
+        sincronizarLimites();
+      });
+  }
+});
+
+// ─── Trello ───────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-cargar-trello').addEventListener('click', async () => {
+  const url    = document.getElementById('trello-url').value.trim();
+  const estado = document.getElementById('trello-estado');
+  if (!url) { toast('Ingresá la URL de la tarjeta', 'error'); return; }
+
+  const btn = document.getElementById('btn-cargar-trello');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">' + getIcon('loader') + '</span> Cargando…';
+  estado.textContent = '';
+
+  try {
+    const data = await TrelloAPI.cargarTarjeta(url);
+    otsTarjeta = data.ots || [];
+
+    btn.disabled = false;
+    btn.innerHTML = getIcon('download') + ' Cargar desde Trello';
+
+    const bannerOk = document.getElementById('banner-trello-ok');
+    bannerOk.style.display = '';
+    bannerOk.innerHTML = `
+      <div class="banner banner-success">
+        ${getIcon('check-circle')}
+        <div>
+          <div class="banner-title">Tarjeta cargada</div>
+          <span>${data.cliente_nombre} · SOL ${data.nro_solicitud}</span>
+        </div>
+      </div>`;
+
+    if (data.nro_solicitud) document.getElementById('nro_solicitud').value = data.nro_solicitud;
+    document.getElementById('trello_url').value = url;
+
+    const selectorWrap = document.getElementById('selector-ot-wrap');
+    const selector     = document.getElementById('selector-ot');
+    selector.innerHTML = '<option value="">— Seleccioná una OT —</option>';
+    otsTarjeta.forEach((ot, i) => {
+      selector.innerHTML += `<option value="${i}">OT ${ot.nro_ot} — M${ot.muestra}${ot.id_muestra ? ' · ' + ot.id_muestra.slice(0, 40) : ''}</option>`;
+    });
+
+    if (otsTarjeta.length === 1) {
+      selector.value = '0';
+      cargarDatosOT(0, data);
+    }
+    selectorWrap.style.display = 'block';
+    selector.onchange = () => {
+      if (selector.value !== '') cargarDatosOT(parseInt(selector.value), data);
+    };
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = getIcon('download') + ' Cargar desde Trello';
+    estado.innerHTML = `<span style="color:var(--danger)">${getIcon('x-circle')} Error: ${err.message}</span>`;
+  }
+});
+
+async function cargarDatosOT(idx, tarjetaData) {
+  const ot = otsTarjeta[idx];
+  if (!ot) return;
+
+  document.getElementById('nro_ot').value       = ot.nro_ot;
+  document.getElementById('id_muestra').value   = ot.id_muestra;
+  document.getElementById('nro_solicitud').value = tarjetaData.nro_solicitud || '';
+  document.getElementById('nro_cliente').value   = tarjetaData.nro_cliente   || '';
+
+  let razonSocialEncontrada = false;
+  if (tarjetaData.nro_cliente) {
+    try {
+      const resp = await fetch(`/api/cliente/${tarjetaData.nro_cliente}`);
+      if (resp.ok) {
+        const cliente = await resp.json();
+        document.getElementById('razon_social').value = cliente.razon_social;
+        razonSocialEncontrada = true;
+      }
+    } catch {}
+  }
+  if (!razonSocialEncontrada && tarjetaData.cliente_nombre) {
+    document.getElementById('razon_social').value = tarjetaData.cliente_nombre;
+    document.getElementById('razon-hint').textContent = '(del título — verificar)';
+  } else {
+    document.getElementById('razon-hint').textContent = '';
+  }
+  toast(`OT ${ot.nro_ot} cargada`, 'ok');
+}
+
+// ─── Guardar ──────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  const form = document.getElementById('form-nueva-ot');
+  if (!validarRequeridos(form)) return;
+
+  const datos  = recolectarDatosForm(form);
+  const nro_ot = datos.nro_ot?.trim();
+  if (!nro_ot) { toast('El N° de OT es obligatorio', 'error'); return; }
+
+  // Validación de fechas (orden cronológico)
+  const fr = datos.fecha_recepcion, fa = datos.fecha_aprobacion, ff = datos.fecha_finalizacion;
+  const hoy = hoyISO();
+  if (fr && fr > hoy)       { toast('La fecha de recepción no puede ser posterior a hoy', 'error'); return; }
+  if (fr && fa && fr > fa)  { toast('La fecha de recepción no puede ser posterior a la de aprobación', 'error'); return; }
+  if (fa && ff && fa > ff)  { toast('La fecha de finalización no puede ser anterior a la de aprobación', 'error'); return; }
+  if (fr && ff && fr > ff)  { toast('La fecha de finalización no puede ser anterior a la de recepción', 'error'); return; }
+
+  try {
+    const resp = await fetch('/api/ot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nro_ot,
+        nro_solicitud:      datos.nro_solicitud,
+        nro_cliente:        datos.nro_cliente        || '',
+        razon_social:       datos.razon_social,
+        id_muestra:         datos.id_muestra,
+        fecha_recepcion:    datos.fecha_recepcion    ? formatearFecha(datos.fecha_recepcion)    : '',
+        fecha_aprobacion:   datos.fecha_aprobacion   ? formatearFecha(datos.fecha_aprobacion)   : '',
+        fecha_finalizacion: datos.fecha_finalizacion ? formatearFecha(datos.fecha_finalizacion) : '',
+        trello_url:         datos.trello_url         || '',
+      }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).error || 'Error al guardar');
+    window.location.href = `/forms/ot.html?nro_ot=${nro_ot}`;
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+});
+
+// dd/mm/yyyy → yyyy-mm-dd
+function isoDesde(s) {
+  if (!s) return '';
+  const [d, m, y] = s.split('/');
+  return y ? `${y}-${m}-${d}` : '';
+}
+
+</script>
+</body>
+</html>

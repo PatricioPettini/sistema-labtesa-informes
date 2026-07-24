@@ -1,0 +1,12 @@
+{
+  "nro_ot": "TEST-001",
+  "nro_solicitud": "99999",
+  "razon_social": "CLIENTE TEST S.A.",
+  "nro_cliente": "999",
+  "id_muestra": "Probeta de prueba — snapshot test",
+  "fecha_recepcion": "2026-01-01",
+  "fecha_aprobacion": "2026-01-02",
+  "fecha_finalizacion": "2026-01-03",
+  "es_preinforme": 0,
+  "trello_columna": "Ensayos"
+}

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ensayo de Impacto — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+  <style>
+    .seccion-caba    { display: none; }
+    body.caba .seccion-caba    { display: block; }
+    body.caba .seccion-neuquen { display: none; }
+    .grupo-card { background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px }
+    .grupo-card h5 { margin:0 0 8px 0;font-size:13px;color:var(--ink-2) }
+    .btn-quitar-grupo { background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;padding:2px 6px }
+  </style>
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Ensayo de Impacto Charpy</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Impacto Charpy</h1>
+        <div class="lab-page-sub">Norma de referencia ASTM E23 · acreditado</div>
+      </div>
+    </div>
+
+    <!-- OT Banner -->
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-impacto" novalidate>
+
+      <!-- Variante -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-section">
+          <h4>Variante del ensayo</h4>
+          <div class="toggle-variante">
+            <button type="button" id="btn-neuquen" class="activo" onclick="setVariante('neuquen')">Neuquén (Galdabini)</button>
+            <button type="button" id="btn-caba"                   onclick="setVariante('caba')">CABA (Wolpert)</button>
+          </div>
+          <input type="hidden" name="variante" id="input-variante" value="neuquen">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Condiciones de ensayo -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Códigos de referencia (opcionales)</label>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="cod_asme" id="cod_asme">
+                <span>ASME BPVC Sección IX Ed. <input type="text" name="ed_asme" placeholder="2025"
+                  style="width:55px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent"></span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_api1104">
+                <span>API 1104 Ed.22-2021 (E1-2023)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_api5l">
+                <span>API 5L</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Norma de ensayo <span class="req">*</span></label>
+              <select name="norma_ensayo" class="select" data-required>
+                <option value="ASTM E23-25">ASTM E23-25</option>
+                <option value="ISO 148-1:2016">ISO 148-1:2016</option>
+                <option value="otra">Otra…</option>
+              </select>
+            </div>
+            <div class="field" id="norma-otra-wrap" style="display:none">
+              <label class="field-label">Especificar norma</label>
+              <input type="text" name="norma_ensayo_otra" class="input" placeholder="Ingresar norma">
+            </div>
+            <div class="field">
+              <label class="field-label">Metodología</label>
+              <input type="text" name="metodologia" class="input" value="ITM N°078">
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Medida de probeta <span class="req">*</span></label>
+              <select name="medida_probeta" id="medida_probeta" class="select" data-required onchange="document.getElementById('medida-otra-wrap').style.display = this.value==='otra' ? 'block':'none'">
+                <option value="">— Seleccionar —</option>
+                <option value="10x10x55">10 × 10 × 55 mm (acreditado)</option>
+                <option value="10x7.5x55">10 × 7,5 × 55 mm (no acreditado)</option>
+                <option value="10x5x55">10 × 5 × 55 mm (no acreditado)</option>
+                <option value="10x2.5x55">10 × 2,5 × 55 mm (no acreditado)</option>
+                <option value="otra">Otra…</option>
+              </select>
+            </div>
+            <div class="field" id="medida-otra-wrap" style="display:none">
+              <label class="field-label">Especificar medida</label>
+              <input type="text" name="medida_probeta_otra" class="input" placeholder="ej: 7 × 7 × 44 mm">
+            </div>
+            <div class="field">
+              <label class="field-label">Entalla Charpy <span class="req">*</span></label>
+              <div class="check-group" style="flex-direction:row;gap:24px;margin-top:8px">
+                <label class="check-item">
+                  <input type="radio" name="entalla" value="V" checked>
+                  <span>V (acreditado)</span>
+                </label>
+                <label class="check-item">
+                  <input type="radio" name="entalla" value="U">
+                  <span>U (no acreditado)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="check-group" style="margin-bottom:12px">
+            <label class="check-item">
+              <input type="checkbox" name="prob_cliente">
+              <span>Probetas mecanizadas por el cliente</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="prob_cupon_soldado">
+              <span>Probeta extraída de cupón soldado</span>
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Orientación de las probetas</label>
+              <select name="orientacion" id="orientacion" class="select" onchange="document.getElementById('orientacion-otra-wrap').style.display = this.value==='otra' ? 'block':'none'">
+                <option value="">— (opcional) —</option>
+                <option value="Longitudinal">Longitudinal</option>
+                <option value="Transversal">Transversal</option>
+                <option value="otra">Otra…</option>
+              </select>
+            </div>
+            <div class="field" id="orientacion-otra-wrap" style="display:none">
+              <label class="field-label">Especificar orientación</label>
+              <input type="text" name="orientacion_otra" class="input" placeholder="ej: Radial / a 45°">
+            </div>
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (°C)</label>
+              <input type="text" name="temperatura" class="input mono" placeholder="-40 / Ambiente / dejar vacía si va por probeta" id="input-temp">
+              <div class="field-hint" id="hint-temp">Si la temperatura varía por probeta, dejar vacío y activar la columna en la tabla</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="field">
+              <label class="field-label">Energía informada <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="energia_informada" class="input" placeholder="ej: Energía mínima individual: 27J">
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+
+          <div class="check-group seccion-neuquen" id="equipos-neuquen">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galdabini]" value="true" checked>
+              <span>Máquina de impacto Galdabini TAG N°MM-409</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[freezer_ee761]" value="true" checked>
+              <span>Ultra freezer TAG N°EE-761</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[controlador_mm021]" value="true" checked>
+              <span>Controlador de temperatura digital TAG N°MM-021</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_mm571]" value="true" checked>
+              <span>Calibre digital TAG N°MM-571</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_cal570]" value="true">
+              <span>Calibre digital TAG N°CAL-570</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galgas_771]" value="true">
+              <span>Galgas patrón TAG N°MM-771 (para 2,5 mm)</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galgas_772]" value="true">
+              <span>Galgas patrón TAG N°MM-772 (para 5 mm)</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galgas_773]" value="true">
+              <span>Galgas patrón TAG N°MM-773 (para 7,5 mm)</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galgas_775]" value="true">
+              <span>Galgas patrón TAG N°MM-775 (para 10 × 10 mm)</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[galgas_776]" value="true">
+              <span>Galgas patrón TAG N°MM-776</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[proyector_165]" value="true" checked>
+              <span>Proyector de perfiles TAG N°MM-165</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_794]" value="true">
+              <span>Termohigrómetro TAG N°MM-794</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_545]" value="true">
+              <span>Termohigrómetro TAG N°PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_702]" value="true">
+              <span>Termohigrómetro TAG N°MM-702</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_701]" value="true">
+              <span>Termohigrómetro TAG N°MM-701</span>
+            </label>
+          </div>
+
+          <div class="check-group seccion-caba" id="equipos-caba">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[wolpert]" value="true" checked>
+              <span>Péndulo de impacto Wolpert 300J serie 220001/2031 TAG N˚MM-010</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[freezer_pol479]" value="true" checked>
+              <span>Ultra freezer TAG N°POL-479</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[controlador_mm315]" value="true" checked>
+              <span>Controlador de temperatura digital TAG N˚MM-315</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_mm694]" value="true" checked>
+              <span>Calibre digital TAG N˚MM-694</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_545]" value="true">
+              <span>Termohigrómetro TAG N°PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_702]" value="true">
+              <span>Termohigrómetro TAG N°MM-702</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_701]" value="true">
+              <span>Termohigrómetro TAG N°MM-701</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_794]" value="true">
+              <span>Termohigrómetro TAG N°MM-794</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+
+          <div style="margin-bottom:12px;padding:10px;background:var(--bg-soft);border-radius:6px">
+            <div style="font-size:12px;color:var(--ink-2);margin-bottom:6px;font-weight:600">Columnas opcionales de la tabla</div>
+            <div class="check-group" style="flex-direction:row;gap:24px;flex-wrap:wrap">
+              <label class="check-item">
+                <input type="checkbox" name="incluir_zona" id="chk-zona" onchange="renderGrupos()">
+                <span>Columna <strong>Zona / Ubicación</strong> (Soldadura, ZAC, etc.)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="incluir_temperatura_tabla" id="chk-temp-tabla" onchange="renderGrupos()">
+                <span>Columna <strong>Temperatura</strong> por probeta</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="grupos-wrap"></div>
+
+          <div style="margin-top:8px">
+            <button type="button" class="btn btn-secondary" id="btn-add-grupo" onclick="agregarGrupo()" style="font-size:13px;padding:6px 12px">
+              + Agregar grupo de probetas
+            </button>
+            <span class="muted" style="font-size:11px;margin-left:8px">Cada grupo tiene N probetas. Útil para informes con soldadura: ZAC y SOLD separados.</span>
+          </div>
+        </div>
+
+        <!-- Notas -->
+        <div class="card-section">
+          <h4>Notas</h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="nota1">
+              <span>Nota 1: Todas las probetas cumplen con las dimensiones y tolerancias correspondientes verificado mediante utilización de las galgas patrón y calibre digital.</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="nota2">
+              <span>Nota 2: Los valores mayores a 138 Joules se encuentran fuera de alcance de acreditación.</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="nota3">
+              <span>Nota 3: La temperatura se encuentra fuera del alcance de acreditación.</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="temp_acreditada">
+              <span>Agregar rango de temperatura acreditada al lado de la temperatura (ej: <em>TEMP ACREDITADA: de -80°C a 50°C</em>)</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="nota_subsize">
+              <span>Nota Subsize: Dimensiones de probeta "Especimen fuera de alcance de acreditación".</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="oaa">
+              <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Evaluación de resultados -->
+        <div class="card-section">
+          <h4>Evaluación de resultados</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="document.getElementById('evaluacion-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección EVALUACIÓN DE RESULTADOS</span>
+          </label>
+          <p class="muted" style="font-size:12px;margin:4px 0 8px">
+            Se incluye la aclaración OAA sobre evaluaciones fuera del alcance de acreditación.
+          </p>
+          <div id="evaluacion-wrap" style="display:none">
+            <textarea name="evaluacion_texto" class="textarea" rows="3" placeholder="Texto de la evaluación..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+// Estado de grupos. Cada grupo: { label, probetas: [{ energia, temperatura }] }
+// El default es 1 grupo de 3 probetas.
+let grupos = [crearGrupoVacio('', 3)];
+
+function crearGrupoVacio(label, nProbetas) {
+  return {
+    label: label || '',
+    probetas: Array.from({ length: nProbetas }, () => ({ energia: '', temperatura: '' }))
+  };
+}
+
+function setVariante(v) {
+  document.getElementById('input-variante').value = v;
+  document.getElementById('btn-neuquen').classList.toggle('activo', v === 'neuquen');
+  document.getElementById('btn-caba').classList.toggle('activo',    v === 'caba');
+  document.body.classList.toggle('caba', v === 'caba');
+}
+
+function renderGrupos() {
+  const incluirZona = document.getElementById('chk-zona').checked;
+  const incluirTemp = document.getElementById('chk-temp-tabla').checked;
+  const wrap = document.getElementById('grupos-wrap');
+
+  let html = '';
+  grupos.forEach((g, gi) => {
+    html += `<div class="grupo-card">
+      <div class="h-stack" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h5>Grupo ${gi + 1}</h5>
+        ${grupos.length > 1 ? `<button type="button" class="btn-quitar-grupo" onclick="quitarGrupo(${gi})" title="Quitar grupo">✕ Quitar</button>` : ''}
+      </div>`;
+
+    if (incluirZona) {
+      html += `<div class="field" style="margin-bottom:8px">
+        <label class="field-label">Etiqueta del grupo (Zona / Ubicación)</label>
+        <input type="text" class="input" value="${escapeAttr(g.label)}"
+          oninput="grupos[${gi}].label = this.value" placeholder="Soldadura / ZAC / Cerca de falla / etc">
+      </div>`;
+    }
+
+    html += `<table class="tabla-resultados">
+      <thead><tr>
+        <th style="width:70px">Probeta</th>
+        ${incluirTemp ? '<th>Temperatura (°C)</th>' : ''}
+        <th>Energía Abs. (Joule)</th>
+        <th style="width:32px"></th>
+      </tr></thead>
+      <tbody>`;
+
+    g.probetas.forEach((p, pi) => {
+      html += `<tr>
+        <td style="text-align:center;font-weight:600">${pi + 1}</td>
+        ${incluirTemp ? `<td><input type="text" value="${escapeAttr(p.temperatura)}"
+          oninput="grupos[${gi}].probetas[${pi}].temperatura = this.value" placeholder="ej: -20 / AMB"></td>` : ''}
+        <td><input type="text" value="${escapeAttr(p.energia)}"
+          oninput="grupos[${gi}].probetas[${pi}].energia = this.value" placeholder="J (ej: 180 / >240)"></td>
+        <td style="text-align:center">
+          ${g.probetas.length > 1
+            ? `<button type="button" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 4px"
+                onclick="quitarProbeta(${gi}, ${pi})" title="Quitar probeta">✕</button>`
+            : ''}
+        </td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>
+      <button type="button" class="btn-small"
+        onclick="agregarProbeta(${gi})"
+        style="margin-top:6px;padding:3px 10px;font-size:12px;border:1px solid var(--border);background:white;border-radius:4px;cursor:pointer">
+        + Agregar probeta al grupo ${gi + 1}
+      </button>
+    </div>`;
+  });
+
+  wrap.innerHTML = html;
+}
+
+function escapeAttr(s) {
+  return String(s ?? '').replace(/"/g, '&quot;').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+}
+
+function agregarGrupo() {
+  if (grupos.length >= 8) { toast('Máximo 8 grupos', 'warn'); return; }
+  grupos.push(crearGrupoVacio('', 3));
+  renderGrupos();
+}
+function quitarGrupo(gi) {
+  if (grupos.length <= 1) return;
+  grupos.splice(gi, 1);
+  renderGrupos();
+}
+function agregarProbeta(gi) {
+  grupos[gi].probetas.push({ energia: '', temperatura: '' });
+  renderGrupos();
+}
+function quitarProbeta(gi, pi) {
+  if (grupos[gi].probetas.length <= 1) return;
+  grupos[gi].probetas.splice(pi, 1);
+  renderGrupos();
+}
+
+function recolectarImpacto() {
+  const form = document.getElementById('form-impacto');
+  const base = recolectarDatosForm(form);
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+  base.grupos       = grupos;
+  return base;
+}
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-impacto');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarImpacto();
+  try {
+    await guardarEnsayoServidor(nroOt, 'impacto', datos);
+    Storage.borrarBorrador(nroOt, 'impacto');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+document.querySelector('[name="norma_ensayo"]').addEventListener('change', function () {
+  document.getElementById('norma-otra-wrap').style.display = this.value === 'otra' ? 'block' : 'none';
+});
+
+function restaurarEstado(datos) {
+  rellenarForm(document.getElementById('form-impacto'), datos);
+  if (datos.tiene_evaluacion) document.getElementById('evaluacion-wrap').style.display = 'block';
+  if (datos.medida_probeta === 'otra') document.getElementById('medida-otra-wrap').style.display = 'block';
+  if (datos.norma_ensayo === 'otra')   document.getElementById('norma-otra-wrap').style.display  = 'block';
+  if (datos.orientacion === 'otra')    document.getElementById('orientacion-otra-wrap').style.display = 'block';
+  if (datos.variante) setVariante(datos.variante);
+  if (Array.isArray(datos.grupos) && datos.grupos.length > 0) grupos = datos.grupos;
+  renderGrupos();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    renderGrupos();
+    return;
+  }
+
+  document.getElementById('back-link').href = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'impacto');
+      if (borrador) {
+        restaurarEstado(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'impacto');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string' ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          restaurarEstado(datos);
+        } else {
+          renderGrupos();
+        }
+      }
+    } else {
+      renderGrupos();
+    }
+  } catch { renderGrupos(); }
+
+  document.getElementById('form-impacto').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'impacto', recolectarImpacto());
+  });
+});
+
+</script>
+</body>
+</html>

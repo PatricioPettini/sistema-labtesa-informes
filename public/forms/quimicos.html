@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Análisis Químico — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Análisis Químico</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Análisis Químico</h1>
+        <div class="lab-page-sub">Composición química por espectrometría</div>
+      </div>
+    </div>
+
+    <!-- OT Banner -->
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-quimicos" novalidate>
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Condiciones de ensayo -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Norma de ensayo</label>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="norma_e415" checked>
+                <span>ASTM E415-21 (espectrometría óptica — aceros ferrosos)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_e1086">
+                <span>ASTM E1086-23 (espectrometría OES)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_e1251">
+                <span>ASTM E1251-23 (aluminio y aleaciones)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_e1999">
+                <span>ASTM E1999-21 (hierro fundido)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_e3047">
+                <span>ASTM E3047-20</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_e1019">
+                <span>Carbono y Azufre: Combustión y absorción IR según ASTM E1019-22</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_otra_chk" id="chk-norma-otra-quim">
+                <span>Otra:
+                  <input type="text" name="norma_otra" id="input-norma-otra-quim" placeholder="Ej: ISO 16730-1:2018"
+                    style="width:340px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent;margin-left:4px">
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Metodología ITM N˚ <span class="req">*</span></label>
+            <input type="text" name="itm_numero" class="input mono" placeholder="054" data-required
+              style="max-width:120px">
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Zona de evaluación</label>
+              <input type="text" name="zona_evaluacion" class="input" placeholder="Núcleo">
+            </div>
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (˚C)</label>
+              <input type="text" name="temperatura" class="input mono" placeholder="21.1">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Patrón utilizado N˚</label>
+            <input type="text" name="patron" class="input mono" placeholder="SS 457/1"
+              style="max-width:200px">
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[spectrotest_361]" value="true" checked>
+              <span>Espectrómetro Spectrotest TAG N˚MM-361</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[aa_shimadzu_478]" value="true">
+              <span>Absorción atómica Shimadzu TAG N˚MM-478</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[spectrotest_463]" value="true">
+              <span>Espectrómetro Spectrotest TAG N˚MM-463</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[icp_oes_371]" value="true">
+              <span>Espectrómetro de emisión atómica ICP-OES TAG N˚QB-371</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[rayos_x_346]" value="true">
+              <span>Rayos X Oxford TAG N˚MM-346</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[spectromax_164]" value="true">
+              <span>Espectrómetro Spectromax TAG N˚MM-164</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[eltra_102]" value="true">
+              <span>Determinador de carbono y azufre Eltra TAG N˚MM-102</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_701]" value="true" checked>
+              <span>Termohigrómetro TAG N˚MM-701</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 12px">
+            Completá solo los elementos detectados. Las filas vacías no aparecen en el informe.
+          </p>
+          <div class="h-stack" style="gap:10px;margin-bottom:10px;align-items:center">
+            <label class="field-label" style="margin:0;white-space:nowrap">Cantidad de muestras:</label>
+            <select id="cant-muestras-quim" class="select" style="max-width:90px" onchange="regenerarTablaQuim()">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+            <span class="muted" style="font-size:11px">— si seleccionás varias, aparecerá una columna por muestra (M1, M2…)</span>
+          </div>
+          <table class="tabla-resultados" id="tabla-quim" style="max-width:880px">
+            <thead id="thead-quim">
+              <tr>
+                <th style="text-align:left;width:200px">Elemento</th>
+                <th>Resultado (%)</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-quim"></tbody>
+          </table>
+        </div>
+
+        <!-- Notas -->
+        <div class="card-section">
+          <h4>Notas</h4>
+          <div class="check-group" style="margin-bottom:12px">
+            <label class="check-item">
+              <input type="checkbox" name="oaa">
+              <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."</span>
+            </label>
+          </div>
+          <label class="check-item" style="margin-bottom:6px">
+            <input type="checkbox" name="tiene_nota" id="chk-nota"
+              onchange="document.getElementById('nota-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar nota personalizada</span>
+          </label>
+          <div id="nota-wrap" style="display:none;margin-top:6px">
+            <textarea name="nota_texto" class="textarea" rows="2" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- Evaluación de resultados -->
+        <div class="card-section">
+          <h4>Evaluación de resultados</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="document.getElementById('evaluacion-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección EVALUACIÓN DE RESULTADOS</span>
+          </label>
+          <p class="muted" style="font-size:12px;margin:4px 0 8px">
+            La evaluación y opiniones están fuera del alcance de acreditación del OAA.
+          </p>
+          <div id="evaluacion-wrap" style="display:none">
+            <textarea name="evaluacion_texto" class="textarea" rows="4"
+              placeholder="Ej: La muestra analizada satisface los requerimientos de composición química de un material tipo...">La muestra analizada satisface los requerimientos de composición química de un material tipo </textarea>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<style>
+.elem-label {
+  font-size: 13px;
+  padding: 4px 8px;
+  color: var(--ink-1);
+}
+.tabla-resultados tbody td input {
+  width: 100%;
+  text-align: center;
+}
+</style>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+// Lista canónica de elementos químicos (orden de las filas en la tabla)
+const ELEMENTOS_QUIM = [
+  { key: 'carbono',    label: 'Carbono' },
+  { key: 'manganeso',  label: 'Manganeso' },
+  { key: 'silicio',    label: 'Silicio' },
+  { key: 'fosforo',    label: 'Fósforo' },
+  { key: 'azufre',     label: 'Azufre' },
+  { key: 'cromo',      label: 'Cromo' },
+  { key: 'niquel',     label: 'Níquel' },
+  { key: 'molibdeno',  label: 'Molibdeno' },
+  { key: 'cobre',      label: 'Cobre' },
+  { key: 'vanadio',    label: 'Vanadio' },
+  { key: 'carb_eq',    label: 'Carb. Equivalente' },
+  { key: 'titanio',    label: 'Titanio' },
+  { key: 'niobio',     label: 'Niobio' },
+  { key: 'boro',       label: 'Boro' },
+  { key: 'aluminio',   label: 'Aluminio' },
+  { key: 'plomo',      label: 'Plomo' },
+  { key: 'cobalto',    label: 'Cobalto' },
+  { key: 'tungsteno',  label: 'Tungsteno' },
+  { key: 'magnesio',   label: 'Magnesio' },
+  { key: 'hierro',     label: 'Hierro' },
+  { key: 'nitrogeno',  label: 'Nitrógeno' },
+  { key: 'estano',     label: 'Estaño' },
+  { key: 'zinc',       label: 'Zinc' },
+  { key: 'antimonio',  label: 'Antimonio' },
+  { key: 'cadmio',     label: 'Cadmio' },
+  { key: 'arsenico',   label: 'Arsénico' },
+  { key: 'selenio',    label: 'Selenio' },
+  { key: 'bismuto',    label: 'Bismuto' },
+  { key: 'plata',      label: 'Plata' },
+];
+
+// Regenera tabla de elementos según cantidad de muestras seleccionada
+function regenerarTablaQuim(valoresPrevios) {
+  const cant = parseInt(document.getElementById('cant-muestras-quim').value, 10) || 1;
+  const label = nroOt || '______';
+  const colHeaders = cant === 1
+    ? [`O.T. ${label}`]
+    : Array.from({ length: cant }, (_, i) => `M${i + 1}`);
+
+  // Encabezado
+  const thead = document.getElementById('thead-quim');
+  thead.innerHTML = `<tr>
+    <th style="text-align:left;width:200px">Elemento</th>
+    ${colHeaders.map((c, i) => `<th><input type="text" name="header_m${i + 1}"
+      value="${c}" style="text-align:center;font-weight:700;font-size:12px"></th>`).join('')}
+  </tr>`;
+
+  // Cuerpo
+  const tbody = document.getElementById('tbody-quim');
+  tbody.innerHTML = ELEMENTOS_QUIM.map(e => {
+    const inputs = Array.from({ length: cant }, (_, i) => {
+      const prev = valoresPrevios?.muestras?.[i]?.elementos?.[e.key]
+                ?? (i === 0 ? (valoresPrevios?.elementos?.[e.key] ?? '') : '');
+      return `<td><input type="text" name="m${i + 1}_${e.key}" class="input mono"
+        value="${prev || ''}" placeholder="—"></td>`;
+    }).join('');
+    return `<tr><td class="elem-label">${e.label}</td>${inputs}</tr>`;
+  }).join('');
+}
+
+function recolectarQuimicos() {
+  const form = document.getElementById('form-quimicos');
+  const base = recolectarDatosForm(form);
+
+  // Equipamiento
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  // Muestras (cant ≥ 1) — cada muestra tiene su columna_label y sus elementos
+  const cant = parseInt(document.getElementById('cant-muestras-quim').value, 10) || 1;
+  const muestras = [];
+  for (let i = 1; i <= cant; i++) {
+    const header = form.querySelector(`[name="header_m${i}"]`);
+    const m = { columna_label: header?.value.trim() || (cant === 1 ? `O.T. ${nroOt}` : `M${i}`), elementos: {} };
+    ELEMENTOS_QUIM.forEach(e => {
+      const input = form.querySelector(`[name="m${i}_${e.key}"]`);
+      m.elementos[e.key] = input?.value.trim() || '';
+    });
+    muestras.push(m);
+  }
+  base.muestras = muestras;
+  // Compatibilidad: si solo hay 1 muestra, exponer también `elementos` (legacy)
+  if (cant === 1) base.elementos = muestras[0].elementos;
+
+  return base;
+}
+
+function rellenarQuimicos(datos) {
+  if (!datos) return;
+  const form = document.getElementById('form-quimicos');
+  rellenarForm(form, datos);
+
+  // Equipamiento
+  if (datos.equipamiento) {
+    form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+      const key = el.name.replace('equipamiento[', '').replace(']', '');
+      el.checked = !!datos.equipamiento[key];
+    });
+  }
+
+  // Cantidad de muestras + regenerar tabla con valores previos
+  const cant = (datos.muestras && datos.muestras.length) || 1;
+  document.getElementById('cant-muestras-quim').value = String(Math.min(Math.max(cant, 1), 4));
+  regenerarTablaQuim(datos);
+
+  if (datos.tiene_evaluacion) document.getElementById('evaluacion-wrap').style.display = 'block';
+  if (datos.tiene_nota)       document.getElementById('nota-wrap').style.display = 'block';
+  if (datos.norma_otra_chk)   document.getElementById('chk-norma-otra-quim').checked = true;
+}
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-quimicos');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarQuimicos();
+  try {
+    await guardarEnsayoServidor(nroOt, 'quimicos', datos);
+    Storage.borrarBorrador(nroOt, 'quimicos');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    return;
+  }
+
+  document.getElementById('back-link').href = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'quimicos');
+      if (borrador) {
+        rellenarQuimicos(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'quimicos');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string'
+            ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          rellenarQuimicos(datos);
+        }
+      }
+    }
+  } catch {}
+
+  // Si no hubo borrador ni ensayo previo, igual hay que generar la tabla inicial (1 muestra)
+  if (!document.getElementById('tbody-quim').children.length) regenerarTablaQuim();
+
+  document.getElementById('form-quimicos').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'quimicos', recolectarQuimicos());
+  });
+});
+
+</script>
+</body>
+</html>

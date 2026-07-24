@@ -1,0 +1,12 @@
+{
+  "metodologia": "ITM N°060",
+  "norma": "ASTM E18",
+  "escala": "HRC",
+  "carga": "150 kgf",
+  "indentador": "Diamante cónico 120°",
+  "resultados": [
+    { "muestra": "M1", "zona": "MB",  "dureza": "24" },
+    { "muestra": "M2", "zona": "ZAC", "dureza": "26" }
+  ],
+  "oaa": true
+}

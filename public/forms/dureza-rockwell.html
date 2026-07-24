@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dureza Rockwell — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Dureza Rockwell</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Dureza Rockwell</h1>
+        <div class="lab-page-sub">Norma ASTM E18 / ISO 6508 · Metodología ITM N°060 · acreditado</div>
+      </div>
+    </div>
+
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-rockwell" novalidate>
+
+      <!-- Variante -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-section">
+          <h4>Variante del ensayo</h4>
+          <div class="toggle-variante">
+            <button type="button" id="btn-var-estandar" class="activo" onclick="setVarianteRockwell('estandar')">Estándar (CABA)</button>
+            <button type="button" id="btn-var-neuquen"                onclick="setVarianteRockwell('neuquen')">Neuquén</button>
+          </div>
+          <input type="hidden" name="variante" id="input-variante" value="estandar">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Condiciones de ensayo -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Norma de ensayo <span class="req">*</span></label>
+            <select name="norma_ensayo" class="select" data-required onchange="onNormaChange(this)">
+              <option value="astm_e18">ASTM E18-25</option>
+              <option value="iso6508">ISO 6508-1:2016</option>
+              <option value="otra">Otra…</option>
+            </select>
+            <input type="text" name="norma_otra" class="input" placeholder="Especificar norma"
+              style="display:none;margin-top:6px" id="norma-otra-input">
+          </div>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Metodología de ensayo</label>
+            <input type="text" name="metodologia" class="input" placeholder="ITM N˚060" value="ITM N˚060">
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Escala <span class="req">*</span></label>
+              <select name="escala" id="sel-escala" class="select" data-required onchange="onEscalaChange()">
+                <option value="HRA">HRA</option>
+                <option value="HRB">HRB</option>
+                <option value="HRC" selected>HRC</option>
+                <option value="HRD">HRD</option>
+                <option value="HRE">HRE</option>
+                <option value="HRF">HRF</option>
+                <option value="HRG">HRG</option>
+                <option value="HRH">HRH</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Carga aplicada (Kgf)</label>
+              <input type="text" name="carga_aplicada" id="input-carga" class="input mono" placeholder="ej: 150">
+              <div class="field-hint">Se autocompleta según la escala. Se puede sobrescribir.</div>
+            </div>
+            <div class="field">
+              <label class="field-label">Indentador</label>
+              <input type="text" name="indentador" id="input-indentador" class="input" placeholder="ej: Cono de diamante 120°">
+              <div class="field-hint">Se autocompleta según la escala. Se puede sobrescribir.</div>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Espesor de probeta (mm)</label>
+              <input type="text" name="espesor_probeta" class="input mono" placeholder="ej: 25">
+            </div>
+            <div class="field">
+              <label class="field-label">Zona ensayada</label>
+              <input type="text" name="zona_ensayo" class="input" placeholder="ej: Superficie">
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (°C) <span class="req">*</span></label>
+              <input type="text" name="temperatura" class="input mono" placeholder="21" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label">Patrón utilizado N˚</label>
+              <input type="text" name="patron" class="input mono" placeholder="ej: 716">
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 10px">
+            El Durómetro Petri TAG N˚MM-012 se incluye siempre. Seleccioná el equipamiento adicional:
+          </p>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_545]" value="true" checked>
+              <span>Termohigrómetro TAG N˚PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_702]" value="true">
+              <span>Termohigrómetro TAG N˚MM-702</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_701]" value="true">
+              <span>Termohigrómetro TAG N˚MM-701</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_794]" value="true">
+              <span>Termohigrómetro TAG N˚MM-794</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_571]" value="true" checked>
+              <span>Calibre digital TAG N˚MM-571</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_694]" value="true">
+              <span>Calibre digital TAG N˚MM-694</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 12px">
+            Completá las mediciones. Las filas vacías se omiten en el informe.
+          </p>
+
+          <div class="tabla-resultados-wrap">
+            <table class="tabla-resultados" id="tabla-rockwell">
+              <thead>
+                <tr>
+                  <th style="width:80px">Impronta N˚</th>
+                  <th style="width:120px">Dureza (<span id="th-escala">HRC</span>)</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-rockwell"></tbody>
+              <tfoot>
+                <tr>
+                  <td style="text-align:right;font-weight:600;padding:6px 8px">Promedio</td>
+                  <td><input type="text" name="promedio" class="input mono" id="input-promedio" placeholder="—" style="text-align:center"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="h-stack" style="gap:8px;margin-top:10px;align-items:center">
+            <label class="field-label" style="margin:0;white-space:nowrap">Cantidad de improntas:</label>
+            <select id="cant-improntas" class="select" style="max-width:120px" onchange="ajustarFilas()">
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6" selected>6</option>
+            </select>
+            <button type="button" class="btn btn-sm" onclick="calcularPromedio()">Calcular promedio</button>
+          </div>
+        </div>
+
+        <!-- Evaluación de resultados -->
+        <div class="card-section">
+          <h4>Evaluación de resultados</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="document.getElementById('evaluacion-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar bloque EVALUACION DE RESULTADOS</span>
+          </label>
+          <div id="evaluacion-wrap" style="display:none;margin-top:8px">
+            <textarea name="evaluacion_texto" class="textarea" rows="3" placeholder="Texto de la evaluación..."></textarea>
+          </div>
+        </div>
+
+        <!-- Nota -->
+        <div class="card-section">
+          <h4>Nota</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_nota" id="chk-nota"
+              onchange="document.getElementById('nota-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección NOTA</span>
+          </label>
+          <div id="nota-wrap" style="display:none;margin-top:8px">
+            <textarea name="nota_texto" class="textarea" rows="3" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- OAA -->
+        <div class="card-section">
+          <h4>Aclaración OAA</h4>
+          <label class="check-item">
+            <input type="checkbox" name="oaa">
+            <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+// Mapeo escala → carga + indentador (mismo que el generator)
+const ESCALAS = {
+  HRA: { carga: '60',  indentador: 'Cono de diamante 120°' },
+  HRB: { carga: '100', indentador: 'Bola de acero 1/16" (1.5875 mm)' },
+  HRC: { carga: '150', indentador: 'Cono de diamante 120°' },
+  HRD: { carga: '100', indentador: 'Cono de diamante 120°' },
+  HRE: { carga: '100', indentador: 'Bola de acero 1/8" (3.175 mm)' },
+  HRF: { carga: '60',  indentador: 'Bola de acero 1/16" (1.5875 mm)' },
+  HRG: { carga: '150', indentador: 'Bola de acero 1/16" (1.5875 mm)' },
+  HRH: { carga: '60',  indentador: 'Bola de acero 1/8" (3.175 mm)' },
+};
+
+// ── Tabla de improntas ────────────────────────────────────────────────────────
+
+function ajustarFilas(valoresPrevios) {
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 6;
+  const tbody = document.getElementById('tbody-rockwell');
+  tbody.innerHTML = '';
+  for (let i = 1; i <= 6; i++) {
+    const m = valoresPrevios?.mediciones?.[i - 1] || {};
+    const display = i <= cant ? '' : 'display:none';
+    const tr = document.createElement('tr');
+    tr.id = `fila-impronta-${i}`;
+    tr.style.cssText = display;
+    tr.innerHTML =
+      `<td style="text-align:center;font-weight:600">${i}</td>` +
+      `<td><input type="text" name="medicion_${i}_dureza" class="input mono" value="${m.dureza || ''}" placeholder=""></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function calcularPromedio() {
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 6;
+  const valores = [];
+  for (let i = 1; i <= cant; i++) {
+    const v = parseFloat(document.querySelector(`[name="medicion_${i}_dureza"]`)?.value);
+    if (!isNaN(v)) valores.push(v);
+  }
+  if (!valores.length) return;
+  const prom = valores.reduce((a, b) => a + b, 0) / valores.length;
+  document.getElementById('input-promedio').value = Math.round(prom);
+  Storage.guardarBorrador(nroOt, 'dureza-rockwell', recolectarRockwell());
+}
+
+function onNormaChange(sel) {
+  const otraInput = document.getElementById('norma-otra-input');
+  otraInput.style.display = sel.value === 'otra' ? 'block' : 'none';
+}
+
+function onEscalaChange() {
+  const escala = document.getElementById('sel-escala').value;
+  const info = ESCALAS[escala];
+  if (!info) return;
+  document.getElementById('th-escala').textContent = escala;
+  // Autocompletar carga e indentador si están vacíos o coinciden con los defaults de OTRA escala
+  const cargaInput = document.getElementById('input-carga');
+  const indenInput = document.getElementById('input-indentador');
+  const otrasCargas = new Set(Object.values(ESCALAS).map(s => s.carga));
+  const otrosIndent = new Set(Object.values(ESCALAS).map(s => s.indentador));
+  if (!cargaInput.value || otrasCargas.has(cargaInput.value.trim())) cargaInput.value = info.carga;
+  if (!indenInput.value || otrosIndent.has(indenInput.value.trim())) indenInput.value = info.indentador;
+  Storage.guardarBorrador(nroOt, 'dureza-rockwell', recolectarRockwell());
+}
+
+function setVarianteRockwell(v) {
+  document.getElementById('input-variante').value = v;
+  document.getElementById('btn-var-estandar').classList.toggle('activo', v === 'estandar');
+  document.getElementById('btn-var-neuquen').classList.toggle('activo',  v === 'neuquen');
+  Storage.guardarBorrador(nroOt, 'dureza-rockwell', recolectarRockwell());
+}
+
+// ── Recolección de datos ──────────────────────────────────────────────────────
+
+function recolectarRockwell() {
+  const form = document.getElementById('form-rockwell');
+  const base = recolectarDatosForm(form);
+
+  // Norma -> flags para el generador
+  const normaVal = form.querySelector('[name="norma_ensayo"]')?.value;
+  base.norma_astm_e18 = normaVal === 'astm_e18';
+  base.norma_iso6508  = normaVal === 'iso6508';
+  if (normaVal === 'otra') {
+    base.norma_astm_e18 = false;
+    base.norma_iso6508  = false;
+    base.norma_otra_texto = form.querySelector('[name="norma_otra"]')?.value || '';
+  }
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  const mediciones = [];
+  for (let i = 1; i <= 6; i++) {
+    mediciones.push({
+      impronta: i,
+      dureza:  form.querySelector(`[name="medicion_${i}_dureza"]`)?.value || '',
+    });
+  }
+  base.mediciones = mediciones;
+
+  return base;
+}
+
+// ── Rellenar desde datos guardados ───────────────────────────────────────────
+
+function rellenarRockwell(datos) {
+  rellenarForm(document.getElementById('form-rockwell'), datos);
+  if (datos.tiene_nota)        document.getElementById('nota-wrap').style.display = 'block';
+  if (datos.tiene_evaluacion)  document.getElementById('evaluacion-wrap').style.display = 'block';
+
+  if (datos.variante) setVarianteRockwell(datos.variante);
+
+  // Restaurar dropdown norma
+  const selNorma = document.querySelector('[name="norma_ensayo"]');
+  if (selNorma) {
+    if (datos.norma_iso6508) selNorma.value = 'iso6508';
+    else if (datos.norma_otra_texto) { selNorma.value = 'otra'; document.getElementById('norma-otra-input').style.display = 'block'; }
+    else selNorma.value = 'astm_e18';
+  }
+
+  // Detectar cant de improntas desde los datos (última fila con valor)
+  if (datos.mediciones?.length) {
+    let maxCant = 3;
+    datos.mediciones.forEach((m, i) => {
+      if (m.dureza) maxCant = Math.max(maxCant, i + 1);
+    });
+    document.getElementById('cant-improntas').value = String(Math.min(maxCant, 6));
+  }
+  ajustarFilas(datos);
+
+  // Sync de escala → header de tabla
+  const escala = (datos.escala || 'HRC').toUpperCase();
+  if (ESCALAS[escala]) {
+    document.getElementById('sel-escala').value = escala;
+    document.getElementById('th-escala').textContent = escala;
+  }
+}
+
+// ── Guardar ───────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-rockwell');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarRockwell();
+  try {
+    await guardarEnsayoServidor(nroOt, 'dureza-rockwell', datos);
+    Storage.borrarBorrador(nroOt, 'dureza-rockwell');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    ajustarFilas();
+    onEscalaChange();
+    return;
+  }
+
+  document.getElementById('back-link').href = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'dureza-rockwell');
+      if (borrador) {
+        rellenarRockwell(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'dureza-rockwell');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string' ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          rellenarRockwell(datos);
+        } else {
+          ajustarFilas();
+          onEscalaChange();
+        }
+      }
+    }
+  } catch { ajustarFilas(); onEscalaChange(); }
+
+  document.getElementById('cant-improntas').addEventListener('change', () => ajustarFilas(recolectarRockwell()));
+
+  document.getElementById('form-rockwell').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'dureza-rockwell', recolectarRockwell());
+  });
+});
+
+</script>
+</body>
+</html>

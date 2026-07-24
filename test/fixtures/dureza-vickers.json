@@ -1,0 +1,12 @@
+{
+  "metodologia": "ITM N°062",
+  "norma": "ASTM E384",
+  "carga_hv": "HV10",
+  "tiempo_aplicacion": "15",
+  "tiempo_aplicacion_unidad": "s",
+  "resultados": [
+    { "muestra": "M1", "dureza": "180" },
+    { "muestra": "M2", "dureza": "195" }
+  ],
+  "oaa": true
+}

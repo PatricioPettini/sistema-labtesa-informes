@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ensayo de Nick Break — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+  <style>
+    .btn-var {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      transition: all 0.15s;
+    }
+    .btn-var:hover { border-color: var(--border-strong); }
+    .btn-var.activo {
+      background: var(--accent, #2563eb);
+      color: white;
+      border-color: var(--accent, #2563eb);
+    }
+  </style>
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Ensayo de Nick Break</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Nick Break</h1>
+        <div class="lab-page-sub">Código API 1104 · Metodología ITM N°079</div>
+      </div>
+    </div>
+
+    <!-- OT Banner -->
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-nick-break" novalidate>
+
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Condiciones de ensayo -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Metodología</label>
+              <input type="text" name="metodologia" class="input" value="ITM N°079">
+            </div>
+            <div class="field">
+              <label class="field-label">Método de ensayo <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="metodo_ensayo" class="input" placeholder="ej: ASTM E8-25">
+              <div class="field-hint">Aparece como "Método de ensayo: …" antes del código de referencia</div>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Códigos de referencia <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcionales)</span></label>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="cod_api1104" checked>
+                <span>API 1104 Ed.22-2021 (E1-2023)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_asme">
+                <span>ASME BPVC Sección IX Ed. <input type="text" name="ed_asme" placeholder="2025"
+                  style="width:55px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent"></span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_api5l">
+                <span>API 5L</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_aws_d11">
+                <span>AWS D1.1</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:0">
+            <div class="field">
+              <label class="field-label">Mecanizado según <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="mecanizado_segun" class="input" value="API 1104 Fig.5"
+                placeholder="ej: API 1104 Fig.5">
+            </div>
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo</label>
+              <input type="text" name="temperatura" class="input mono"
+                placeholder="ej: 22.1 °C  (vacío = no aparece)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+
+          <div style="margin-bottom:14px;padding:10px;background:var(--bg-soft);border-radius:6px">
+            <div style="font-size:12px;color:var(--ink-2);margin-bottom:8px;font-weight:600">
+              Sede / variante de equipamiento <span style="color:var(--danger)">*</span>
+            </div>
+            <div class="toggle-variante" style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-var activo" data-var="emic"  onclick="setVarianteEquipo('emic')">
+                Neuquén – Emic
+              </button>
+              <button type="button" class="btn-var" data-var="torne" onclick="setVarianteEquipo('torne')">
+                Neuquén – Prensa TORNE Y MEC
+              </button>
+            </div>
+            <input type="hidden" name="variante_equipo" id="variante_equipo" value="emic">
+            <div class="field-hint" style="margin-top:6px">Elegí la sede y máquina principal; cambian los equipos disponibles abajo.</div>
+          </div>
+
+          <div class="check-group equipos-set" id="equipos-emic">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[maquina_emic]" value="true" checked>
+              <span>Máquina de tracción Emic TAG N°MM-203</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_571]" value="true">
+              <span>Calibre digital TAG N°MM-571</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_570]" value="true">
+              <span>Calibre digital TAG N°MM-570</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigrometro]" value="true">
+              <span>Termohigrómetro TAG N°PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termo_pmm545]" value="true">
+              <span>Termohigrómetro TAG N°PMM-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termo_702]" value="true">
+              <span>Termohigrómetro TAG N°MM-702</span>
+            </label>
+          </div>
+
+          <div class="check-group equipos-set" id="equipos-torne" style="display:none">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[prensa_torne]" value="true" checked>
+              <span>Prensa Plegadora TORNE Y MEC TAG N° MM-913</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_694]" value="true" checked>
+              <span>Calibre digital TAG N°MM-694</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termo_794]" value="true" checked>
+              <span>Termohigrómetro TAG N°MM-794</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+
+          <div style="margin-bottom:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--ink-3);font-weight:500">Cantidad de probetas:</span>
+            <select name="cantidad_probetas" id="cantidad_probetas" class="select" style="width:70px;padding:4px 6px;font-size:12px">
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+            <span style="font-size:11px;color:var(--ink-3)">Las probetas se rotulan NB 1, NB 2, …</span>
+          </div>
+
+          <div id="tabla-resultados-wrap"></div>
+
+          <div class="field-hint" style="margin-top:8px">
+            Para "Presenta escoria" podés agregar dimensiones por probeta abajo (L x A en mm). Para "Otro" se usa el texto que escribas tal cual.
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="card-section">
+          <h4>Observaciones</h4>
+          <div class="check-group" style="margin-bottom:12px">
+            <label class="check-item">
+              <input type="checkbox" name="muestra_fuera_alcance">
+              <span>"Muestra fuera del alcance de acreditación"</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="nota_oaa" checked>
+              <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA"</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Observaciones adicionales <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+            <textarea name="observaciones_extra" class="textarea" rows="2"
+              placeholder="Información adicional para el informe…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+const RESULTADOS_PRESET = [
+  { value: 'No presenta indicaciones relevantes', label: 'No presenta indicaciones relevantes' },
+  { value: 'Presenta escoria',                    label: 'Presenta escoria (+ L x A opcional)' },
+  { value: 'Presenta poro',                       label: 'Presenta poro (+ diámetro opcional)' },
+  { value: 'Presenta indicación',                 label: 'Presenta indicación (+ medidas opcional)' },
+  { value: 'otro',                                label: 'Otro (texto libre)…' },
+];
+
+function setVarianteEquipo(variante) {
+  document.getElementById('variante_equipo').value = variante;
+  document.querySelectorAll('.btn-var').forEach(b => {
+    b.classList.toggle('activo', b.dataset.var === variante);
+  });
+  document.querySelectorAll('.equipos-set').forEach(el => el.style.display = 'none');
+  const set = document.getElementById('equipos-' + variante);
+  if (set) set.style.display = '';
+}
+function mostrarEquipos(v) { setVarianteEquipo(v); }
+
+function generarTablaResultados(prev) {
+  const cant   = parseInt(document.querySelector('[name="cantidad_probetas"]')?.value || 2);
+  const probs  = prev?.probetas || [];
+
+  let html = `<table class="tabla-resultados">
+    <thead><tr>
+      <th style="width:80px;text-align:left">Probeta</th>
+      <th style="width:280px">Resultado</th>
+      <th>Detalle</th>
+    </tr></thead>
+    <tbody>`;
+
+  for (let i = 0; i < cant; i++) {
+    const probId = `NB ${i + 1}`;
+    const saved  = probs.find(x => x.id === probId) || {};
+    const tipoRes = saved.tipo_resultado || 'No presenta indicaciones relevantes';
+    const detalle = saved.detalle || '';
+    const placeholderPorTipo = (t) => {
+      if (t === 'Presenta escoria')    return 'ej: 1.3 x 0.7  (L x A en mm)';
+      if (t === 'Presenta poro')       return 'ej: 0.65  (diámetro en mm)';
+      if (t === 'Presenta indicación') return 'ej: 3  ó  3 x 0.7  (longitud o L x A en mm)';
+      if (t === 'otro')                return 'texto del resultado';
+      return '';
+    };
+    const usaDetalle = (t) => ['Presenta escoria','Presenta poro','Presenta indicación','otro'].includes(t);
+    const showDet = usaDetalle(tipoRes);
+
+    const opts = RESULTADOS_PRESET.map(o =>
+      `<option value="${o.value}" ${tipoRes === o.value ? 'selected' : ''}>${o.label}</option>`
+    ).join('');
+
+    html += `<tr data-idx="${i}">
+      <td style="font-weight:600">${probId}</td>
+      <td>
+        <select name="tipo_res_${i}" class="select" style="width:100%;padding:4px 6px;font-size:12px"
+          onchange="onTipoResultadoChange(${i})">
+          ${opts}
+        </select>
+      </td>
+      <td>
+        <div id="detalle-wrap-${i}" style="display:${showDet ? 'flex' : 'none'};gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="detalle-${i}" value="${detalle.replace(/"/g, '&quot;')}"
+            placeholder="${placeholderPorTipo(tipoRes)}"
+            class="input mono" style="width:100%;padding:4px 8px;font-size:12px"
+            oninput="onDetalleChange()">
+        </div>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('tabla-resultados-wrap').innerHTML = html;
+}
+
+function onTipoResultadoChange(idx) {
+  const sel  = document.querySelector(`[name="tipo_res_${idx}"]`);
+  const wrap = document.getElementById(`detalle-wrap-${idx}`);
+  const inp  = document.getElementById(`detalle-${idx}`);
+  const v    = sel?.value || '';
+  const mostrar = ['Presenta escoria','Presenta poro','Presenta indicación','otro'].includes(v);
+  if (wrap) wrap.style.display = mostrar ? 'flex' : 'none';
+  if (inp) {
+    const ph =
+      v === 'Presenta escoria'    ? 'ej: 1.3 x 0.7  (L x A en mm)' :
+      v === 'Presenta poro'       ? 'ej: 0.65  (diámetro en mm)' :
+      v === 'Presenta indicación' ? 'ej: 3  ó  3 x 0.7  (longitud o L x A en mm)' :
+      v === 'otro'                ? 'texto del resultado' : '';
+    inp.placeholder = ph;
+  }
+  if (window.Storage && nroOt) {
+    try { Storage.guardarBorrador(nroOt, 'nick-break', recolectarNickBreak()); } catch {}
+  }
+}
+function onDetalleChange() {
+  if (window.Storage && nroOt) {
+    try { Storage.guardarBorrador(nroOt, 'nick-break', recolectarNickBreak()); } catch {}
+  }
+}
+
+function recolectarNickBreak() {
+  const form = document.getElementById('form-nick-break');
+  const base = recolectarDatosForm(form);
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  const cant = parseInt(document.querySelector('[name="cantidad_probetas"]')?.value || 2);
+  const probetas = [];
+  for (let i = 0; i < cant; i++) {
+    const tipoRes = document.querySelector(`[name="tipo_res_${i}"]`)?.value || 'No presenta indicaciones relevantes';
+    const detalle = document.getElementById(`detalle-${i}`)?.value.trim() || '';
+    probetas.push({
+      id:             `NB ${i + 1}`,
+      tipo_resultado: tipoRes,
+      detalle,
+    });
+  }
+  base.probetas = probetas;
+  return base;
+}
+
+document.querySelector('[name="cantidad_probetas"]').addEventListener('change', () => {
+  const prev = recolectarNickBreak();
+  generarTablaResultados(prev);
+});
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-nick-break');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarNickBreak();
+  try {
+    await guardarEnsayoServidor(nroOt, 'nick-break', datos);
+    Storage.borrarBorrador(nroOt, 'nick-break');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    generarTablaResultados();
+    return;
+  }
+
+  document.getElementById('back-link').href      = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const cargarDatos = (guardado) => {
+        rellenarForm(document.getElementById('form-nick-break'), guardado);
+        mostrarEquipos(guardado.variante_equipo || 'emic');
+        const cantSel = document.querySelector('[name="cantidad_probetas"]');
+        if (cantSel && guardado.probetas) {
+          cantSel.value = String(guardado.probetas.length);
+        }
+        generarTablaResultados(guardado);
+      };
+
+      const borrador = Storage.cargarBorrador(nroOt, 'nick-break');
+      if (borrador) {
+        cargarDatos(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'nick-break');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string'
+            ? JSON.parse(ensayo.datos_json)
+            : ensayo.datos_json;
+          cargarDatos(datos);
+        } else {
+          generarTablaResultados();
+        }
+      }
+
+      activarAutoguardado(document.getElementById('form-nick-break'), nroOt, 'nick-break', recolectarNickBreak);
+    }
+  } catch (err) {
+    console.error(err);
+    generarTablaResultados();
+  }
+});
+
+</script>
+</body>
+</html>

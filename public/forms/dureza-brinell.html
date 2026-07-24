@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dureza Brinell — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Dureza Brinell</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Dureza Brinell</h1>
+        <div class="lab-page-sub">Norma ASTM E10 / ISO 6506-1 · Metodología ITM N°059 · acreditado</div>
+      </div>
+    </div>
+
+    <!-- OT Banner -->
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-brinell" novalidate>
+
+      <!-- Variante -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-section">
+          <h4>Variante del ensayo</h4>
+          <div class="toggle-variante">
+            <button type="button" id="btn-var-estandar" class="activo" onclick="setVarianteBrinell('estandar')">Estándar (CABA)</button>
+            <button type="button" id="btn-var-neuquen"                onclick="setVarianteBrinell('neuquen')">Neuquén</button>
+          </div>
+          <input type="hidden" name="variante" id="input-variante" value="estandar">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Condiciones de ensayo -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Norma de ensayo <span class="req">*</span></label>
+            <select name="norma_ensayo" class="select" data-required onchange="onNormaChange(this)">
+              <option value="astm_e10">ASTM E10-23</option>
+              <option value="iso6506">ISO 6506-1:2014</option>
+              <option value="otra">Otra…</option>
+            </select>
+            <input type="text" name="norma_otra" class="input" placeholder="Especificar norma"
+              style="display:none;margin-top:6px" id="norma-otra-input">
+          </div>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Metodología de ensayo</label>
+            <input type="text" name="metodologia" class="input" placeholder="ITM N˚059" value="ITM N˚059">
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Bolilla — diámetro <span class="req">*</span></label>
+              <select name="bolilla_diametro" class="select" data-required>
+                <option value="">— Seleccionar —</option>
+                <option value="2,5">2,5 mm</option>
+                <option value="5">5 mm</option>
+                <option value="10">10 mm (estándar)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Diámetro de impronta <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional, mm)</span></label>
+              <input type="text" name="diametro_impronta" class="input mono" placeholder="ej: 2.45">
+            </div>
+            <div class="field">
+              <label class="field-label">Carga aplicada <span class="req">*</span></label>
+              <select name="carga_aplicada" class="select" data-required>
+                <option value="">— Seleccionar —</option>
+                <option value="31,25">31,25 Kgf (HBW 2,5/15,6)</option>
+                <option value="62,5">62,5 Kgf (HBW 2,5/31,25)</option>
+                <option value="187,5">187,5 Kgf (HBW 5/187,5)</option>
+                <option value="750">750 Kgf (HBW 10/750)</option>
+                <option value="1000">1000 Kgf (HBW 10/1000)</option>
+                <option value="3000">3000 Kgf (HBW 10/3000)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Tiempo de aplicación</label>
+              <input type="text" name="tiempo_aplicacion" class="input mono" placeholder="15 s" value="15 s">
+            </div>
+            <div class="field">
+              <label class="field-label">Espesor de probeta (mm)</label>
+              <input type="text" name="espesor_probeta" class="input mono" placeholder="ej: 25">
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Zona de impronta</label>
+              <input type="text" name="zona_ensayo" class="input" placeholder="ej: Superficie">
+            </div>
+            <div class="field">
+              <label class="field-label">Muestra ensayada</label>
+              <input type="text" name="muestra_ensayada" class="input" placeholder="ej: Tapón">
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (°C) <span class="req">*</span></label>
+              <input type="text" name="temperatura" class="input mono" placeholder="21" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label">Patrón utilizado N˚</label>
+              <input type="text" name="patron" class="input mono" placeholder="ej: 716">
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 10px" id="lbl-durometro">
+            El Durómetro Petri TAG N˚MM-170 se incluye siempre. Seleccioná el equipamiento adicional:
+          </p>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_571]" value="true" checked>
+              <span>Calibre digital TAG N˚MM-571</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_cal570]" value="true">
+              <span>Calibre digital TAG N˚CAL-570</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_694]" value="true">
+              <span>Calibre digital TAG N˚MM-694</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[registrador_545]" value="true" checked>
+              <span>Registrador de temperatura TAG N˚PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[registrador_702]" value="true">
+              <span>Registrador de temperatura TAG N˚MM-702</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_701]" value="true">
+              <span>Termohigrómetro TAG N˚MM-701</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_794]" value="true">
+              <span>Termohigrómetro TAG N˚MM-794</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[proyector_165]" value="true" checked>
+              <span>Proyector de perfiles TAG N˚MM-165</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[microscopio_173]" value="true">
+              <span>Microscopio de medición TAG N˚MM-173</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 12px">
+            Completá las mediciones. Las filas vacías se omiten en el informe.
+          </p>
+
+          <div class="tabla-resultados-wrap">
+            <table class="tabla-resultados" id="tabla-brinell">
+              <thead>
+                <tr>
+                  <th style="width:80px">Impronta N˚</th>
+                  <th class="col-zona-th" style="width:120px;display:none">Zona</th>
+                  <th style="width:120px">Dureza HB</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-brinell"></tbody>
+              <tfoot>
+                <tr>
+                  <td style="text-align:right;font-weight:600;padding:6px 8px">Promedio HB</td>
+                  <td class="col-zona-td" style="display:none"></td>
+                  <td><input type="text" name="promedio_hb" class="input mono" id="input-promedio" placeholder="—" style="text-align:center"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <label class="check-item" style="margin-top:8px">
+            <input type="checkbox" name="incluir_zona" id="chk-incluir-zona" onchange="toggleZonaBrinell(this.checked)">
+            <span>Incluir columna Zona</span>
+          </label>
+
+          <div class="h-stack" style="gap:8px;margin-top:10px;align-items:center">
+            <label class="field-label" style="margin:0;white-space:nowrap">Cantidad de improntas:</label>
+            <select id="cant-improntas" class="select" style="max-width:120px" onchange="ajustarFilas()">
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6" selected>6</option>
+            </select>
+            <button type="button" class="btn btn-sm" onclick="calcularPromedio()">Calcular promedio</button>
+          </div>
+        </div>
+
+        <!-- Evaluación de resultados -->
+        <div class="card-section">
+          <h4>Evaluación de resultados</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="document.getElementById('evaluacion-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar bloque EVALUACION DE RESULTADOS</span>
+          </label>
+          <div id="evaluacion-wrap" style="display:none;margin-top:8px">
+            <textarea name="evaluacion_texto" class="textarea" rows="3" placeholder="Texto de la evaluación..."></textarea>
+          </div>
+        </div>
+
+        <!-- Nota -->
+        <div class="card-section">
+          <h4>Nota</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_nota" id="chk-nota"
+              onchange="document.getElementById('nota-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección NOTA</span>
+          </label>
+          <div id="nota-wrap" style="display:none;margin-top:8px">
+            <textarea name="nota_texto" class="textarea" rows="3" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- OAA -->
+        <div class="card-section">
+          <h4>Aclaración OAA</h4>
+          <label class="check-item">
+            <input type="checkbox" name="oaa">
+            <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+// ── Tabla de improntas ────────────────────────────────────────────────────────
+
+function ajustarFilas(valoresPrevios) {
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 6;
+  const tbody = document.getElementById('tbody-brinell');
+  const incluirZona = document.getElementById('chk-incluir-zona')?.checked;
+  tbody.innerHTML = '';
+  for (let i = 1; i <= 6; i++) {
+    const m = valoresPrevios?.mediciones?.[i - 1] || {};
+    const display = i <= cant ? '' : 'display:none';
+    const tr = document.createElement('tr');
+    tr.id = `fila-impronta-${i}`;
+    tr.style.cssText = display;
+    const zonaCell = `<td class="col-zona-td" style="${incluirZona ? '' : 'display:none'}"><input type="text" name="medicion_${i}_zona" class="input" value="${m.zona || ''}" placeholder="ej: ZAC"></td>`;
+    tr.innerHTML =
+      `<td style="text-align:center;font-weight:600">${i}</td>` +
+      zonaCell +
+      `<td><input type="text" name="medicion_${i}_dureza" class="input mono" value="${m.dureza || ''}" placeholder="HB"></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// U9: Muestra u oculta la columna Zona en la tabla
+function toggleZonaBrinell(show) {
+  document.querySelectorAll('.col-zona-th, .col-zona-td').forEach(el => {
+    el.style.display = show ? '' : 'none';
+  });
+  Storage.guardarBorrador(nroOt, 'dureza-brinell', recolectarBrinell());
+}
+
+function calcularPromedio() {
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 6;
+  const valores = [];
+  for (let i = 1; i <= cant; i++) {
+    const v = parseFloat(document.querySelector(`[name="medicion_${i}_dureza"]`)?.value);
+    if (!isNaN(v)) valores.push(v);
+  }
+  if (!valores.length) return;
+  const prom = valores.reduce((a, b) => a + b, 0) / valores.length;
+  document.getElementById('input-promedio').value = Math.round(prom * 10) / 10;
+  Storage.guardarBorrador(nroOt, 'dureza-brinell', recolectarBrinell());
+}
+
+function onNormaChange(sel) {
+  const otraInput = document.getElementById('norma-otra-input');
+  otraInput.style.display = sel.value === 'otra' ? 'block' : 'none';
+}
+
+// U8: Variante Estándar (Petri MM-170, CABA) vs Neuquén (Shimadzu MM-151)
+function setVarianteBrinell(v) {
+  document.getElementById('input-variante').value = v;
+  document.getElementById('btn-var-estandar').classList.toggle('activo', v === 'estandar');
+  document.getElementById('btn-var-neuquen').classList.toggle('activo',  v === 'neuquen');
+  const lbl = document.getElementById('lbl-durometro');
+  if (lbl) {
+    lbl.textContent = v === 'neuquen'
+      ? 'El Durómetro Shimadzu TAG N˚MM-151 se incluye siempre. Seleccioná el equipamiento adicional:'
+      : 'El Durómetro Petri TAG N˚MM-170 se incluye siempre. Seleccioná el equipamiento adicional:';
+  }
+  Storage.guardarBorrador(nroOt, 'dureza-brinell', recolectarBrinell());
+}
+
+// ── Recolección de datos ──────────────────────────────────────────────────────
+
+function recolectarBrinell() {
+  const form = document.getElementById('form-brinell');
+  const base = recolectarDatosForm(form);
+
+  // Norma -> flags para el generador
+  const normaVal = form.querySelector('[name="norma_ensayo"]')?.value;
+  base.norma_astm_e10 = normaVal === 'astm_e10';
+  base.norma_iso6506  = normaVal === 'iso6506';
+  if (normaVal === 'otra') {
+    base.norma_astm_e10 = false;
+    base.norma_iso6506  = false;
+    base.norma_otra_texto = form.querySelector('[name="norma_otra"]')?.value || '';
+  }
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  const mediciones = [];
+  for (let i = 1; i <= 6; i++) {
+    mediciones.push({
+      impronta: i,
+      zona:    form.querySelector(`[name="medicion_${i}_zona"]`)?.value   || '',
+      dureza:  form.querySelector(`[name="medicion_${i}_dureza"]`)?.value || '',
+    });
+  }
+  base.mediciones = mediciones;
+
+  return base;
+}
+
+// ── Rellenar desde datos guardados ───────────────────────────────────────────
+
+function rellenarBrinell(datos) {
+  rellenarForm(document.getElementById('form-brinell'), datos);
+  if (datos.tiene_nota) document.getElementById('nota-wrap').style.display = 'block';
+  if (datos.tiene_evaluacion) document.getElementById('evaluacion-wrap').style.display = 'block';
+
+  // U8: aplicar variante visualmente
+  if (datos.variante) setVarianteBrinell(datos.variante);
+
+  // U9: aplicar visualmente columna Zona si está marcada
+  if (datos.incluir_zona) toggleZonaBrinell(true);
+
+  // Restaurar dropdown norma
+  const selNorma = document.querySelector('[name="norma_ensayo"]');
+  if (selNorma) {
+    if (datos.norma_iso6506) selNorma.value = 'iso6506';
+    else if (datos.norma_otra_texto) { selNorma.value = 'otra'; document.getElementById('norma-otra-input').style.display = 'block'; }
+    else selNorma.value = 'astm_e10';
+  }
+
+  // Detectar cant de improntas desde los datos (última fila con valor)
+  if (datos.mediciones?.length) {
+    let maxCant = 3;
+    datos.mediciones.forEach((m, i) => {
+      if (m.dureza) maxCant = Math.max(maxCant, i + 1);
+    });
+    document.getElementById('cant-improntas').value = String(Math.min(maxCant, 6));
+  }
+  ajustarFilas(datos);
+}
+
+// ── Guardar ───────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-brinell');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarBrinell();
+  try {
+    await guardarEnsayoServidor(nroOt, 'dureza-brinell', datos);
+    Storage.borrarBorrador(nroOt, 'dureza-brinell');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    ajustarFilas();
+    return;
+  }
+
+  document.getElementById('back-link').href = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'dureza-brinell');
+      if (borrador) {
+        rellenarBrinell(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'dureza-brinell');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string' ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          rellenarBrinell(datos);
+        } else {
+          ajustarFilas();
+        }
+      }
+    }
+  } catch { ajustarFilas(); }
+
+  document.getElementById('cant-improntas').addEventListener('change', () => ajustarFilas(recolectarBrinell()));
+
+  document.getElementById('form-brinell').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'dureza-brinell', recolectarBrinell());
+  });
+});
+
+</script>
+</body>
+</html>

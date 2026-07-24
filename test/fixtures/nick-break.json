@@ -1,0 +1,9 @@
+{
+  "metodologia": "ITM N°081",
+  "norma": "API 1104",
+  "resultados": [
+    { "probeta": "NB1", "observaciones": "Sin discontinuidades observables" },
+    { "probeta": "NB2", "observaciones": "Sin discontinuidades observables" }
+  ],
+  "oaa": true
+}

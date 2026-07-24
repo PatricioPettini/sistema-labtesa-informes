@@ -1,0 +1,9 @@
+{
+  "metodologia": "ITM interno",
+  "norma": "ASTM E340",
+  "reactivo": "Nital al 3%",
+  "aumento": "10X",
+  "observaciones_opciones": ["frase_1"],
+  "resultado_texto": "La muestra analizada presenta una estructura de soldadura completa.",
+  "oaa": true
+}

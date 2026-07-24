@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle OT — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+  <style>
+    /* Modal de confirmación */
+    .confirm-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; opacity: 0; transition: opacity 0.15s;
+    }
+    .confirm-overlay.visible { opacity: 1; }
+    .confirm-box {
+      background: white; border-radius: 10px; padding: 24px 28px;
+      max-width: 380px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      transform: translateY(8px); transition: transform 0.15s;
+    }
+    .confirm-overlay.visible .confirm-box { transform: translateY(0); }
+    .confirm-box .confirm-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #fef2f2; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+    }
+    .confirm-box .confirm-icon svg { color: #ef4444; }
+    .confirm-box h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; color: #111; }
+    .confirm-box p  { font-size: 13px; color: #555; margin: 0 0 20px; line-height: 1.5; }
+    .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .confirm-actions .btn-cancel-confirm {
+      padding: 7px 14px; border: 1px solid #d1d5db; border-radius: 6px;
+      background: white; font-size: 13px; cursor: pointer; color: #374151;
+    }
+    .confirm-actions .btn-cancel-confirm:hover { background: #f9fafb; }
+    .confirm-actions .btn-ok-confirm {
+      padding: 7px 16px; border: none; border-radius: 6px;
+      background: #ef4444; color: white; font-size: 13px;
+      font-weight: 500; cursor: pointer;
+    }
+    .confirm-actions .btn-ok-confirm:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <span id="crumb-ot">OT</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <div class="h-stack" style="gap:10px;margin-bottom:6px">
+          <h1 id="page-ot-num" style="margin:0">OT —</h1>
+          <span id="page-ot-chip"></span>
+        </div>
+        <div class="lab-page-sub" id="page-ot-sub">—</div>
+      </div>
+      <div class="lab-page-head-actions">
+        <button class="btn" type="button" id="btn-editar-ot">Editar OT</button>
+        <button class="btn btn-danger-ghost" type="button" id="btn-eliminar-ot"></button>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+
+      <!-- ── Columna izquierda ───────────────────────────────────────────── -->
+      <div class="stack">
+
+        <!-- Datos de la OT -->
+        <section class="card" id="ot-header-card">
+          <div class="card-hd"><h3>Datos de la OT</h3></div>
+          <div class="card-bd">
+            <dl class="data-list">
+              <dt>N° OT</dt>        <dd class="mono" id="ot-data-nro">—</dd>
+              <dt>Solicitud</dt>    <dd class="mono" id="ot-data-solicitud">—</dd>
+              <dt>Cliente</dt>      <dd id="ot-data-cliente">—</dd>
+              <dt>ID Muestra</dt>   <dd class="mono" id="ot-data-muestra" style="white-space:pre-wrap">—</dd>
+              <dt>Recepción</dt>    <dd id="ot-data-recepcion">—</dd>
+              <dt>Aprobación</dt>   <dd id="ot-data-aprobacion">—</dd>
+              <dt>Finalización</dt> <dd id="ot-data-finalizacion">—</dd>
+            </dl>
+          </div>
+        </section>
+
+        <!-- Fotos de recepción -->
+        <section class="card">
+          <div class="card-hd">
+            <h3>Fotos de recepción</h3>
+            <span class="card-hd-meta muted" id="fotos-count">0 fotos</span>
+          </div>
+          <div class="card-bd">
+            <div class="photo-grid" id="fotos-thumbs"></div>
+            <input type="file" id="fotos-input-raw" accept="image/*" multiple style="display:none">
+            <p class="muted" style="margin-top:12px;font-size:11px">
+              Hacé click sobre una foto para recortarla o rotarla. Las fotos se incluyen en el informe Word.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <!-- ── Columna derecha (sticky) ───────────────────────────────────── -->
+      <aside class="stack" style="position:sticky;top:74px">
+
+        <!-- Ensayos -->
+        <section class="card">
+          <div class="card-hd">
+            <h3>Ensayos</h3>
+            <span class="card-hd-meta" id="ensayos-count">0 cargados</span>
+          </div>
+          <div class="card-bd" style="padding-top:0">
+            <div id="ensayos-lista"></div>
+          </div>
+          <div class="card-section" style="background:var(--bg-soft);border-top:1px solid var(--border)">
+            <h4>Agregar ensayo</h4>
+            <div class="v-stack" style="gap:6px" id="botones-agregar"></div>
+          </div>
+        </section>
+
+        <!-- Generar informe -->
+        <section class="card">
+          <div class="card-bd">
+            <h4 style="margin:0 0 8px;font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;font-weight:600">Generar informe</h4>
+            <p class="muted" style="margin:0 0 10px;font-size:12px">
+              Se generará un documento Word con todos los ensayos cargados, fotos y datos de la OT.
+            </p>
+            <label class="check-item" style="margin-bottom:12px;gap:8px">
+              <input type="checkbox" id="chk-preinforme" style="width:14px;height:14px;accent-color:var(--accent)">
+              <span style="font-size:12px;font-weight:600;color:var(--ink-2)">Preinforme (informe preliminar)</span>
+            </label>
+            <button class="btn btn-success btn-lg" type="button" id="btn-generar" style="width:100%"></button>
+            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:10px">
+              <button class="btn btn-lg" type="button" id="btn-generar-qa" style="width:100%;background:var(--accent);color:#fff;border-color:var(--accent)"></button>
+              <p class="muted" style="margin:6px 0 0;font-size:11px">Valida y autocorrige los datos antes de generar.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel resultado QA -->
+        <section class="card" id="qa-panel" style="display:none">
+          <div class="card-hd">
+            <h3 id="qa-panel-titulo">Revisión QA</h3>
+            <span id="qa-panel-badge" class="card-hd-meta"></span>
+          </div>
+          <div class="card-bd" id="qa-panel-body" style="font-size:13px"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<!-- ── Modal editor de fotos ──────────────────────────────────────────────── -->
+<div id="modal-editor-foto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:var(--r-xl);padding:20px;display:flex;flex-direction:column;gap:12px;max-width:min(760px,95vw);max-height:95vh;overflow:auto;box-shadow:var(--shadow-pop)">
+    <div class="h-stack" style="justify-content:space-between">
+      <span style="font-weight:700;font-size:15px;color:var(--ink-1)">Editar foto</span>
+      <button type="button" onclick="cerrarEditorFoto()" class="btn btn-sm btn-ghost" id="btn-cerrar-modal"></button>
+    </div>
+    <canvas id="canvas-editor" style="display:block;cursor:crosshair;max-width:100%;border:1px solid var(--border);border-radius:var(--r);user-select:none"></canvas>
+    <div class="h-stack" style="flex-wrap:wrap;gap:8px">
+      <button type="button" class="btn btn-sm" onclick="rotarEditor(-90)" id="btn-rotar-izq"></button>
+      <button type="button" class="btn btn-sm" onclick="rotarEditor(90)"  id="btn-rotar-der"></button>
+      <button type="button" class="btn btn-sm" id="btn-limpiar-recorte" onclick="limpiarRecorte()" style="display:none">Limpiar recorte</button>
+      <span class="muted" style="font-size:12px;margin-left:auto">Arrastrá para recortar</span>
+    </div>
+    <div class="h-stack" style="justify-content:flex-end;gap:8px">
+      <button type="button" class="btn" onclick="cerrarEditorFoto()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="confirmarEditorFoto()" id="btn-confirmar-foto"></button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const NOMBRES_ENSAYO = {
+  traccion:         'Tracción',
+  impacto:          'Impacto Charpy',
+  'dureza-brinell': 'Dureza Brinell',
+  'dureza-rockwell':'Dureza Rockwell',
+  'dureza-vickers': 'Dureza Vickers',
+  'mapa-vickers':   'Mapa Vickers',
+  plegado:          'Plegado',
+  quimicos:         'Análisis Químico',
+  'nick-break':     'Nick Break',
+  'ferrita-delta':  'Ferrita Delta',
+  metalografia:     'Metalografía',
+  macrografia:      'Macrografía',
+};
+
+const TODOS_ENSAYOS = Object.keys(NOMBRES_ENSAYO);
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('nro_ot');
+
+if (!nroOt) {
+  document.querySelector('.lab-main').innerHTML =
+    '<div class="card card-bd"><p style="color:var(--danger)">No se especificó OT. <a href="/">Volver al dashboard</a></p></div>';
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Set up icon-only buttons
+  document.getElementById('btn-eliminar-ot').innerHTML = getIcon('trash') + ' Eliminar';
+  document.getElementById('btn-editar-ot').innerHTML   = getIcon('edit')  + ' Editar OT';
+  document.getElementById('btn-generar').innerHTML     = getIcon('doc')   + ' Generar Word';
+  document.getElementById('btn-generar-qa').innerHTML  = getIcon('check') + ' Generar con QA';
+  document.getElementById('btn-cerrar-modal').innerHTML = getIcon('x');
+  document.getElementById('btn-rotar-izq').innerHTML   = getIcon('back')  + ' Rotar izq.';
+  document.getElementById('btn-rotar-der').innerHTML   = getIcon('chevron-r') + ' Rotar der.';
+  document.getElementById('btn-confirmar-foto').innerHTML = getIcon('check') + ' Confirmar';
+  document.getElementById('btn-limpiar-recorte').innerHTML = getIcon('x') + ' Limpiar recorte';
+
+  if (!nroOt) return;
+
+  await cargarFotosLS();
+  renderFotoThumbs();
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (!resp.ok) throw new Error('OT no encontrada');
+    const ot = await resp.json();
+
+    document.title = `OT ${ot.nro_ot} — LABTESA`;
+    document.getElementById('crumb-ot').textContent         = `OT ${ot.nro_ot}`;
+    document.getElementById('page-ot-num').textContent      = `OT ${ot.nro_ot}`;
+    document.getElementById('page-ot-sub').innerHTML        =
+      `<span class="mono">Solicitud ${ot.nro_solicitud || '—'}</span> · ${ot.razon_social || '—'}`;
+    document.getElementById('btn-editar-ot').addEventListener('click', () => {
+      window.location.href = `/forms/nueva-ot.html?nro_ot=${ot.nro_ot}`;
+    });
+
+    document.getElementById('btn-eliminar-ot').addEventListener('click', async () => {
+      confirmarAccion({
+        titulo: `Eliminar OT ${ot.nro_ot}`,
+        mensaje: `¿Eliminar la OT ${ot.nro_ot} (${ot.razon_social})? Esto eliminará también todos sus ensayos. Esta acción no se puede deshacer.`,
+        labelOk: 'Sí, eliminar',
+        onOk: async () => {
+          try {
+            const r = await fetch(`/api/ot/${ot.nro_ot}`, { method: 'DELETE' });
+            if (!r.ok) throw new Error((await r.json()).error || 'Error al eliminar');
+            localStorage.removeItem(`fotos_ot_${ot.nro_ot}`);
+            window.location.href = '/';
+          } catch (err) {
+            toast(`Error al eliminar: ${err.message}`, 'error');
+          }
+        }
+      });
+    });
+
+    document.getElementById('ot-data-nro').textContent         = ot.nro_ot;
+    document.getElementById('ot-data-solicitud').textContent   = ot.nro_solicitud || '—';
+    document.getElementById('ot-data-cliente').textContent     = ot.razon_social || '—';
+    document.getElementById('ot-data-muestra').textContent     = ot.id_muestra   || '—';
+    document.getElementById('ot-data-recepcion').textContent   = ot.fecha_recepcion    || '—';
+    document.getElementById('ot-data-aprobacion').textContent  = ot.fecha_aprobacion   || '—';
+    document.getElementById('ot-data-finalizacion').textContent = ot.fecha_finalizacion || '—';
+
+    // Preinforme toggle
+    const chkPre = document.getElementById('chk-preinforme');
+    chkPre.checked = !!ot.es_preinforme;
+    chkPre.addEventListener('change', async () => {
+      await fetch(`/api/ot/${nroOt}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ es_preinforme: chkPre.checked ? 1 : 0 }),
+      });
+    });
+
+    // ── Ensayos cargados ──────────────────────────────────────────────────
+    const ensayos = ot.ensayos || [];
+    const lista   = document.getElementById('ensayos-lista');
+    const countEl = document.getElementById('ensayos-count');
+    if (countEl) countEl.textContent = `${ensayos.length} cargado${ensayos.length !== 1 ? 's' : ''}`;
+
+    if (ensayos.length) {
+      lista.innerHTML = '';
+      ensayos.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'row-item';
+        row.innerHTML =
+          `<div class="row-item-main">
+            <span style="width:8px;height:8px;border-radius:2px;background:var(--success);flex:0 0 8px"></span>
+            <div>
+              <div class="row-item-title">${NOMBRES_ENSAYO[e.tipo] || e.tipo}</div>
+            </div>
+          </div>
+          <div class="row-item-actions">
+            <a href="/forms/${e.tipo}.html?ot=${ot.nro_ot}" class="btn btn-sm btn-ghost" title="Editar">
+              ${getIcon('edit')}
+            </a>
+            <button data-id="${e.id}" class="btn-del-ensayo btn btn-sm btn-danger-ghost" aria-label="Eliminar ${NOMBRES_ENSAYO[e.tipo] || e.tipo}">
+              ${getIcon('trash')}
+            </button>
+          </div>`;
+        lista.appendChild(row);
+      });
+      lista.querySelectorAll('.btn-del-ensayo').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const nombreEnsayo = btn.getAttribute('aria-label')?.replace('Eliminar ', '') || 'este ensayo';
+          confirmarAccion({
+            titulo: `Eliminar ensayo`,
+            mensaje: `¿Eliminar ${nombreEnsayo}? Los datos cargados se perderán. Esta acción no se puede deshacer.`,
+            labelOk: 'Eliminar',
+            onOk: async () => {
+              await fetch(`/api/ensayo/${btn.dataset.id}`, { method: 'DELETE' });
+              location.reload();
+            }
+          });
+        });
+      });
+    } else {
+      lista.innerHTML = '<p class="muted" style="font-size:13px;padding:10px 0">Sin ensayos cargados todavía.</p>';
+    }
+
+    // ── Botones agregar ───────────────────────────────────────────────────
+    const tiposExistentes = new Set(ensayos.map(e => e.tipo));
+    const botonesWrap = document.getElementById('botones-agregar');
+    TODOS_ENSAYOS.forEach(tipo => {
+      if (tiposExistentes.has(tipo)) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.style.cssText = 'justify-content:space-between;width:100%;text-align:left';
+      btn.innerHTML = `<span class="h-stack">${getIcon('plus')} ${NOMBRES_ENSAYO[tipo] || tipo}</span>${getIcon('chevron-r')}`;
+      btn.addEventListener('click', () => { window.location.href = `/forms/${tipo}.html?ot=${ot.nro_ot}`; });
+      botonesWrap.appendChild(btn);
+    });
+    if (!botonesWrap.children.length) {
+      botonesWrap.innerHTML = '<p class="muted" style="font-size:12px">Todos los ensayos han sido cargados.</p>';
+    }
+
+  } catch (err) {
+    document.getElementById('ot-header-card').innerHTML =
+      `<div class="card-bd"><p style="color:var(--danger)">Error al cargar OT: ${err.message}. <a href="/">Volver al dashboard</a></p></div>`;
+  }
+
+  // ── File input ────────────────────────────────────────────────────────
+  document.getElementById('fotos-input-raw').addEventListener('change', function () {
+    Array.from(this.files).forEach(file => {
+      const url = URL.createObjectURL(file);
+      window.fotosEditadas.push({ original: file, edited: null, url, name: file.name });
+    });
+    this.value = '';
+    renderFotoThumbs();
+  });
+
+  // ── Canvas crop events ────────────────────────────────────────────────
+  const canvasEd = document.getElementById('canvas-editor');
+  canvasEd.addEventListener('mousedown', e => {
+    _edDrag = _canvasPos(e);
+    _edCrop = { x: _edDrag.x, y: _edDrag.y, w: 0, h: 0 };
+  });
+  canvasEd.addEventListener('mousemove', e => {
+    if (!_edDrag) return;
+    const p = _canvasPos(e);
+    _edCrop = { x: _edDrag.x, y: _edDrag.y, w: p.x - _edDrag.x, h: p.y - _edDrag.y };
+    _renderEditor();
+  });
+  canvasEd.addEventListener('mouseup', () => {
+    if (!_edDrag) return;
+    _edDrag = null;
+    const nc = _normCrop(_edCrop);
+    if (!nc || nc.w < 8 || nc.h < 8) {
+      _edCrop = null;
+    } else {
+      _edCrop = nc;
+      document.getElementById('btn-limpiar-recorte').style.display = '';
+    }
+    _renderEditor();
+  });
+  canvasEd.addEventListener('mouseleave', () => { _edDrag = null; });
+});
+
+// ─── Generar Word ─────────────────────────────────────────────────────────────
+
+document.getElementById('btn-generar')?.addEventListener('click', async () => {
+  if (!nroOt) return;
+  toast('Generando Word...', 'info');
+  try {
+    await generarWord(nroOt, null, window.fotosEditadas);
+    toast('Word generado y descargado', 'ok');
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+});
+
+// ─── Editor de fotos ──────────────────────────────────────────────────────────
+
+window.fotosEditadas = [];
+let _edIdx = -1, _edImg = null, _edRot = 0, _edCrop = null, _edDrag = null;
+
+function renderFotoThumbs() {
+  const cont = document.getElementById('fotos-thumbs');
+  cont.innerHTML = '';
+
+  window.fotosEditadas.forEach((f, i) => {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'position:relative;aspect-ratio:4/3;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);background:var(--bg-readonly)';
+    cell.innerHTML =
+      `<img src="${f.url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` +
+      `<span class="photo-tag">${f.name ? f.name.substring(0, 12) : 'IMG_' + String(i+1).padStart(2,'0')}</span>` +
+      `<div style="position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(0,0,0,.5);padding:3px;gap:2px;z-index:1">` +
+      `<button type="button" data-i="${i}" class="_ed-btn" style="flex:1;border:none;background:none;color:#fff;font-size:11px;cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center">${getIcon('crop')}</button>` +
+      `<button type="button" data-i="${i}" class="_del-btn" style="flex:1;border:none;background:none;color:#fff;font-size:11px;cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center">${getIcon('x')}</button>` +
+      `</div>`;
+    cont.appendChild(cell);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'photo-add';
+  addBtn.style.cssText = 'aspect-ratio:4/3;border-radius:var(--r)';
+  addBtn.innerHTML = getIcon('plus') + '<span style="font-size:12px">Agregar foto</span>';
+  addBtn.addEventListener('click', () => document.getElementById('fotos-input-raw').click());
+  cont.appendChild(addBtn);
+
+  const countEl = document.getElementById('fotos-count');
+  if (countEl) countEl.textContent = `${window.fotosEditadas.length} foto${window.fotosEditadas.length !== 1 ? 's' : ''}`;
+
+  cont.querySelectorAll('._ed-btn').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); abrirEditorFoto(+b.dataset.i); }));
+  cont.querySelectorAll('._del-btn').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); quitarFoto(+b.dataset.i); }));
+  guardarFotosLS();
+}
+
+function quitarFoto(i) {
+  URL.revokeObjectURL(window.fotosEditadas[i].url);
+  window.fotosEditadas.splice(i, 1);
+  renderFotoThumbs();
+}
+
+function abrirEditorFoto(i) {
+  _edIdx = i; _edRot = 0; _edCrop = null; _edDrag = null;
+  const f   = window.fotosEditadas[i];
+  const src = URL.createObjectURL(f.edited || f.original);
+  _edImg = new Image();
+  _edImg.onload = () => { _renderEditor(); URL.revokeObjectURL(src); };
+  _edImg.src = src;
+  document.getElementById('btn-limpiar-recorte').style.display = 'none';
+  document.getElementById('modal-editor-foto').style.display  = 'flex';
+}
+
+function cerrarEditorFoto() {
+  document.getElementById('modal-editor-foto').style.display = 'none';
+  _edIdx = -1; _edImg = null; _edCrop = null; _edDrag = null;
+}
+
+function rotarEditor(deg) {
+  _edRot = (_edRot + deg + 360) % 360;
+  _edCrop = null;
+  document.getElementById('btn-limpiar-recorte').style.display = 'none';
+  _renderEditor();
+}
+
+function limpiarRecorte() {
+  _edCrop = null;
+  document.getElementById('btn-limpiar-recorte').style.display = 'none';
+  _renderEditor();
+}
+
+function _normCrop(c) {
+  if (!c) return null;
+  return { x: c.w >= 0 ? c.x : c.x + c.w, y: c.h >= 0 ? c.y : c.y + c.h, w: Math.abs(c.w), h: Math.abs(c.h) };
+}
+
+function _canvasPos(e) {
+  const cv = document.getElementById('canvas-editor');
+  const r  = cv.getBoundingClientRect();
+  return { x: Math.round((e.clientX - r.left) * cv.width / r.width), y: Math.round((e.clientY - r.top) * cv.height / r.height) };
+}
+
+function _renderEditor() {
+  if (!_edImg) return;
+  const cv  = document.getElementById('canvas-editor');
+  const ctx = cv.getContext('2d');
+  const sw  = _edRot % 180 !== 0;
+  const dW  = sw ? _edImg.naturalHeight : _edImg.naturalWidth;
+  const dH  = sw ? _edImg.naturalWidth  : _edImg.naturalHeight;
+  const sc  = Math.min(700 / dW, 520 / dH, 1);
+  cv.width  = Math.round(dW * sc);
+  cv.height = Math.round(dH * sc);
+  ctx.save();
+  ctx.translate(cv.width / 2, cv.height / 2);
+  ctx.rotate((_edRot * Math.PI) / 180);
+  ctx.drawImage(_edImg, -_edImg.naturalWidth * sc / 2, -_edImg.naturalHeight * sc / 2, _edImg.naturalWidth * sc, _edImg.naturalHeight * sc);
+  ctx.restore();
+  const nc = _normCrop(_edCrop);
+  if (nc && nc.w > 2 && nc.h > 2) {
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillRect(0, 0, cv.width, nc.y);
+    ctx.fillRect(0, nc.y + nc.h, cv.width, cv.height - nc.y - nc.h);
+    ctx.fillRect(0, nc.y, nc.x, nc.h);
+    ctx.fillRect(nc.x + nc.w, nc.y, cv.width - nc.x - nc.w, nc.h);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.strokeRect(nc.x, nc.y, nc.w, nc.h); ctx.setLineDash([]);
+    ctx.fillStyle = '#fff';
+    [[nc.x,nc.y],[nc.x+nc.w,nc.y],[nc.x,nc.y+nc.h],[nc.x+nc.w,nc.y+nc.h]].forEach(([px,py]) => ctx.fillRect(px-4,py-4,8,8));
+  }
+}
+
+function confirmarEditorFoto() {
+  if (!_edImg || _edIdx < 0) return;
+  const sw = _edRot % 180 !== 0;
+  const rW = sw ? _edImg.naturalHeight : _edImg.naturalWidth;
+  const rH = sw ? _edImg.naturalWidth  : _edImg.naturalHeight;
+  const sc = Math.min(2000 / rW, 2000 / rH, 1);
+  const c1 = document.createElement('canvas');
+  c1.width  = Math.round(rW * sc);
+  c1.height = Math.round(rH * sc);
+  const ctx1 = c1.getContext('2d');
+  ctx1.save();
+  ctx1.translate(c1.width / 2, c1.height / 2);
+  ctx1.rotate((_edRot * Math.PI) / 180);
+  ctx1.drawImage(_edImg, -_edImg.naturalWidth * sc / 2, -_edImg.naturalHeight * sc / 2, _edImg.naturalWidth * sc, _edImg.naturalHeight * sc);
+  ctx1.restore();
+  const nc  = _normCrop(_edCrop);
+  const cv  = document.getElementById('canvas-editor');
+  const out = (nc && nc.w > 8 && nc.h > 8) ? (() => {
+    const cx = Math.round(nc.x * c1.width / cv.width);
+    const cy = Math.round(nc.y * c1.height / cv.height);
+    const cw = Math.round(nc.w * c1.width / cv.width);
+    const ch = Math.round(nc.h * c1.height / cv.height);
+    const c2 = document.createElement('canvas');
+    c2.width = cw; c2.height = ch;
+    c2.getContext('2d').drawImage(c1, cx, cy, cw, ch, 0, 0, cw, ch);
+    return c2;
+  })() : c1;
+  out.toBlob(blob => {
+    if (!blob) return;
+    URL.revokeObjectURL(window.fotosEditadas[_edIdx].url);
+    window.fotosEditadas[_edIdx].edited = blob;
+    window.fotosEditadas[_edIdx].url    = URL.createObjectURL(blob);
+    cerrarEditorFoto();
+    renderFotoThumbs();
+  }, 'image/jpeg', 0.92);
+}
+
+async function guardarFotosLS() {
+  if (!nroOt) return;
+  try {
+    const items = await Promise.all(window.fotosEditadas.map(f => new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ dataUrl: reader.result, name: f.name });
+      reader.readAsDataURL(f.edited || f.original);
+    })));
+    // Guardar en localStorage como respaldo
+    if (items.length) localStorage.setItem(`fotos_ot_${nroOt}`, JSON.stringify(items));
+    else localStorage.removeItem(`fotos_ot_${nroOt}`);
+    // Guardar en DB via API
+    const fd = new FormData();
+    for (const f of window.fotosEditadas) {
+      fd.append('fotos', f.edited || f.original, f.name || 'foto.jpg');
+    }
+    await fetch(`/api/ot/${nroOt}/fotos`, { method: 'POST', body: fd }).catch(() => {});
+  } catch {}
+}
+
+// ─── Generar Word con QA ──────────────────────────────────────────────────────
+
+document.getElementById('btn-generar-qa')?.addEventListener('click', async () => {
+  if (!nroOt) return;
+
+  const btn = document.getElementById('btn-generar-qa');
+  const panel = document.getElementById('qa-panel');
+  const panelBody = document.getElementById('qa-panel-body');
+  const panelBadge = document.getElementById('qa-panel-badge');
+  const panelTitulo = document.getElementById('qa-panel-titulo');
+
+  btn.disabled = true;
+  btn.innerHTML = getIcon('check') + ' Validando con IA...';
+  panel.style.display = 'none';
+
+  try {
+    // Recopilar fotos igual que el botón normal
+    const formData = new FormData();
+    for (const f of (window.fotosEditadas || [])) {
+      const blob = f.edited || f.original;
+      formData.append('fotos', blob, f.name || 'foto.jpg');
+    }
+
+    const resp = await fetch(`/api/generate-with-qa/${nroOt}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (resp.ok) {
+      // QA aprobó → descargar el docx
+      const qaOk          = resp.headers.get('X-QA-OK') === 'true';
+      const nAdvs         = parseInt(resp.headers.get('X-QA-Advertencias') || '0');
+      const blob          = await resp.blob();
+      const disposition   = resp.headers.get('Content-Disposition') || '';
+      const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
+      const filename      = filenameMatch
+        ? decodeURIComponent(filenameMatch[1])
+        : `informe_${nroOt}.docx`;
+
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+
+      // Mostrar panel de resultado
+      panel.style.display = '';
+      panelTitulo.textContent = 'Revisión QA';
+      if (qaOk) {
+        panelBadge.textContent = '✅ Aprobado';
+        panelBadge.style.color = 'var(--success)';
+        panelBody.innerHTML = nAdvs > 0
+          ? `<p style="color:var(--success);font-weight:600">Informe generado y descargado.</p><p class="muted">${nAdvs} advertencia(s) menores — revisá el panel de estado si querés el detalle.</p>`
+          : `<p style="color:var(--success);font-weight:600">✅ Informe generado sin errores ni advertencias.</p>`;
+      } else {
+        panelBadge.textContent = '⚠️ Con advertencias';
+        panelBadge.style.color = 'var(--warning, #e67e22)';
+        panelBody.innerHTML = `<p style="font-weight:600">Informe generado con advertencias.</p><p class="muted">Consultá el estado QA para el detalle.</p>`;
+      }
+      toast('Word generado correctamente', 'ok');
+
+    } else if (resp.status === 422) {
+      // QA rechazó
+      const data = await resp.json();
+      panel.style.display = '';
+      panelTitulo.textContent = 'QA: Revisión necesaria';
+      panelBadge.textContent  = '❌ Rechazado';
+      panelBadge.style.color  = 'var(--danger)';
+
+      let html = `<p style="color:var(--danger);font-weight:600;margin:0 0 10px">${data.resumen || 'El informe tiene errores que deben corregirse.'}</p>`;
+
+      if (data.errores?.length) {
+        html += `<p style="font-weight:600;font-size:12px;color:var(--ink-2);margin:8px 0 4px">Errores críticos (${data.errores.length}):</p><ul style="margin:0;padding-left:18px">`;
+        data.errores.forEach(e => { html += `<li style="color:var(--danger);margin-bottom:3px">${e}</li>`; });
+        html += '</ul>';
+      }
+      if (data.advertencias?.length) {
+        html += `<p style="font-weight:600;font-size:12px;color:var(--ink-2);margin:10px 0 4px">Advertencias (${data.advertencias.length}):</p><ul style="margin:0;padding-left:18px">`;
+        data.advertencias.forEach(a => { html += `<li class="muted" style="margin-bottom:3px">${a}</li>`; });
+        html += '</ul>';
+      }
+      html += `<button type="button" class="btn btn-sm btn-danger-ghost" style="margin-top:12px;width:100%" id="btn-forzar-qa">Generar igualmente (ignorar errores)</button>`;
+      panelBody.innerHTML = html;
+
+      document.getElementById('btn-forzar-qa')?.addEventListener('click', async () => {
+        toast('Generando de todas formas...', 'info');
+        try {
+          const r2 = await fetch(`/api/generate-with-qa/${nroOt}?forzar=true`, { method: 'POST', body: formData });
+          if (!r2.ok) throw new Error('Error al generar');
+          const b2 = await r2.blob();
+          const d2 = r2.headers.get('Content-Disposition') || '';
+          const fn2Match = d2.match(/filename\*=UTF-8''([^;]+)/);
+          const fn2 = fn2Match ? decodeURIComponent(fn2Match[1]) : `informe_${nroOt}_forzado.docx`;
+          const u2 = URL.createObjectURL(b2);
+          const a2 = document.createElement('a'); a2.href = u2; a2.download = fn2; a2.click();
+          URL.revokeObjectURL(u2);
+          toast('Descargado con advertencias', 'ok');
+        } catch(err) { toast(`Error: ${err.message}`, 'error'); }
+      });
+
+      toast('QA detectó errores — revisá el panel', 'error');
+    } else {
+      const data = await resp.json().catch(() => ({}));
+      toast(`Error: ${data.error || resp.statusText}`, 'error');
+    }
+  } catch (err) {
+    toast(`Error al conectar: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = getIcon('check') + ' Generar con QA';
+  }
+});
+
+async function cargarFotosLS() {
+  if (!nroOt) return;
+  try {
+    // Intentar cargar desde DB primero (fuente de verdad)
+    const resp = await fetch(`/api/ot/${nroOt}/fotos`);
+    if (resp.ok) {
+      const items = await resp.json();
+      if (items.length) {
+        for (const item of items) {
+          const blob = await fetch(item.dataUrl).then(r => r.blob());
+          window.fotosEditadas.push({ original: blob, edited: null, url: URL.createObjectURL(blob), name: item.name });
+        }
+        renderFotoThumbs();
+        return;
+      }
+    }
+    // Fallback: localStorage
+    const stored = localStorage.getItem(`fotos_ot_${nroOt}`);
+    if (!stored) return;
+    for (const item of JSON.parse(stored)) {
+      const blob = await fetch(item.dataUrl).then(r => r.blob());
+      window.fotosEditadas.push({ original: blob, edited: null, url: URL.createObjectURL(blob), name: item.name });
+    }
+  } catch {}
+}
+
+// ── Modal de confirmación pro ─────────────────────────────────────────────────
+function confirmarAccion({ titulo, mensaje, labelOk = 'Eliminar', onOk }) {
+  // Crear overlay si no existe
+  let overlay = document.getElementById('confirm-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'confirm-overlay';
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <div class="confirm-icon">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+        </div>
+        <h3 id="confirm-title"></h3>
+        <p id="confirm-msg"></p>
+        <div class="confirm-actions">
+          <button class="btn-cancel-confirm" id="confirm-cancel">Cancelar</button>
+          <button class="btn-ok-confirm" id="confirm-ok"></button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  document.getElementById('confirm-title').textContent = titulo;
+  document.getElementById('confirm-msg').textContent   = mensaje;
+  document.getElementById('confirm-ok').textContent    = labelOk;
+
+  // Mostrar con animación
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+
+  const close = () => {
+    overlay.classList.remove('visible');
+    setTimeout(() => { overlay.style.display = 'none'; }, 150);
+  };
+
+  // Limpiar listeners anteriores clonando los botones
+  const okBtn     = document.getElementById('confirm-ok');
+  const cancelBtn = document.getElementById('confirm-cancel');
+  const newOk     = okBtn.cloneNode(true);
+  const newCancel = cancelBtn.cloneNode(true);
+  okBtn.replaceWith(newOk);
+  cancelBtn.replaceWith(newCancel);
+
+  document.getElementById('confirm-ok').addEventListener('click', () => { close(); onOk(); });
+  document.getElementById('confirm-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
+</script>
+</body>
+</html>

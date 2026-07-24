@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Determinación de Ferrita Delta — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+  <style>
+    .btn-var {
+      padding: 8px 14px; border: 1px solid var(--border); background: white;
+      border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+      color: var(--ink-2); transition: all 0.15s;
+    }
+    .btn-var:hover { border-color: var(--border-strong); }
+    .btn-var.activo { background: var(--accent,#2563eb); color: white; border-color: var(--accent,#2563eb); }
+  </style>
+</head>
+<body>
+<div class="lab-app density-regular">
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a><span class="sep">/</span>
+      <a id="back-link" href="#">OT</a><span class="sep">/</span>
+      <span>Determinación de Ferrita Delta</span>
+    </div>
+    <div class="lab-page-head">
+      <div>
+        <h1>Determinación de Ferrita Delta</h1>
+        <div class="lab-page-sub">ITM N˚032</div>
+      </div>
+    </div>
+
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item"><span class="lbl">OT</span><span class="val mono" id="banner-ot">—</span></div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-ferrita" novalidate>
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Variante de equipo -->
+        <div class="card-section">
+          <h4>Variante de ensayo</h4>
+          <div style="padding:10px;background:var(--bg-soft);border-radius:6px">
+            <div style="font-size:12px;color:var(--ink-2);margin-bottom:8px;font-weight:600">
+              Equipo principal <span style="color:var(--danger)">*</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-var activo" data-var="fischer" onclick="setVariante('fischer')">
+                Medidor Fischer (portátil)
+              </button>
+              <button type="button" class="btn-var" data-var="microscopio" onclick="setVariante('microscopio')">
+                Microscopio + Fischer
+              </button>
+            </div>
+            <input type="hidden" name="variante" id="variante-input" value="fischer">
+          </div>
+        </div>
+
+        <!-- Condiciones comunes -->
+        <div class="card-section">
+          <h4>Condiciones de ensayo</h4>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Metodología</label>
+              <input type="text" name="metodologia" class="input" value="ITM N˚032">
+            </div>
+            <div class="field" id="field-norma">
+              <label class="field-label">Norma de ensayo <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="norma" class="input" placeholder="ej: ASTM E562  (vacío = no aparece)">
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field" id="field-temperatura">
+              <label class="field-label">Temperatura de ensayo <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="temperatura" class="input mono" placeholder="ej: 22  (vacío = no aparece)">
+            </div>
+          </div>
+        </div>
+
+        <!-- VARIANTE 1: Fischer portátil -->
+        <div id="seccion-fischer" class="card-section">
+          <h4>Zona y mediciones</h4>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Zona examinada <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="zona_examinada" class="input" placeholder="ej: Cordón de soldadura">
+            </div>
+            <div class="field">
+              <label class="field-label">Sectores analizados <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="sectores" class="input" placeholder="ej: Metal base, ZAC, Soldadura">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Cantidad de mediciones <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+            <input type="text" name="cantidad_mediciones" class="input mono" style="max-width:120px" placeholder="ej: 10">
+          </div>
+
+          <h4 style="margin-top:20px">Resultado</h4>
+          <div class="check-group" style="margin-bottom:12px">
+            <label class="check-item">
+              <input type="checkbox" name="sin_deteccion" id="chk-sin-deteccion" onchange="toggleSinDeteccion()">
+              <span>Sin detección de ferrita delta (Valor &lt; 0.1 %)</span>
+            </label>
+          </div>
+          <div id="campo-resultado-v1">
+            <div class="field">
+              <label class="field-label">Contenido de ferrita delta (%)</label>
+              <input type="text" name="resultado" class="input mono" style="max-width:160px" placeholder="ej: 3.5">
+              <div class="field-hint">Aparece como: "…presenta un contenido de ferrita delta de X %"</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VARIANTE 2: Microscopio + Fischer -->
+        <div id="seccion-microscopio" class="card-section" style="display:none">
+          <h4>Zonas y probetas</h4>
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Zonas examinadas</label>
+            <div class="check-group">
+              <label class="check-item"><input type="checkbox" name="zona_v2_mb" checked><span>Metal Base</span></label>
+              <label class="check-item"><input type="checkbox" name="zona_v2_zac" checked><span>Z.A.C.</span></label>
+              <label class="check-item"><input type="checkbox" name="zona_v2_sold" checked><span>Soldadura</span></label>
+            </div>
+          </div>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Reactivo utilizado <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="reactivo" class="input" placeholder="ej: Ataque electroquímico ácido oxálico 10%">
+            </div>
+            <div class="field">
+              <label class="field-label">Aumento utilizado <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="aumento" class="input" placeholder="ej: 100X / 200X">
+            </div>
+          </div>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Cantidad de probetas <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="cantidad_probetas" class="input mono" style="max-width:120px" placeholder="ej: 2">
+            </div>
+            <div class="field">
+              <label class="field-label">Mediciones realizadas <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="cantidad_mediciones_v2" class="input mono" style="max-width:120px" placeholder="ej: 140">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Modo del resultado</label>
+            <div class="check-group" style="flex-direction:row;gap:24px">
+              <label class="check-item">
+                <input type="radio" name="modo_resultado" value="tabla" checked onchange="toggleModoResultado()">
+                <span>Tabla rígida (MB/ZAC/Sold con 2 muestras)</span>
+              </label>
+              <label class="check-item">
+                <input type="radio" name="modo_resultado" value="narrativo" onchange="toggleModoResultado()">
+                <span>Narrativo con zonas + valores</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="bloque-modo-tabla">
+          <h4 style="margin-top:20px">Tabla de resultados</h4>
+          <div style="overflow-x:auto">
+            <table class="tabla-resultados" style="min-width:360px">
+              <thead><tr>
+                <th style="text-align:left">Zona</th>
+                <th>Mtra.1 (%)</th>
+                <th>Mtra.2 (%)</th>
+              </tr></thead>
+              <tbody>
+                <tr><td>Metal Base A</td><td><input type="text" name="tabla_mb_a_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_mb_a_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>Metal Base B</td><td><input type="text" name="tabla_mb_b_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_mb_b_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>ZAC Raíz A</td><td><input type="text" name="tabla_zac_ra_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_zac_ra_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>ZAC Raíz B</td><td><input type="text" name="tabla_zac_rb_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_zac_rb_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>Sold. Cara</td><td><input type="text" name="tabla_sold_cara_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_sold_cara_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>Sold. Med</td><td><input type="text" name="tabla_sold_med_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_sold_med_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+                <tr><td>Sold. Raíz</td><td><input type="text" name="tabla_sold_raiz_c1" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td><td><input type="text" name="tabla_sold_raiz_c2" class="input mono" style="width:80px;padding:3px 6px;font-size:12px" placeholder="—"></td></tr>
+              </tbody>
+            </table>
+          </div>
+          </div><!-- /bloque-modo-tabla -->
+
+          <div id="bloque-modo-narrativo" style="display:none">
+            <h4 style="margin-top:20px">Zonas y valores (narrativo)</h4>
+            <p class="muted" style="font-size:12px;margin:0 0 8px">Ingresá una fila por zona. El generador arma la frase narrativa con el promedio.</p>
+            <div id="tbody-zonas-narr"></div>
+            <button type="button" class="btn btn-sm" onclick="agregarZonaNarrativa()" style="margin-top:6px">+ Agregar zona</button>
+          </div>
+        </div>
+
+        <!-- Nota -->
+        <div class="card-section">
+          <h4>Nota</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_nota" id="chk-nota"
+              onchange="document.getElementById('nota-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección NOTA</span>
+          </label>
+          <div id="nota-wrap" style="display:none;margin-top:8px">
+            <textarea name="nota_texto" class="textarea" rows="3" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="card-section">
+          <h4>Observaciones</h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="oaa" checked>
+              <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA"</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+
+function setVariante(v) {
+  document.getElementById('variante-input').value = v;
+  document.querySelectorAll('.btn-var').forEach(b => b.classList.toggle('activo', b.dataset.var === v));
+  document.getElementById('seccion-fischer').style.display    = v === 'fischer'     ? '' : 'none';
+  document.getElementById('seccion-microscopio').style.display = v === 'microscopio' ? '' : 'none';
+  document.getElementById('field-norma').style.display = v === 'fischer' ? '' : 'none';
+  autoguardar();
+}
+
+function toggleSinDeteccion() {
+  const checked = document.getElementById('chk-sin-deteccion').checked;
+  document.getElementById('campo-resultado-v1').style.display = checked ? 'none' : '';
+  autoguardar();
+}
+
+function toggleModoResultado() {
+  const modo = document.querySelector('[name="modo_resultado"]:checked')?.value || 'tabla';
+  document.getElementById('bloque-modo-tabla').style.display     = modo === 'tabla'     ? '' : 'none';
+  document.getElementById('bloque-modo-narrativo').style.display = modo === 'narrativo' ? '' : 'none';
+  if (modo === 'narrativo' && document.getElementById('tbody-zonas-narr').children.length === 0) {
+    ['Metal Base', 'Z.A.C.', 'Soldadura'].forEach(z => agregarZonaNarrativa(z, ''));
+  }
+  autoguardar();
+}
+
+function agregarZonaNarrativa(zona, valor) {
+  const wrap = document.getElementById('tbody-zonas-narr');
+  const row = document.createElement('div');
+  row.className = 'zona-narr-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+  row.innerHTML =
+    `<input type="text" class="input zona-narr-zona" placeholder="Zona (ej: Metal Base)" value="${(zona || '').replace(/"/g,'&quot;')}" style="flex:1">` +
+    `<input type="text" class="input mono zona-narr-valor" placeholder="Valor (%)" value="${(valor || '').toString().replace(/"/g,'&quot;')}" style="max-width:140px">` +
+    `<button type="button" class="btn btn-sm" onclick="this.parentElement.remove(); autoguardar()">Quitar</button>`;
+  wrap.appendChild(row);
+  row.querySelectorAll('input').forEach(i => i.addEventListener('input', autoguardar));
+}
+
+function recolectarFerrita() {
+  const form = document.getElementById('form-ferrita');
+  const base = recolectarDatosForm(form);
+  // Zonas V2 (modo tabla)
+  base.zonas_v2 = [];
+  if (document.querySelector('[name="zona_v2_mb"]')?.checked)   base.zonas_v2.push('Metal Base');
+  if (document.querySelector('[name="zona_v2_zac"]')?.checked)  base.zonas_v2.push('Z.A.C.');
+  if (document.querySelector('[name="zona_v2_sold"]')?.checked) base.zonas_v2.push('Soldadura');
+  // Zonas narrativas (modo narrativo)
+  base.zonas = [];
+  document.querySelectorAll('#tbody-zonas-narr .zona-narr-row').forEach(row => {
+    const zona  = row.querySelector('.zona-narr-zona')?.value.trim() || '';
+    const valor = row.querySelector('.zona-narr-valor')?.value.trim() || '';
+    if (zona || valor) base.zonas.push({ zona, valor });
+  });
+  return base;
+}
+
+function cargarDatos(datos) {
+  rellenarForm(document.getElementById('form-ferrita'), datos);
+  setVariante(datos.variante || 'fischer');
+  if (datos.sin_deteccion) toggleSinDeteccion();
+  if (datos.tiene_nota) document.getElementById('nota-wrap').style.display = 'block';
+  if (datos.zonas_v2) {
+    document.querySelector('[name="zona_v2_mb"]').checked   = datos.zonas_v2.includes('Metal Base');
+    document.querySelector('[name="zona_v2_zac"]').checked  = datos.zonas_v2.includes('Z.A.C.');
+    document.querySelector('[name="zona_v2_sold"]').checked = datos.zonas_v2.includes('Soldadura');
+  }
+  // Restaurar modo_resultado + zonas narrativas
+  const modo = datos.modo_resultado || 'tabla';
+  const radio = document.querySelector(`[name="modo_resultado"][value="${modo}"]`);
+  if (radio) radio.checked = true;
+  document.getElementById('tbody-zonas-narr').innerHTML = '';
+  if (Array.isArray(datos.zonas) && datos.zonas.length > 0) {
+    datos.zonas.forEach(z => agregarZonaNarrativa(z.zona || '', z.valor || ''));
+  }
+  toggleModoResultado();
+}
+
+function autoguardar() {
+  if (window.Storage && nroOt) {
+    try { Storage.guardarBorrador(nroOt, 'ferrita-delta', recolectarFerrita()); } catch {}
+  }
+}
+
+document.getElementById('form-ferrita').addEventListener('input', autoguardar);
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada.', 'error'); return; }
+  const datos = recolectarFerrita();
+  try {
+    await guardarEnsayoServidor(nroOt, 'ferrita-delta', datos);
+    Storage.borrarBorrador(nroOt, 'ferrita-delta');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT. <a href="/">Ir al dashboard</a></span>`;
+    return;
+  }
+
+  document.getElementById('back-link').href       = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'ferrita-delta');
+      if (borrador) {
+        cargarDatos(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'ferrita-delta');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string'
+            ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          cargarDatos(datos);
+        }
+      }
+      activarAutoguardado(document.getElementById('form-ferrita'), nroOt, 'ferrita-delta', recolectarFerrita);
+    }
+  } catch (err) { console.error(err); }
+});
+</script>
+</body>
+</html>

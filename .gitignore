@@ -1,0 +1,57 @@
+# ── Secrets y credenciales ────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Base de datos y backups ───────────────────────────────────────────
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+backups/
+
+# ── Logs del servicio Windows ─────────────────────────────────────────
+service-stdout.log
+service-stderr.log
+*.log
+
+# ── Uploads / archivos generados por el usuario ───────────────────────
+uploads/
+
+# ── Bundle generado (se rebuilda con `npm run build`) ─────────────────
+public-new/dist/
+
+# ── Node ──────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Scripts one-shot y salidas de debug del análisis del laboratorio ──
+# Todo lo que empiece con "_" es workspace temporal (no va al repo).
+_*
+debug-header-*.xml
+FM-*-analisis.*
+PROMPT-CONTINUACION.md
+PROMPT-CLAUDE-CODE-AUDIT.md
+SUPERPROMPT-CONTINUACION.md
+
+# ── Editor / OS ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ── NSSM (binario, se distribuye aparte) ──────────────────────────────
+nssm/
+
+# ── Documentos internos que no van al repo ────────────────────────────
+_inspect/
+
+# ── Informes .docx de referencia de los agentes ───────────────────────
+# Son informes REALES de clientes (Pampa Energía, Mercedes Benz, Conuar, ...)
+# usados solo como material de referencia opcional para los agentes de Claude.
+# No van al repo por privacidad. Si un colaborador los necesita, se pasan
+# aparte (ej. via drive interno).
+server/agents/informes-referencia/

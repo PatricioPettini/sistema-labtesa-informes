@@ -1,0 +1,16 @@
+{
+  "variante": "fischer",
+  "norma": "AWS A4.2M",
+  "metodologia": "Fischer FMP30",
+  "zona_examinada": "Cordón de soldadura",
+  "cantidad_mediciones": 5,
+  "mediciones": [
+    { "sector": "Central", "zona": "Cordón", "m1": "6.5", "m2": "6.8", "m3": "7.0", "prom": "6.77" },
+    { "sector": "Bordes",  "zona": "Cordón", "m1": "5.9", "m2": "6.1", "m3": "6.3", "prom": "6.10" }
+  ],
+  "especificacion_material": "AISI 316L",
+  "valor_especificacion": "3-15 FN",
+  "conclusion_presenta": true,
+  "resultado": "6.44",
+  "oaa": true
+}

@@ -1,0 +1,14 @@
+{
+  "metodologia": "ITM N°080",
+  "norma": "ASME BPVC IX",
+  "probeta_mecanizada_segun": "QW-462.3",
+  "diametro_mandril": "38",
+  "angulo": "180",
+  "tipo_tabla": "auto",
+  "resultados": [
+    { "tipo": "Cara",  "probeta": "P1", "observaciones": "SIN INDICACIONES" },
+    { "tipo": "Raíz",  "probeta": "P2", "observaciones": "SIN INDICACIONES" },
+    { "tipo": "Lado",  "probeta": "P3", "observaciones": "SIN INDICACIONES" }
+  ],
+  "oaa": true
+}

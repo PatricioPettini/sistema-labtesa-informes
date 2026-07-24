@@ -1,0 +1,21 @@
+{
+  "variante": "neuquen",
+  "metodologia": "ITM N°078",
+  "norma_iso148_1": true,
+  "norma_iso148_1_year": "2016",
+  "cod_asme": true,
+  "ed_asme": "2023",
+  "temperatura_ensayo": "-20",
+  "medida_probeta": "10x10",
+  "tipo_probeta": "Charpy V",
+  "resultados": [
+    { "zona": "Metal Base",  "temperatura": "-20", "energia": "120" },
+    { "zona": "Metal Base",  "temperatura": "-20", "energia": "125" },
+    { "zona": "Metal Base",  "temperatura": "-20", "energia": "118" },
+    { "zona": "ZAC",         "temperatura": "-20", "energia": "95"  },
+    { "zona": "Soldadura",   "temperatura": "-20", "energia": "82"  }
+  ],
+  "oaa": true,
+  "tiene_evaluacion": true,
+  "evaluacion_texto": "Los resultados obtenidos satisfacen los requisitos del código de referencia."
+}

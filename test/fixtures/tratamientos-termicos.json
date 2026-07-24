@@ -1,0 +1,10 @@
+{
+  "metodologia": "Norma interna",
+  "norma": "AWS D1.1",
+  "ciclos": [
+    { "etapa": "Calentamiento", "temperatura": "600", "tiempo": "60", "velocidad": "150" },
+    { "etapa": "Sostenimiento", "temperatura": "600", "tiempo": "120", "velocidad": "-" },
+    { "etapa": "Enfriamiento",  "temperatura": "20",  "tiempo": "480", "velocidad": "150" }
+  ],
+  "oaa": true
+}

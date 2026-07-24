@@ -1,0 +1,8 @@
+{
+  "metodologia": "ITM interno metalografía",
+  "norma": "ASTM E3",
+  "reactivo": "Nital 3%",
+  "aumento": "100X",
+  "resultado_texto": "La microestructura observada corresponde a ferrita-perlita.",
+  "oaa": true
+}

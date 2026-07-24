@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dureza Vickers — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Dureza Vickers</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Dureza Vickers</h1>
+        <div class="lab-page-sub">Norma ASTM E92 / ISO 6507-1 · Metodología ITM N°076 · acreditado</div>
+      </div>
+    </div>
+
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item"><span class="lbl">OT</span><span class="val mono" id="banner-ot">—</span></div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-vickers" novalidate>
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- ── Condiciones ── -->
+        <div class="card-section">
+          <h4>Normas de ensayo</h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="norma_astm_e92" checked>
+              <span>ASTM E92<input type="text" name="norma_astm_e92_ed" placeholder="-23" style="width:55px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;font-family:var(--font-mono);background:transparent;margin-left:2px"></span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="norma_astm_e384">
+              <span>ASTM E384<input type="text" name="norma_astm_e384_ed" placeholder="-22" style="width:55px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;font-family:var(--font-mono);background:transparent;margin-left:2px"></span>
+            </label>
+            <label class="check-item"><input type="checkbox" name="norma_din_en_1043"><span>DIN EN 1043</span></label>
+            <label class="check-item"><input type="checkbox" name="norma_din_iso_15614"><span>DIN ISO 15614</span></label>
+            <label class="check-item"><input type="checkbox" name="norma_ypf_b0005"><span>YPF ED-B-00.05-01</span></label>
+            <label class="check-item"><input type="checkbox" name="norma_ypf_b0500"><span>YPF ED-B-05.00-01</span></label>
+            <label class="check-item"><input type="checkbox" name="norma_ypf_ep"><span>YPF ED(EP)-B-02.00-00</span></label>
+            <label class="check-item">
+              <input type="checkbox" name="metodologia_cliente">
+              <span>Metodología de ensayo según indicaciones del cliente</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <h4>Códigos de referencia <span style="font-weight:400;font-size:12px;color:var(--ink-3)">(opcionales)</span></h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="cod_asme" id="cod_asme">
+              <span>ASME BPVC Sección IX Ed.
+                <input type="text" name="ed_asme" placeholder="2025"
+                  style="width:50px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent">
+              </span>
+            </label>
+            <label class="check-item"><input type="checkbox" name="cod_aws_d11"><span>AWS D1.1</span></label>
+            <label class="check-item"><input type="checkbox" name="cod_api1104"><span>API 1104</span></label>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <h4>Parámetros de ensayo</h4>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Metodología</label>
+              <input type="text" name="metodologia" class="input mono" value="ITM N°076" placeholder="ej: ITM N°076">
+            </div>
+            <div class="field">
+              <label class="field-label">Tiempo de aplicación</label>
+              <input type="text" name="tiempo_aplicacion" class="input mono" value="15 s" placeholder="ej: 15 s">
+            </div>
+          </div>
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Carga aplicada (Kgf) <span class="req">*</span></label>
+              <select name="carga_aplicada" class="select" data-required>
+                <option value="">— Seleccionar —</option>
+                <option value="0,1">0,1 kgf → HV 0,1/15</option>
+                <option value="0,3">0,3 kgf → HV 0,3/15</option>
+                <option value="0,5">0,5 kgf → HV 0,5/15</option>
+                <option value="1">1 kgf → HV 1/15</option>
+                <option value="3">3 kgf → HV 3/15</option>
+                <option value="5">5 kgf → HV 5/15</option>
+                <option value="10">10 kgf → HV 10/15</option>
+                <option value="30">30 kgf → HV 30/15</option>
+                <option value="50">50 kgf → HV 50/15</option>
+                <option value="100">100 kgf → HV 100/15</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Espesor de probeta (mm)</label>
+              <input type="text" name="espesor_probeta" class="input mono" placeholder="ej: 10">
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (°C) <span class="req">*</span></label>
+              <input type="number" name="temperatura" class="input mono" step="0.1" placeholder="21" data-required>
+            </div>
+            <div class="field">
+              <label class="field-label">Patrón N˚ <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <input type="text" name="patron" class="input mono" placeholder="ej: 045">
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Equipamiento ── -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+
+          <div style="margin-bottom:12px">
+            <p class="muted" style="font-size:12px;margin:0 0 8px;font-weight:600">Grupo A — Buehler Wilson</p>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[buehler_405]" value="true" checked>
+                <span>Microdurómetro Buehler Wilson VH 1150 TAG N˚MM-405</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[calibre_mitutoyo_703]" value="true">
+                <span>Calibre digital Mitutoyo TAG N˚MM-703</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[calibre_570]" value="true">
+                <span>Calibre digital Mitutoyo TAG N˚CAL-570</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[termohigro_700]" value="true" checked>
+                <span>Termohigrómetro TAG N˚MM-700</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[patron_vickers]" value="true">
+                <span>Patrón TAG N˚MM-*** (usar N˚ del campo de arriba)</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <p class="muted" style="font-size:12px;margin:0 0 8px;font-weight:600">Grupo B — Zwick</p>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[zwick_013]" value="true">
+                <span>Microdurómetro Zwick TAG N˚MM-013</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="equipamiento[calibre_694]" value="true">
+                <span>Calibre digital TAG N˚MM-694</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Resultados ── -->
+        <div class="card-section">
+          <h4>Resultados obtenidos</h4>
+          <p class="muted" style="font-size:12px;margin:0 0 12px">
+            Zona y Distancia son opcionales por fila. Las filas sin Dureza HV se omiten en el informe.
+          </p>
+
+          <div class="h-stack" style="gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+            <label class="field-label" style="margin:0;white-space:nowrap">Cantidad de improntas:</label>
+            <select id="cant-improntas" class="select" style="max-width:110px" onchange="ajustarFilas()">
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="8">8</option>
+              <option value="10" selected>10</option>
+              <option value="12">12</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+              <option value="25">25</option>
+              <option value="30">30</option>
+            </select>
+            <button type="button" class="btn btn-sm" onclick="calcularPromedio()">Calcular promedio</button>
+          </div>
+
+          <div class="tabla-resultados-wrap">
+            <table class="tabla-resultados" id="tabla-vickers">
+              <thead>
+                <tr>
+                  <th style="width:80px">Impronta N˚</th>
+                  <th>Zona</th>
+                  <th style="width:120px">Dureza HV</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-vickers"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" style="text-align:right;font-weight:600;padding:6px 8px">Promedio HV</td>
+                  <td><input type="text" name="promedio_hv" id="input-promedio" class="input mono" placeholder="—" style="text-align:center"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Nota ── -->
+        <div class="card-section">
+          <h4>Nota</h4>
+          <div class="check-group">
+            <label class="check-item">
+              <input type="checkbox" name="nota_conversion">
+              <span>Equivalencia de durezas según ASTM E140-12(2019) tabla *.</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="tiene_nota" id="chk-nota"
+                onchange="document.getElementById('nota-wrap').style.display = this.checked ? 'block' : 'none'">
+              <span style="font-weight:600">Agregar nota personalizada</span>
+            </label>
+          </div>
+          <div id="nota-wrap" style="display:none;margin-top:8px">
+            <textarea name="nota_texto" class="textarea" rows="3" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- ── OAA ── -->
+        <div class="card-section">
+          <h4>Aclaración OAA</h4>
+          <label class="check-item">
+            <input type="checkbox" name="oaa">
+            <span>"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."</span>
+          </label>
+        </div>
+
+        <!-- ── Evaluación ── -->
+        <div class="card-section">
+          <h4>Evaluación de resultados</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="document.getElementById('evaluacion-wrap').style.display = this.checked ? 'block' : 'none'">
+            <span style="font-weight:600">Agregar sección EVALUACIÓN DE RESULTADOS</span>
+          </label>
+          <div id="evaluacion-wrap" style="display:none;margin-top:8px">
+            <textarea name="evaluacion_texto" class="textarea" rows="3" placeholder="Texto de la evaluación..."></textarea>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="h-stack" style="justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const params = new URLSearchParams(location.search);
+const nroOt  = params.get('ot') || '';
+function ajustarFilas(valoresPrevios) {
+  const cant  = parseInt(document.getElementById('cant-improntas').value, 10) || 10;
+  const tbody = document.getElementById('tbody-vickers');
+  tbody.innerHTML = '';
+  for (let i = 1; i <= 30; i++) {
+    const m   = valoresPrevios?.mediciones?.[i - 1] || {};
+    const tr  = document.createElement('tr');
+    tr.id     = `fila-${i}`;
+    tr.style.display = i <= cant ? '' : 'none';
+    tr.innerHTML =
+      `<td style="text-align:center;font-weight:600">${i}</td>` +
+      `<td><input type="text" name="m${i}_zona" class="input" value="${m.zona || ''}" placeholder="ej: ZAC"></td>` +
+      `<td><input type="text" name="m${i}_dureza" class="input mono" value="${m.dureza || ''}" placeholder="HV"></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function calcularPromedio() {
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 10;
+  const vals = [];
+  for (let i = 1; i <= cant; i++) {
+    const v = parseFloat(document.querySelector(`[name="m${i}_dureza"]`)?.value);
+    if (!isNaN(v)) vals.push(v);
+  }
+  if (!vals.length) return;
+  const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+  document.getElementById('input-promedio').value = Math.round(prom * 10) / 10;
+  Storage.guardarBorrador(nroOt, 'dureza-vickers', recolectarVickers());
+}
+
+// ── Recolección ───────────────────────────────────────────────────────────────
+
+function recolectarVickers() {
+  const form = document.getElementById('form-vickers');
+  const base = recolectarDatosForm(form);
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  const cant = parseInt(document.getElementById('cant-improntas').value, 10) || 10;
+  const mediciones = [];
+  for (let i = 1; i <= 30; i++) {
+    mediciones.push({
+      impronta: i,
+      zona:     form.querySelector(`[name="m${i}_zona"]`)?.value   || '',
+      dureza:   form.querySelector(`[name="m${i}_dureza"]`)?.value || '',
+    });
+  }
+  base.mediciones  = mediciones;
+  base.cant_improntas = cant;
+  return base;
+}
+
+// ── Rellenar ──────────────────────────────────────────────────────────────────
+
+function rellenarVickers(datos) {
+  rellenarForm(document.getElementById('form-vickers'), datos);
+  if (datos.tiene_evaluacion) document.getElementById('evaluacion-wrap').style.display = 'block';
+  if (datos.tiene_nota)       document.getElementById('nota-wrap').style.display = 'block';
+
+  const cant = datos.cant_improntas || (datos.mediciones?.length) || 10;
+  document.getElementById('cant-improntas').value = String(Math.min(cant, 30));
+  ajustarFilas(datos);
+  toggleDistancia(mostrarDistancia);
+}
+
+// ── Guardar ───────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada.', 'error'); return; }
+  const form = document.getElementById('form-vickers');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarVickers();
+  try {
+    await guardarEnsayoServidor(nroOt, 'dureza-vickers', datos);
+    Storage.borrarBorrador(nroOt, 'dureza-vickers');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    ajustarFilas();
+    return;
+  }
+
+  document.getElementById('back-link').href        = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+
+      const borrador = Storage.cargarBorrador(nroOt, 'dureza-vickers');
+      if (borrador) {
+        rellenarVickers(borrador);
+      } else {
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'dureza-vickers');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string' ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          rellenarVickers(datos);
+        } else {
+          ajustarFilas();
+        }
+      }
+    }
+  } catch { ajustarFilas(); }
+
+  document.getElementById('cant-improntas').addEventListener('change', () => ajustarFilas(recolectarVickers()));
+  document.getElementById('form-vickers').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'dureza-vickers', recolectarVickers());
+  });
+});
+
+</script>
+</body>
+</html>

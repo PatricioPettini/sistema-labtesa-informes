@@ -1,0 +1,10 @@
+{
+  "metodologia": "ITM interno",
+  "norma": "ISO 4287",
+  "resultado_texto": "Los valores obtenidos fueron los siguientes:",
+  "resultados": [
+    { "muestra": "M1", "ra": "1.25", "rz": "6.8" },
+    { "muestra": "M2", "ra": "1.30", "rz": "7.1" }
+  ],
+  "oaa": true
+}

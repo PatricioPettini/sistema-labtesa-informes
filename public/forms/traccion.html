@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ensayo de Tracción — LABTESA</title>
+  <link rel="stylesheet" href="/css/app-styles.css">
+  <style>
+    .seccion-neuquen { display: none; }
+    body.neuquen .seccion-neuquen { display: block; }
+    body.neuquen .seccion-estandar { display: none; }
+  </style>
+</head>
+<body>
+<div class="lab-app density-regular">
+
+  <header class="lab-topbar">
+    <div class="h-stack" style="gap:16px">
+      <div class="lab-brand">
+        <div class="lab-logo">L</div>
+        <div>
+          <div class="lab-brand-name">Sistema de Informes</div>
+          <div class="lab-brand-sub">LABTESA · Laboratorio metalúrgico</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <div class="lab-crumb">
+      <a href="/">Órdenes de trabajo</a>
+      <span class="sep">/</span>
+      <a id="back-link" href="#">OT</a>
+      <span class="sep">/</span>
+      <span>Ensayo de Tracción</span>
+    </div>
+
+    <div class="lab-page-head">
+      <div>
+        <h1>Ensayo de Tracción</h1>
+        <div class="lab-page-sub">Norma de referencia ASTM E8 / IRAM-IAS U500-102 · acreditado</div>
+      </div>
+    </div>
+
+    <!-- OT Banner -->
+    <div id="ot-banner" class="ot-banner">
+      <div class="ot-banner-item">
+        <span class="lbl">OT</span>
+        <span class="val mono" id="banner-ot">—</span>
+      </div>
+      <div class="ot-banner-divider"></div>
+      <div class="ot-banner-item" style="flex:1;min-width:0">
+        <span class="lbl">Cliente</span>
+        <span class="val" id="banner-cliente" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
+    </div>
+
+    <form id="form-traccion" novalidate>
+
+      <!-- Variante -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-section">
+          <h4>Variante del ensayo</h4>
+          <div class="toggle-variante">
+            <button type="button" id="btn-estandar" class="activo" onclick="setVariante('estandar')">Estándar</button>
+            <button type="button" id="btn-neuquen"               onclick="setVariante('neuquen')">Neuquén</button>
+          </div>
+          <input type="hidden" name="variante" id="input-variante" value="estandar">
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+
+        <!-- Normas y metodología -->
+        <div class="card-section">
+          <h4>Normas y metodología</h4>
+
+          <div class="field" style="margin-bottom:12px">
+            <label class="field-label">Códigos de referencia (opcionales)</label>
+            <div class="check-group">
+              <label class="check-item">
+                <input type="checkbox" name="cod_asme" id="cod_asme">
+                <span>ASME BPVC Sección IX Ed. <input type="text" name="ed_asme" placeholder="2025"
+                  style="width:55px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;font-family:var(--font-mono);background:transparent"></span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_api1104">
+                <span>API 1104 Ed.22-2021 (E1-2023)</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="cod_api5l">
+                <span>API 5L</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="norma_astm_a370">
+                <span>Norma de referencia: ASTM A370-24</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-bottom:12px">
+            <div class="field">
+              <label class="field-label" for="norma_ensayo">Norma de ensayo <span class="req">*</span></label>
+              <select name="norma_ensayo" id="norma_ensayo" class="select" data-required>
+                <option value="">— Seleccionar —</option>
+                <option value="ASTM E8-25">ASTM E8-25</option>
+                <option value="ASTM E8M-25">ASTM E8M-25</option>
+                <option value="ASTM A370-24">ASTM A370-24</option>
+                <option value="ISO 6892-1:2019">ISO 6892-1:2019</option>
+                <option value="DIN 50109">DIN 50109</option>
+                <option value="otra">Otra...</option>
+              </select>
+            </div>
+            <div class="field" id="norma-otra-wrap" style="display:none">
+              <label class="field-label">Especificar norma</label>
+              <input type="text" name="norma_ensayo_otra" class="input" placeholder="Ingresar norma">
+            </div>
+            <div class="field">
+              <label class="field-label">Metodología</label>
+              <input type="text" name="metodologia" class="input" value="ITM N˚075">
+            </div>
+          </div>
+
+          <div class="check-group" style="margin-bottom:12px">
+            <label class="check-item" id="wrap-plano-asme">
+              <input type="checkbox" name="tiene_plano_asme" id="chk-plano-asme">
+              <span>Plano de probeta según
+                <input type="text" name="plano_asme" placeholder="ISO 6892-1:2019 Tabla D.1 Diam 14 / ASME BPVC Sección IX Ed.2025 QW 462.1(a) / etc"
+                  style="width:340px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent">
+              </span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="tiene_figura_spec" id="chk-figura">
+              <span>Probeta mecanizada según
+                <input type="text" name="figura_spec" placeholder="Fig. 9 Spec 1 / ASTM A370-23 Fig. 4 Standard / etc"
+                  style="width:340px;border:none;border-bottom:1px solid var(--border-strong);font-size:13px;padding:0 2px;background:transparent">
+              </span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="prob_cliente">
+              <span>Probeta mecanizada por el cliente</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="prob_soldada">
+              <span>Probeta soldada</span>
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Orientación de la probeta <span style="font-size:11px;color:var(--ink-3);font-weight:400">(opcional)</span></label>
+              <select name="orientacion" class="select">
+                <option value="">— Seleccionar —</option>
+                <option value="Longitudinal">Longitudinal</option>
+                <option value="Transversal">Transversal</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Temperatura de ensayo (°C) <span class="req">*</span></label>
+              <input type="number" name="temperatura" class="input mono" step="0.1" placeholder="21" data-required>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:12px" id="unidades-wrap">
+            <label class="field-label">Unidades de resultado</label>
+            <div class="check-group" style="flex-direction:row;gap:24px;margin-top:4px">
+              <label class="check-item">
+                <input type="radio" name="unidad" value="MPa" checked>
+                <span>MPa (por defecto)</span>
+              </label>
+              <label class="check-item">
+                <input type="radio" name="unidad" value="KSI">
+                <span>KSI</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipamiento -->
+        <div class="card-section">
+          <h4>Equipamiento utilizado</h4>
+
+          <div class="check-group seccion-estandar" id="equipos-estandar">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[emic]" value="true" checked>
+              <span>Máquina de tracción Emic TAG N˚MM-203</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_571]" value="true" checked>
+              <span>Calibre digital TAG N˚MM-571</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[nivel_781]" value="true">
+              <span>Nivel angular magnético TAG N˚MM-781</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_545]" value="true" checked>
+              <span>Termohigrómetro TAG N˚PCAL-545</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_702]" value="true">
+              <span>Termohigrómetro TAG N˚MM-702</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_cal570]" value="true">
+              <span>Calibre digital TAG N˚CAL-570</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[trazado_782]" value="true">
+              <span>Dispositivo de trazado TAG N˚MM-782</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[regla_441]" value="true">
+              <span>Regla metálica TAG N˚MM-441/443</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[proyector_165]" value="true">
+              <span>Proyector de perfiles TAG N˚MM-165</span>
+            </label>
+          </div>
+
+          <div class="check-group seccion-neuquen" id="equipos-neuquen">
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[shimadzu]" value="true" checked>
+              <span>Máquina de tracción Shimadzu TAG N˚MM-151</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[calibre_694]" value="true" checked>
+              <span>Calibre digital TAG N˚MM-694</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" name="equipamiento[termohigro_794]" value="true" checked>
+              <span>Termohigrómetro TAG N°MM-794</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Muestras y resultados -->
+        <div class="card-section">
+          <h4>Muestras y resultados</h4>
+          <div class="field-grid" style="margin-bottom:16px;max-width:480px">
+            <div class="field">
+              <label class="field-label">Cantidad de muestras</label>
+              <select id="cant-muestras" class="select" onchange="generarTablaMuestras()">
+                <option value="1">1 muestra</option>
+                <option value="2">2 muestras</option>
+                <option value="3">3 muestras</option>
+                <option value="4">4 muestras</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Columna "Valores requeridos"</label>
+              <label class="check-item" style="margin-top:8px">
+                <input type="checkbox" id="chk-valores-req" onchange="generarTablaMuestras()">
+                <span>Agregar columna de especificación</span>
+              </label>
+            </div>
+          </div>
+          <div id="tabla-muestras-wrap" class="tabla-resultados-wrap"></div>
+        </div>
+
+        <!-- Nota -->
+        <div class="card-section">
+          <h4>Nota</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_nota" id="chk-nota" onchange="toggleSeccion('nota-wrap', this.checked)">
+            <span style="font-weight:600">Agregar sección NOTA</span>
+          </label>
+          <div id="nota-wrap" style="display:none;margin-top:8px">
+            <textarea name="nota_texto" class="textarea" rows="3" placeholder="Texto de la nota..."></textarea>
+          </div>
+        </div>
+
+        <!-- Secciones opcionales Neuquén -->
+        <div class="card-section seccion-neuquen">
+          <h4>Secciones opcionales (Neuquén)</h4>
+          <label class="check-item" style="margin-bottom:8px">
+            <input type="checkbox" name="tiene_evaluacion" id="chk-evaluacion"
+              onchange="toggleSeccion('evaluacion-wrap', this.checked)">
+            <span style="font-weight:600">Agregar EVALUACIÓN DE RESULTADOS</span>
+          </label>
+          <div id="evaluacion-wrap" style="display:none;margin-top:8px">
+            <textarea name="evaluacion_texto" class="textarea" rows="3" placeholder="Texto de la evaluación..."></textarea>
+          </div>
+        </div>
+
+        <!-- Aclaración OAA (común a ambas variantes) -->
+        <div class="card-section">
+          <label class="check-item">
+            <input type="checkbox" name="oaa">
+            <span>Agregar aclaración OAA: "Los parámetros marcados con (*) no están incluidos en el alcance de la acreditación del OAA"</span>
+          </label>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="card-section">
+          <h4>Observaciones</h4>
+          <textarea name="observaciones" class="textarea" rows="3" placeholder="Observaciones adicionales (opcional)..."></textarea>
+        </div>
+      </div>
+
+      <div class="h-stack" style="justify-content:space-between;margin-top:4px">
+        <span class="muted" style="font-size:12px">Los cambios se guardan al presionar Guardar ensayo.</span>
+        <div class="h-stack" style="gap:8px">
+          <button type="button" class="btn" id="btn-cancelar">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btn-guardar"></button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="/js/storage.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/form-base.js"></script>
+<script>
+
+const FILAS_ESTANDAR = [
+  { label: 'Ancho promedio (mm)',                    key: 'ancho_promedio' },
+  { label: 'Espesor promedio (mm)',                  key: 'espesor_promedio' },
+  { label: 'Diámetro promedio (mm)',                 key: 'diametro_promedio' },
+  { label: 'Sección inicial S0 (mm²)',               key: 'seccion_inicial' },
+  { label: 'Carga máxima (DaN)',                     key: 'carga_maxima' },
+  { label: 'Resistencia a la tracción (MPa/KSI)',    key: 'resistencia_traccion' },
+  { label: 'Carga de fluencia (DaN)',                key: 'carga_fluencia' },
+  { label: 'Tensión de fluencia (MPa/KSI)',          key: 'tension_fluencia' },
+  { label: 'Longitud inicial (mm)',                  key: 'longitud_inicial' },
+  { label: 'Longitud final (mm)',                    key: 'longitud_final' },
+  { label: 'Alargamiento (%)',                       key: 'alargamiento' },
+  { label: 'Diámetro final (mm)',                    key: 'diametro_final' },
+  { label: 'Sección final (mm²)',                    key: 'seccion_final' },
+  { label: 'Estricción (%)',                         key: 'estriccion' },
+  { label: 'Defectos',                               key: 'defectos' },
+  { label: 'Zona de rotura',                         key: 'zona_rotura' },
+  { label: 'Tipo de rotura',                         key: 'tipo_rotura' },
+  { label: 'Lado de rotura',                         key: 'lado_rotura' },
+];
+
+const FILAS_NEUQUEN = [
+  { label: 'Ancho promedio (mm)',              key: 'ancho_promedio' },
+  { label: 'Espesor promedio (mm)',            key: 'espesor_promedio' },
+  { label: 'Diámetro promedio (mm)',           key: 'diametro_promedio' },
+  { label: 'Sección inicial S0 (mm²)',         key: 'seccion_inicial' },
+  { label: 'Carga máxima (DaN)',               key: 'carga_maxima' },
+  { label: 'Resistencia a la tracción (MPa)',  key: 'resistencia_traccion' },
+  { label: 'Carga de fluencia (DaN)',          key: 'carga_fluencia' },
+  { label: 'Tensión de fluencia (MPa)',        key: 'tension_fluencia' },
+  { label: 'Longitud inicial (mm)',            key: 'longitud_inicial' },
+  { label: 'Longitud final (mm)',              key: 'longitud_final' },
+  { label: 'Alargamiento (%)',                 key: 'alargamiento' },
+];
+
+// Filas que llevan asterisco OAA por defecto (cuando el checkbox global OAA está activo)
+const ASTERISCO_DEFAULT = new Set([
+  'tension_fluencia', 'alargamiento', 'estriccion',
+  'zona_rotura', 'tipo_rotura', 'lado_rotura',
+]);
+
+// Estado mutable de filas: claves excluidas / claves con asterisco
+let filasExcluidas    = new Set();
+let filasConAsterisco = new Set();
+
+const params         = new URLSearchParams(location.search);
+const nroOt          = params.get('ot') || '';
+let   varianteActual = 'estandar';
+
+function setVariante(v) {
+  varianteActual = v;
+  document.getElementById('input-variante').value = v;
+  document.getElementById('btn-estandar').classList.toggle('activo', v === 'estandar');
+  document.getElementById('btn-neuquen').classList.toggle('activo',  v === 'neuquen');
+  document.body.classList.toggle('neuquen', v === 'neuquen');
+  generarTablaMuestras();
+}
+
+function generarTablaMuestras(valoresPrevios) {
+  // Restaurar estado de filas excluidas / con asterisco si viene de un borrador o ensayo guardado
+  if (valoresPrevios?.filas_excluidas)    filasExcluidas    = new Set(valoresPrevios.filas_excluidas);
+  if (valoresPrevios?.filas_con_asterisco) filasConAsterisco = new Set(valoresPrevios.filas_con_asterisco);
+
+  const cantEl = document.getElementById('cant-muestras');
+  const cant   = parseInt(cantEl.value, 10) || 1;
+  const conReq = document.getElementById('chk-valores-req').checked;
+  const filas  = varianteActual === 'estandar' ? FILAS_ESTANDAR : FILAS_NEUQUEN;
+  const label  = nroOt || '______';
+  // Default de encabezados de columna: 1 muestra → "O.T. xxx"; varias → "M1", "M2", "M3"...
+  const colMuestras = cant === 1
+    ? [`O.T. ${label}`]
+    : Array.from({ length: cant }, (_, i) => `M${i + 1}`);
+
+  let html = `<table class="tabla-resultados">
+    <thead><tr>
+      <th style="width:22px" title="Quitar fila"></th>
+      <th>Parámetros</th>
+      <th style="width:34px" title="Marcar con * (fuera de alcance OAA)">*</th>
+      ${colMuestras.map((c, i) => `<th><input type="text" name="nro_ot_m${i+1}"
+        value="${c}" style="text-align:center;font-weight:700;font-size:12px"></th>`).join('')}
+      ${conReq ? '<th>Valores requeridos</th>' : ''}
+    </tr></thead>
+    <tbody>`;
+
+  filas.forEach(({ label: lbl, key }) => {
+    if (filasExcluidas.has(key)) return;
+    const ast = filasConAsterisco.has(key);
+    html += `<tr data-key="${key}">
+      <td style="text-align:center;padding:0">
+        <button type="button" class="btn-quitar-fila" title="Quitar esta fila"
+          onclick="quitarFila('${key}')"
+          style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:4px">✕</button>
+      </td>
+      <td>${lbl}${ast ? ' <span style="color:var(--accent);font-weight:700">*</span>' : ''}</td>
+      <td style="text-align:center">
+        <input type="checkbox" ${ast ? 'checked' : ''}
+          onchange="toggleAsterisco('${key}', this.checked)"
+          title="Marcar con * (fuera de alcance OAA)">
+      </td>`;
+    for (let i = 0; i < cant; i++) {
+      const val = valoresPrevios?.muestras?.[i]?.[key] ?? '';
+      html += `<td><input type="text" name="m${i}_${key}" value="${val}"></td>`;
+    }
+    if (conReq) {
+      const valReq = valoresPrevios?.valores_req?.[key] ?? '';
+      html += `<td><input type="text" name="req_${key}" value="${valReq}"></td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Botón para restaurar filas eliminadas (si hay alguna)
+  const filasOcultas = filas.filter(f => filasExcluidas.has(f.key));
+  if (filasOcultas.length > 0) {
+    html += `<div style="margin-top:8px;padding:8px;background:var(--bg-soft);border-radius:6px">
+      <span style="font-size:12px;color:var(--muted)">Filas ocultas:</span>
+      ${filasOcultas.map(f => `
+        <button type="button" class="btn-small" onclick="restaurarFila('${f.key}')"
+          style="margin:2px 4px;padding:3px 8px;font-size:12px;border:1px solid var(--border);background:white;border-radius:4px;cursor:pointer">
+          + ${f.label}
+        </button>
+      `).join('')}
+    </div>`;
+  }
+
+  document.getElementById('tabla-muestras-wrap').innerHTML = html;
+}
+
+// Helpers globales para los botones inline
+function quitarFila(key) {
+  filasExcluidas.add(key);
+  filasConAsterisco.delete(key);
+  generarTablaMuestras(recolectarTodo());
+}
+function restaurarFila(key) {
+  filasExcluidas.delete(key);
+  generarTablaMuestras(recolectarTodo());
+}
+function toggleAsterisco(key, on) {
+  if (on) filasConAsterisco.add(key);
+  else    filasConAsterisco.delete(key);
+  // Re-render para actualizar visualmente el asterisco al lado del label
+  generarTablaMuestras(recolectarTodo());
+}
+
+function recolectarTodo() {
+  const form = document.getElementById('form-traccion');
+  const cant = parseInt(document.getElementById('cant-muestras').value, 10) || 1;
+  const filas = varianteActual === 'estandar' ? FILAS_ESTANDAR : FILAS_NEUQUEN;
+  const base = recolectarDatosForm(form);
+
+  const equipamiento = {};
+  form.querySelectorAll('[name^="equipamiento["]').forEach(el => {
+    const key = el.name.replace('equipamiento[', '').replace(']', '');
+    equipamiento[key] = el.checked;
+  });
+  base.equipamiento = equipamiento;
+
+  const muestras = [];
+  for (let i = 0; i < cant; i++) {
+    const m = {};
+    filas.forEach(({ key }) => {
+      const input = form.querySelector(`[name="m${i}_${key}"]`);
+      m[key] = input?.value ?? '';
+    });
+    const headerInput = form.querySelector(`[name="nro_ot_m${i + 1}"]`);
+    m.columna_label = headerInput ? headerInput.value.trim() : `M${i + 1}`;
+    muestras.push(m);
+  }
+  base.muestras = muestras;
+
+  if (document.getElementById('chk-valores-req').checked) {
+    const valores_req = {};
+    filas.forEach(({ key }) => {
+      const input = form.querySelector(`[name="req_${key}"]`);
+      if (input) valores_req[key] = input.value;
+    });
+    base.valores_req = valores_req;
+  }
+
+  // Preservar estado de filas
+  base.filas_excluidas    = Array.from(filasExcluidas);
+  base.filas_con_asterisco = Array.from(filasConAsterisco);
+  return base;
+}
+
+function toggleSeccion(id, visible) {
+  document.getElementById(id).style.display = visible ? 'block' : 'none';
+}
+
+document.getElementById('btn-guardar').addEventListener('click', async () => {
+  if (!nroOt) { toast('Sin OT cargada. Abrí este formulario desde la página de la OT.', 'error'); return; }
+  const form = document.getElementById('form-traccion');
+  if (!validarRequeridos(form)) return;
+  const datos = recolectarTodo();
+  try {
+    await guardarEnsayoServidor(nroOt, 'traccion', datos);
+    Storage.borrarBorrador(nroOt, 'traccion');
+    toast('Datos guardados correctamente', 'ok');
+  } catch (err) {
+    toast(`Error al guardar: ${err.message}`, 'error');
+  }
+});
+
+document.querySelector('[name="norma_ensayo"]').addEventListener('change', function () {
+  document.getElementById('norma-otra-wrap').style.display = this.value === 'otra' ? 'block' : 'none';
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('btn-guardar').innerHTML  = getIcon('check') + ' Guardar ensayo';
+  document.getElementById('btn-cancelar').innerHTML = getIcon('back')  + ' Volver';
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    window.location.href = nroOt ? `/forms/ot.html?nro_ot=${nroOt}` : '/';
+  });
+
+  if (!nroOt) {
+    document.getElementById('ot-banner').innerHTML =
+      `<span style="color:var(--danger)">Sin OT especificada. <a href="/">Ir al dashboard</a></span>`;
+    return;
+  }
+
+  document.getElementById('back-link').href = `/forms/ot.html?nro_ot=${nroOt}`;
+  document.getElementById('back-link').textContent = `OT ${nroOt}`;
+
+  try {
+    const resp = await fetch(`/api/ot/${nroOt}`);
+    if (resp.ok) {
+      const ot = await resp.json();
+      document.getElementById('banner-ot').textContent      = `OT ${ot.nro_ot}`;
+      document.getElementById('banner-cliente').textContent = ot.razon_social || '';
+    }
+  } catch {}
+
+  const borrador = Storage.cargarBorrador(nroOt, 'traccion');
+  if (borrador) {
+    rellenarForm(document.getElementById('form-traccion'), borrador);
+    if (borrador.variante) setVariante(borrador.variante);
+    generarTablaMuestras(borrador);
+  } else {
+    try {
+      const resp = await fetch(`/api/ot/${nroOt}`);
+      if (resp.ok) {
+        const ot = await resp.json();
+        const ensayo = (ot.ensayos || []).find(e => e.tipo === 'traccion');
+        if (ensayo) {
+          const datos = typeof ensayo.datos_json === 'string' ? JSON.parse(ensayo.datos_json) : ensayo.datos_json;
+          rellenarForm(document.getElementById('form-traccion'), datos);
+          if (datos.variante) setVariante(datos.variante);
+          generarTablaMuestras(datos);
+        } else {
+          setVariante(varianteActual);
+        }
+      }
+    } catch { setVariante(varianteActual); }
+  }
+
+  document.getElementById('form-traccion').addEventListener('input', () => {
+    Storage.guardarBorrador(nroOt, 'traccion', recolectarTodo());
+  });
+});
+
+</script>
+</body>
+</html>
