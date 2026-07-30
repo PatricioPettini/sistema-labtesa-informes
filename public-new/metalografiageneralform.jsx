@@ -151,6 +151,16 @@ function MetalografiaGeneralForm(props) {
                   n.opciones.map(function (op, i) { return _r('option', { key: i, value: op }); })
                 )
               : null),
+          // Otra norma de ensayo — opcional. Si tiene texto, se emite como una
+          // segunda línea "Norma de ensayo: <ref_otra>" en el Word.
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },
+            _r('span', { style: { color: '#555', minWidth: 130 } }, 'Otra norma:'),
+            _r('input', {
+              style: S.inline,
+              placeholder: 'Opcional — Ej: ASTM E407',
+              value: d.ref_otra || '',
+              onChange: function (e) { upd('analisis.' + n.key + '.ref_otra', e.target.value); },
+            })),
           // Metodología de ensayo — segundo campo separado. El generator ya lo
           // soporta (line "Metodología de ensayo: ${metod}").
           _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },

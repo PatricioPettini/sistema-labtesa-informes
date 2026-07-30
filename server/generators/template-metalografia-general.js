@@ -144,6 +144,7 @@ function construirBloqueEnsayo(datos) {
     seccionesActivas.forEach(([k, label]) => {
       const cfg = datos.analisis[k] || {};
       const ref = String(cfg.ref || '').trim();
+      const refOtra = String(cfg.ref_otra || '').trim();
       const metod = String(cfg.metodologia || '').trim();
       const zonaSec = String(cfg.zona || zonaTxt || '').trim();
       const ataqueSec = String(cfg.ataque || '').trim() || reactivoLinea.replace(/^Ataque utilizado:\s*/, '');
@@ -156,6 +157,7 @@ function construirBloqueEnsayo(datos) {
       // ── CONDICIONES DE ENSAYO ─────────────────────────────────────
       partes.push(pHeading('CONDICIONES DE ENSAYO'));
       if (ref)          partes.push(pLinea(`Norma de ensayo: ${ref}`));
+      if (refOtra)      partes.push(pLinea(`Norma de ensayo: ${refOtra}`));
       if (metod)        partes.push(pLinea(`Metodología de ensayo: ${metod}`));
       if (ataqueSec)    partes.push(pLinea(`Ataque utilizado: ${ataqueSec}`));
       if (zonaSec)      partes.push(pLinea(`Zonas examinadas: ${zonaSec}`));
