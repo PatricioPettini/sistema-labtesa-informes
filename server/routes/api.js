@@ -968,12 +968,31 @@ async function armarFotosParaOtYTipo(ot, tipo, ensayoId) {
     const { extraerNumerosMuestra } = require('../utils/fotos-auto');
     const numsMideEnsayo = extraerNumerosMuestra(ot.id_muestra);
     const setMPropio = new Set(numsMideEnsayo);
+    // Extrae TODOS los M<n> mencionados en un basename ("M1 M2 y M3.jpg" → [1,2,3]).
+    // Se usa como fallback cuando `it.muestra` (de carpeta ancestro) es null.
+    function _extraerMuestrasDeBasename(base) {
+      const nums = [];
+      const re = /\bM\s*(\d+)\b/gi;
+      let m;
+      while ((m = re.exec(base)) !== null) {
+        const n = parseInt(m[1], 10);
+        if (!isNaN(n) && nums.indexOf(n) === -1) nums.push(n);
+      }
+      return nums;
+    }
     const propios = r.items.filter(it => {
-      if (it.muestra == null) return false;
-      const nroOtDest = nroOtDeOrden[it.muestra];
-      if (nroOtDest && String(nroOtDest) === String(ot.nro_ot)) return true;
-      if (setMPropio.size > 0 && setMPropio.has(it.muestra)) return true;
-      return false;
+      // Muestras candidatas: primero de carpeta ancestro, después del basename.
+      let muestras = [];
+      if (it.muestra != null) muestras = [it.muestra];
+      else muestras = _extraerMuestrasDeBasename(pathMod.basename(it.abs));
+      if (muestras.length === 0) return false;
+      // ¿Alguna muestra corresponde a esta OT?
+      return muestras.some(mNum => {
+        const nroOtDest = nroOtDeOrden[mNum];
+        if (nroOtDest && String(nroOtDest) === String(ot.nro_ot)) return true;
+        if (setMPropio.size > 0 && setMPropio.has(mNum)) return true;
+        return false;
+      });
     });
     if (propios.length > 0) archivos = propios.map(it => it.abs);
   }
