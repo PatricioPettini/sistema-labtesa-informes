@@ -231,6 +231,36 @@ function esParrafoBlanco(para) {
 // ── Generador principal ───────────────────────────────────────────────────────
 
 function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
+  // ── Filtro multi-OT: si datos._filtro_ot está seteado, solo emitir las
+  // filas cuyo `nro_ot_override` matchea (o vacío/default para la OT del
+  // ensayo). El word-generator llama a este template una vez por cada OT del
+  // registro con `_filtro_ot` seteado.
+  if (datos && datos._filtro_ot != null) {
+    const otFiltro = String(datos._filtro_ot);
+    const esOtDelEnsayo = otFiltro === String(ot.nro_ot || '');
+    const filtrarArr = (arr) => (Array.isArray(arr) ? arr : []).filter(p => {
+      const ov = String((p && p.nro_ot_override) || '').trim();
+      const perteneceA = ov || String(ot.nro_ot || '');
+      return perteneceA === otFiltro || (esOtDelEnsayo && !ov);
+    });
+    datos = Object.assign({}, datos);
+    if (Array.isArray(datos.resultados)) datos.resultados = filtrarArr(datos.resultados);
+  }
+
+  // ── Aplicar textos_por_ot para la OT actual. Cada OT guarda sus propios
+  // textos de evaluación; si el mapa está presente, sobrescribimos los
+  // campos raíz con los de la OT actual antes de emitir.
+  if (datos && datos.textos_por_ot && typeof datos.textos_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const textosOt = datos.textos_por_ot[nroOtActual];
+    if (textosOt) {
+      datos = Object.assign({}, datos);
+      ['evaluacion_texto'].forEach(k => {
+        if (textosOt[k] !== undefined) datos[k] = textosOt[k];
+      });
+    }
+  }
+
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
 

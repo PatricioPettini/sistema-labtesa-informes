@@ -283,6 +283,26 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en impacto (mismo patrón que tracción/plegado).
+    if (tipo === 'impacto' && Array.isArray(clean.resultados)) {
+      var hayOverrideImp = clean.resultados.some(function (r) {
+        var over = String((r && r.nro_ot_override) || '').trim();
+        return over && over !== String(ot.nro_ot);
+      });
+      if (hayOverrideImp && typeof window.LabStore.saveEnsayoImpactoMultiOt === 'function') {
+        window.LabStore.saveEnsayoImpactoMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Impacto guardado · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+        return;
+      }
+    }
     window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null);
     toast((window.LabStore.labels[tipo] || 'Ensayo') + ' guardado', 'success');
     nav('#/ot/' + ot.nro_ot);
@@ -400,7 +420,7 @@ function EnsayoForm(props) {
       // (FM-039 y FM-037 respectivamente). Los otros ensayos siguen usando
       // el layout genérico basado en `sections`.
       tipo === 'impacto' && typeof window.ImpactoForm === 'function'
-        ? React.createElement(window.ImpactoForm, { datos: datos, set: set })
+        ? React.createElement(window.ImpactoForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'traccion' && typeof window.TraccionForm === 'function'
         ? React.createElement(window.TraccionForm, { datos: datos, set: set, otNro: props.nro_ot })

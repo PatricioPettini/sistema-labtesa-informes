@@ -560,6 +560,111 @@
       });
     },
 
+    // Split multi-OT para impacto: mismo patrón que tracción/plegado. Las filas
+    // de `resultados[]` con `nro_ot_override` apuntando a otra OT se transfieren
+    // al ensayo de impacto de esa OT hermana. Aplana `textos_por_ot` y
+    // `condiciones_por_ot` por hijo.
+    saveEnsayoImpactoMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var resultados = Array.isArray(datos.resultados) ? datos.resultados : [];
+      var otActualStr = String(nro_ot_actual);
+      var grupos = {};
+      resultados.forEach(function (r, i) {
+        var over = String((r && r.nro_ot_override) || '').trim();
+        var dest = over || otActualStr;
+        (grupos[dest] = grupos[dest] || []).push(i);
+      });
+      function extraerGrupo(idxs) {
+        return idxs.map(function (oldIdx) {
+          var r = Object.assign({}, resultados[oldIdx] || {});
+          delete r.nro_ot_override;
+          return r;
+        });
+      }
+      // Textos opcionales por OT (evaluación libre para impacto).
+      var mapaTextos = (datos && datos.textos_por_ot) || {};
+      var TEXTO_KEYS = ['evaluacion_texto'];
+      function aplanarTextosPara(nroOt) {
+        var m = mapaTextos[nroOt] || {};
+        var out = {};
+        TEXTO_KEYS.forEach(function (k) {
+          if (m[k] !== undefined) out[k] = m[k];
+          else if (nroOt === otActualStr) {
+            if (datos[k] !== undefined) out[k] = datos[k];
+          } else {
+            out[k] = '';
+          }
+        });
+        return out;
+      }
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      function condsPara(nroOt) {
+        var m = mapaCond[nroOt];
+        return m ? { condiciones_por_ot: { [nroOt]: Object.assign({}, m) } } : {};
+      }
+      var otsDest = Object.keys(grupos);
+      var idxActual = grupos[otActualStr] || [];
+      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsPara(otActualStr));
+      delete datosActual.textos_por_ot;
+      if (!datosActual.condiciones_por_ot) delete datosActual.condiciones_por_ot;
+      datosActual.resultados = extraerGrupo(idxActual);
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'impacto', datosActual, existingId || null);
+      var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var subResultados = extraerGrupo(grupos[nroY]);
+        var existente = _db.ensayos.find(function (e) {
+          return e.nro_ot === nroY && e.tipo === 'impacto';
+        });
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          var resultadosPrev = Array.isArray(datosPrev.resultados) ? datosPrev.resultados : [];
+          datosY = Object.assign({}, datosPrev, aplanarTextosPara(nroY), condsPara(nroY), {
+            resultados: resultadosPrev.concat(subResultados),
+          });
+          delete datosY.textos_por_ot;
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          // Condiciones GLOBALES del ensayo actual: norma, equipamiento, ITM,
+          // temperatura global, medida_probeta, entalla, etc. Se copian intactas.
+          var CONDICIONES_GLOBALES = [
+            'variante', 'maquina', 'metodologia',
+            'norma_iso148_1', 'norma_iso148_1_year',
+            'norma_astm_e23', 'norma_astm_e23_year',
+            'norma_din_10045', 'norma_din_10045_year',
+            'norma',
+            'cod_asme', 'ed_asme', 'cod_api1104', 'cod_api5l',
+            'cod_aws_d11', 'cod_extra',
+            'temperatura', 'medida_probeta', 'entalla', 'tipo_probeta',
+            'equipamiento', 'equipamiento_tags', 'otros_equipos',
+            'nota1', 'nota_evaluaciones', 'nota_no_conforme',
+            'nota_incertidumbre', 'nota_externo',
+          ];
+          datosY = Object.assign({}, aplanarTextosPara(nroY), condsPara(nroY), {
+            resultados: subResultados,
+          });
+          CONDICIONES_GLOBALES.forEach(function (k) {
+            if (datos[k] !== undefined) datosY[k] = datos[k];
+          });
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'impacto', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, cantidad: subResultados.length, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: idxActual.length },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
     // Igual que saveEnsayo pero devuelve una Promise con la fila guardada (id
     // real de la DB). Lo usa el flujo de firma-obligatoria-al-guardar, que
     // necesita el id para firmar inmediatamente después de guardar.

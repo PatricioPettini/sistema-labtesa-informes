@@ -59,6 +59,18 @@ function ImpactoForm(props) {
 
   var medidas = splitMedida(datos.medida_probeta);
 
+  // ── Contexto multi-OT (idéntica lógica que tracción/plegado) ─────────────
+  // otNroActual = la OT del ensayo actual (donde estamos parados).
+  // otsDisponibles = todas las OTs hermanas de la misma solicitud (incluida la actual).
+  //                  Habilita el selector de OT por fila en la tabla de resultados.
+  var otNroActual = props.otNro || '';
+  var otActualObj = otNroActual && window.LabStore && window.LabStore.getOt
+    ? window.LabStore.getOt(otNroActual) : null;
+  var solActual = otActualObj && otActualObj.nro_solicitud;
+  var otsDisponibles = (solActual && window.LabStore.listOtsBySolicitud)
+    ? window.LabStore.listOtsBySolicitud(solActual)
+    : (otActualObj ? [otActualObj] : []);
+
   // ── Estilos comunes ────────────────────────────────────────────────────
   var S = Object.assign({}, window.FORM_STYLES, {
     // padBox local: la variante de impacto necesita flex-column con gap para
@@ -251,6 +263,9 @@ function ImpactoForm(props) {
         _r('thead', null,
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { style: { border: '1px solid #333', padding: 3, width: 40 } }, 'N°'),
+            otsDisponibles.length > 1
+              ? _r('th', { style: { border: '1px solid #333', padding: 3, width: 90 }, title: 'OT destino de la fila' }, 'OT')
+              : null,
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'ZONA / N° PROBETA'),
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'VERIF. DIM. (int.)'),
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'ENERGÍA [J]'),
@@ -267,8 +282,36 @@ function ImpactoForm(props) {
             r = r || {};
             var tdIn = { border: '1px solid #333', padding: 0 };
             var inp = Object.assign({}, S.inputCell, { border: 'none', width: '100%' });
+            var otOverride = String(r.nro_ot_override || '').trim();
+            var otEffective = otOverride || otNroActual;
+            var esOtra = otOverride && otOverride !== otNroActual;
             return _r('tr', { key: i },
               _r('td', { style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' } }, i + 1),
+              // Selector de OT — solo si hay hermanas. Al cambiar, esta fila
+              // se transfiere al ensayo de impacto de la OT destino al guardar
+              // (vía saveEnsayoImpactoMultiOt).
+              otsDisponibles.length > 1
+                ? _r('td', { style: { border: '1px solid #333', textAlign: 'center', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
+                    _r('select', {
+                      value: otEffective,
+                      onChange: function (e) {
+                        var v = String(e.target.value || '').trim();
+                        if (v === otNroActual) v = '';
+                        setRow(i, 'nro_ot_override', v);
+                      },
+                      title: 'OT destino de esta fila (misma solicitud)',
+                      style: {
+                        border: 'none', outline: 'none', width: '100%',
+                        padding: '3px 4px', fontSize: 10, background: 'transparent',
+                        color: esOtra ? '#8a5a00' : '#24292f',
+                        fontWeight: esOtra ? 700 : 400,
+                      },
+                    },
+                      otsDisponibles.map(function (o) {
+                        var label = o.nro_ot + (o.nro_ot === otNroActual ? ' (esta)' : '');
+                        return _r('option', { key: o.nro_ot, value: o.nro_ot }, label);
+                      })))
+                : null,
               _r('td', { style: tdIn }, _r('input', { style: inp, value: r.zona || '', onChange: function (e) { setRow(i, 'zona', e.target.value); } })),
               _r('td', { style: tdIn }, _r('select', { style: inp, value: r.verif_dimensional || '',
                 onChange: function (e) { setRow(i, 'verif_dimensional', e.target.value); } },

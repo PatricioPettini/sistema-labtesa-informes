@@ -570,6 +570,10 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
       if (ensayo.tipo === 'plegado' && (Array.isArray(datos.resultados) || Array.isArray(datos.probetas))) {
         datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
       }
+      // Multi-OT en impacto: idem — filtra `resultados` por nro_ot_override.
+      if (ensayo.tipo === 'impacto' && Array.isArray(datos.resultados)) {
+        datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
+      }
       const fotos = i === 0 ? fotosCaratula : null;
       const buf = GENERADORES_TEMPLATE[ensayo.tipo](otConFecha, datos, fotos);
       resultBuf = resultBuf === null ? buf : combinarBuffers(resultBuf, buf, i);
