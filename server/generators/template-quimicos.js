@@ -432,14 +432,22 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   // matchearía). Después el override de labels aplica sobre las filas fijas
   // que quedan; las nuevas ya tienen el label custom.
   if (Array.isArray(datos.elementos_extra) && datos.elementos_extra.length > 0) {
-    const rePlata = /<w:tr\b[^>]*>(?:(?!<w:tr\b)[\s\S])*?Plata %(?:(?!<\/w:tr>)[\s\S])*?<\/w:tr>/;
+    // En el template real, el label es `<w:t>Plata</w:t>` (sin el "%" pegado).
+    // El "%" viene en otra celda o run separado. Buscamos solo "Plata".
+    const rePlata = /<w:tr\b[^>]*>(?:(?!<w:tr\b)[\s\S])*?<w:t[^>]*>Plata<\/w:t>(?:(?!<\/w:tr>)[\s\S])*?<\/w:tr>/;
     const mPlata = outXml.match(rePlata);
+    console.log('[quimicos] elementos_extra:', datos.elementos_extra.length + ' filas; molde Plata encontrado: ' + !!mPlata);
     if (mPlata) {
       const filaMolde = mPlata[0];
       const filasNuevas = datos.elementos_extra.map(function (el) {
         const labelXml = String(el.label || '').trim()
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '';
-        let f = filaMolde.replace(/(<w:t[^>]*>)Plata %(<\/w:t>)/, '$1' + labelXml + '$2');
+        // Reemplazar el texto "Plata" del molde por el label completo del custom
+        // (que ya incluye el "%" u otra unidad si el técnico lo puso). El "%"
+        // adyacente del molde queda residual — lo limpiamos con un replace extra.
+        let f = filaMolde.replace(/(<w:t[^>]*>)Plata(<\/w:t>)/, '$1' + labelXml + '$2');
+        // Eliminar el "%" residual (viene en un <w:t> aparte en el molde de Plata).
+        f = f.replace(/(<w:t[^>]*>)\s*%\s*(<\/w:t>)/, '$1$2');
         // Valores de las muestras para este elemento custom (los cargó el
         // técnico en la tabla del form bajo la key `el.k`).
         const muestrasParaEsta = Array.isArray(datos.muestras) ? datos.muestras : [];
