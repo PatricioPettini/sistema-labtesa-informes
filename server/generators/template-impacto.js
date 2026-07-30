@@ -352,11 +352,40 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
     if (!v) return '';
     return (v[0] === '-' || v[0] === ':') ? v : '-' + v;
   }
-  // Orden CONDICIONES: Norma de ensayo primero, Metodología al final
-  // (el Código de referencia va en su propio placeholder, antes que este).
-  // Override multi-OT: si datos._norma_ensayo_override tiene contenido, esa
-  // línea REEMPLAZA todas las normas globales (checkboxes + texto libre).
-  if (datos._norma_ensayo_override) {
+  // Agrupador por probeta (mismo patrón que tracción). Recibe una etiqueta y
+  // un key. Devuelve [] si no hay valores; una sola línea "Etiqueta: valor"
+  // si todas las probetas tienen el mismo valor; "Etiqueta: A (M1, M3); B (M2)"
+  // si difieren.
+  function agruparPorProbeta(etiqueta, key) {
+    const filas = Array.isArray(datos.resultados) ? datos.resultados : [];
+    const items = filas.map((r, i) => {
+      const raw = String((r && r[key]) || '').trim();
+      const nombre = (r && String(r.nombre || '').trim()) || `M${i + 1}`;
+      return { nombre, valor: raw };
+    }).filter(x => x.valor);
+    if (items.length === 0) return [];
+    const grupos = new Map();
+    items.forEach(x => {
+      if (!grupos.has(x.valor)) grupos.set(x.valor, []);
+      grupos.get(x.valor).push(x.nombre);
+    });
+    const valores = Array.from(grupos.keys());
+    if (valores.length === 1) return [`${etiqueta}: ${valores[0]}`];
+    const partes = valores.map(v => `${v} (${grupos.get(v).join(', ')})`);
+    return [`${etiqueta}: ${partes.join('; ')}`];
+  }
+
+  // Orden CONDICIONES: Norma de ensayo primero, Metodología al final.
+  // Prioridad:
+  //   1) Si hay filas de resultados[] con `norma` cargada → agrupamos por
+  //      probeta (ignora los checkboxes globales).
+  //   2) Si no → checkboxes/texto libre globales.
+  //   3) Override multi-OT (compat con `_norma_ensayo_override`) sigue como
+  //      escape hatch cuando lo setea condiciones_por_ot.
+  const normasPorProbeta = agruparPorProbeta('Norma de ensayo', 'norma');
+  if (normasPorProbeta.length > 0) {
+    normasPorProbeta.forEach(pushDedup);
+  } else if (datos._norma_ensayo_override) {
     pushDedup(`Norma de ensayo: ${datos._norma_ensayo_override}`);
   } else {
     if (datos.norma_iso148_1)    pushDedup(`Norma de ensayo: ISO 148-1${sufAnio('norma_iso148_1')}`);
@@ -368,17 +397,22 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
   if (metodologia)               pushDedup(`Metodología de ensayo: ${metodologia}`);
   const normas_seleccionadas_linea = normas.length ? normas.join('\n') : '__SECTION_HIDE__';
 
-  // Códigos de referencia. Override multi-OT: si _codigo_referencia_override
-  // tiene contenido, esa línea REEMPLAZA todos los códigos globales.
+  // Códigos de referencia. Prioridad:
+  //   1) Filas de resultados[] con `codigo_referencia` cargado → agrupamos por
+  //      probeta.
+  //   2) Override multi-OT `_codigo_referencia_override`.
+  //   3) Checkboxes globales + codigos extra.
   const codigos = [];
-  if (datos._codigo_referencia_override) {
+  const codsPorProbeta = agruparPorProbeta('Código de referencia', 'codigo_referencia');
+  if (codsPorProbeta.length > 0) {
+    codsPorProbeta.forEach(l => codigos.push(l));
+  } else if (datos._codigo_referencia_override) {
     codigos.push(`Código de referencia: ${datos._codigo_referencia_override}`);
   } else {
     if (datos.cod_asme)    codigos.push(`Código de referencia: ASME BPVC Sección IX Ed.${datos.ed_asme || '2025'}`);
     if (datos.cod_api1104) codigos.push('Código de referencia: API 1104 Ed.22-2021 (E1-2023)');
     if (datos.cod_api5l)   codigos.push('Código de referencia: API 5L');
     if (datos.cod_aws_d11) codigos.push('Código de referencia: AWS D1.1/D1.1M-2020');
-    // Códigos extra libres: una línea por código.
     if (datos.cod_extra) {
       String(datos.cod_extra).split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(linea => {
         codigos.push(/^c[oó]digo de referencia\s*:/i.test(linea) ? linea : `Código de referencia: ${linea}`);

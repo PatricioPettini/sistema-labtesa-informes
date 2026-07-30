@@ -471,148 +471,102 @@ function ImpactoForm(props) {
     )
   );
 
-  // ── 1.7 CONDICIONES Y EVALUACIÓN POR OT (NIVEL 2 multi-OT) ──────────────
-  // Solo aparece si hay ≥2 OTs hermanas. Permite editar norma, código de
-  // referencia y evaluación específicos POR OT. Con tab selector y popover
-  // "Copiar a otras OTs" al lado de cada campo.
-  var multiOt = otsEnEnsayo.length > 1;
-  function popoverCopiarBtn(clave, onCopiar) {
-    return _r('div', { style: { position: 'relative' } },
-      _r('button', {
-        type: 'button',
-        onClick: function () {
-          setCopyDest([]);
-          setCopyOpen(copyOpen === clave ? '' : clave);
-        },
-        title: 'Copiar a otras OTs',
-        style: {
-          border: '1px solid var(--border)', background: 'var(--surface)',
-          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-          color: 'var(--text-2)',
-        },
-      }, 'Copiar →'),
-      copyOpen === clave
-        ? _r('div', {
-            style: {
-              position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
-              background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: 6,
-              boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
-            },
-          },
-            _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a otras OTs'),
-            _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-              otsEnEnsayo.filter(function (n) { return n !== otActiva; }).map(function (nro) {
-                var checked = copyDest.indexOf(nro) >= 0;
-                return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-                  _r('input', {
-                    type: 'checkbox', checked: checked,
-                    onChange: function () {
-                      setCopyDest(checked ? copyDest.filter(function (n) { return n !== nro; }) : copyDest.concat([nro]));
-                    },
-                  }),
-                  _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-              })
-            ),
-            _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-              _r('button', {
-                type: 'button', onClick: function () { setCopyOpen(''); },
-                style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' },
-              }, 'Cancelar'),
-              _r('button', {
-                type: 'button',
-                onClick: function () {
-                  var destinos = copyDest.slice();
-                  if (destinos.length === 0) destinos = otsEnEnsayo.filter(function (n) { return n !== otActiva; });
-                  onCopiar(destinos);
-                  setCopyOpen(''); setCopyDest([]);
-                },
-                style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 },
-              }, 'Copiar'))
+  // ── 1.7 CONDICIONES POR PROBETA (mismo patrón que tracción) ─────────────
+  // Tabla con una columna por probeta (M1..MN) y filas de campos que pueden
+  // diferir por probeta: Norma de ensayo y Código de referencia. Al editar M1
+  // el valor se propaga a las probetas que estaban vacías o tenían el mismo
+  // valor previo de M1; las que fueron editadas manualmente quedan "fijas".
+  var COND_PROB_FIELDS = [
+    { k: 'norma',              label: 'Norma de ensayo',      placeholder: 'Ej: ISO 148-1:2016' },
+    { k: 'codigo_referencia',  label: 'Código de referencia', placeholder: 'Ej: ASME BPVC Sección IX Ed.2025' },
+  ];
+  var resultadosArr = Array.isArray(datos.resultados) ? datos.resultados : [];
+  var blockCondProbeta = resultadosArr.length > 0 ? _r('div', null,
+    _r('div', { style: S.headTitle }, '1.7  CONDICIONES POR PROBETA'),
+    _r('div', { style: { padding: 8, overflowX: 'auto' } },
+      _r('div', { style: { fontSize: 10, color: '#555', marginBottom: 6 } },
+        'Editar la columna M1 propaga automáticamente el valor a las demás probetas que tenían el mismo valor o estaban vacías. Si cambiás M2 (u otra) manualmente, esa queda "fija" y ya no se sobrescribe desde M1.'),
+      _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 11, minWidth: 640 } },
+        _r('thead', null,
+          _r('tr', { style: { background: '#e6e6e6' } },
+            _r('th', { style: { border: '1px solid #999', padding: 4, width: 170, textAlign: 'left' } }, 'Campo'),
+            resultadosArr.map(function (r, iFis) {
+              var nombreValor = (r && r.nombre != null) ? r.nombre : ('M' + (iFis + 1));
+              return _r('th', { key: iFis, style: { border: '1px solid #999', padding: 3, minWidth: 120 } },
+                _r('div', { style: { fontWeight: 800, marginBottom: 2 } }, 'Probeta ' + (iFis + 1)),
+                _r('input', {
+                  style: { border: '1px solid #bbb', background: 'transparent', fontSize: 10, padding: '3px 5px', outline: 'none', width: '100%', textAlign: 'center', fontWeight: 700 },
+                  value: nombreValor,
+                  onChange: function (e) { setRow(iFis, 'nombre', e.target.value); },
+                }));
+            })
           )
-        : null
-    );
-  }
+        ),
+        _r('tbody', null, COND_PROB_FIELDS.map(function (f) {
+          return _r('tr', { key: f.k },
+            _r('td', { style: { border: '1px solid #999', padding: '4px 8px', fontWeight: 700, background: '#fafafa' } }, f.label),
+            resultadosArr.map(function (r, iFis) {
+              var val = (r && r[f.k]) || '';
+              var cellStyle = { border: '1px solid #999', padding: 0 };
+              var inputStyle = { border: 'none', width: '100%', padding: '5px 6px', background: 'transparent', fontSize: 11 };
 
-  var seccionMultiOt = multiOt ? _r('div', null,
-    _r('div', { style: S.headTitle }, '1.7  CONDICIONES Y EVALUACIÓN POR OT'),
-    // Tab bar
-    _r('div', {
-      style: {
-        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-        padding: '8px 12px', background: 'var(--warning-soft)',
-        borderTop: '1px solid var(--border-strong)', fontSize: 11,
-      },
-    },
-      _r('span', { style: { fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '.05em', fontSize: 10 } }, 'Editando OT:'),
-      _r('div', { style: { display: 'inline-flex', border: '1px solid var(--border-strong)', borderRadius: 4, overflow: 'hidden', background: 'var(--surface)' } },
-        otsEnEnsayo.map(function (nro, i) {
-          var activa = nro === otActiva;
-          var esActual = nro === otNroActual;
-          return _r('button', {
-            key: nro, type: 'button',
-            onClick: function () { setOtActiva(nro); },
-            style: {
-              border: 'none',
-              borderLeft: i === 0 ? 'none' : '1px solid var(--border-strong)',
-              background: activa ? 'var(--accent)' : 'var(--surface)',
-              color: activa ? '#fff' : 'var(--text)',
-              padding: '5px 12px', fontSize: 12, fontWeight: activa ? 700 : 500,
-              cursor: activa ? 'default' : 'pointer',
-              fontFamily: 'ui-monospace, Consolas, monospace',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-            },
-          }, nro, esActual ? _r('span', { style: { fontSize: 9, opacity: 0.8, fontFamily: 'system-ui' } }, '· actual') : null);
-        })),
-      _r('span', { style: { fontSize: 10, color: 'var(--text-3)' } }, 'Cada OT puede tener condiciones y evaluación distintas.')
-    ),
-    // Norma de ensayo OT-específica
-    _r('div', { style: { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 } },
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-        _r('span', { style: { fontWeight: 600, fontSize: 11, minWidth: 130 } }, 'Norma de ensayo:'),
-        _r('input', {
-          style: Object.assign({}, S.inputCell, { flex: 1 }),
-          placeholder: 'Ej.: ISO 148-1:2016 (deja vacío para heredar global)',
-          value: getCondOt(otActiva, 'norma_ensayo_ot') || '',
-          onChange: function (e) { setCondOt(otActiva, 'norma_ensayo_ot', e.target.value); },
-        }),
-        popoverCopiarBtn('norma_' + otActiva, function (destinos) {
-          copiarCondAOts(otActiva, destinos, ['norma_ensayo_ot']);
-        })
-      ),
-      // Código de referencia OT-específico
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-        _r('span', { style: { fontWeight: 600, fontSize: 11, minWidth: 130 } }, 'Código de referencia:'),
-        _r('input', {
-          style: Object.assign({}, S.inputCell, { flex: 1 }),
-          placeholder: 'Ej.: ASME BPVC Sección IX (deja vacío para heredar global)',
-          value: getCondOt(otActiva, 'codigo_referencia_ot') || '',
-          onChange: function (e) { setCondOt(otActiva, 'codigo_referencia_ot', e.target.value); },
-        }),
-        popoverCopiarBtn('cod_' + otActiva, function (destinos) {
-          copiarCondAOts(otActiva, destinos, ['codigo_referencia_ot']);
-        })
-      ),
-      // Evaluación libre OT-específica
-      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-          _r('span', { style: { fontWeight: 600, fontSize: 11 } }, 'Texto de evaluación (OT ' + otActiva + '):'),
-          popoverCopiarBtn('eval_' + otActiva, function (destinos) {
-            copiarTextoAOts(otActiva, destinos, 'evaluacion_texto');
-          })),
-        _r('textarea', {
-          style: Object.assign({}, S.inputCell, { width: '100%', minHeight: 70, resize: 'vertical' }),
-          placeholder: 'Escribí acá la evaluación específica para esta OT (deja vacío para heredar global)',
-          value: getTextoOt(otActiva, 'evaluacion_texto') || '',
-          onChange: function (e) { setTextoOt(otActiva, 'evaluacion_texto', e.target.value); },
+              // Handler: al cambiar M1 (iFis===0), propagar a las probetas que
+              // estaban vacías o tenían exactamente el valor previo de M1.
+              function aplicarCambio(nuevoVal) {
+                var arr = resultadosArr.slice();
+                var viejoValM1 = String((resultadosArr[0] || {})[f.k] || '');
+                arr[iFis] = Object.assign({}, arr[iFis] || {}, {});
+                arr[iFis][f.k] = nuevoVal;
+                if (iFis === 0) {
+                  for (var j = 1; j < arr.length; j++) {
+                    var ro = arr[j] || {};
+                    var valOtro = String(ro[f.k] || '');
+                    if (valOtro === '' || valOtro === viejoValM1) {
+                      arr[j] = Object.assign({}, ro, {});
+                      arr[j][f.k] = nuevoVal;
+                    }
+                  }
+                }
+                set('resultados', arr);
+              }
+
+              // Combos editables con datalist (sugerencias del catálogo local).
+              if (f.k === 'norma' && typeof window.NormaInput === 'function') {
+                return _r('td', { key: iFis, style: cellStyle },
+                  _r(window.NormaInput, {
+                    tipo: 'impacto', categoria: 'ensayo',
+                    style: inputStyle, placeholder: f.placeholder,
+                    value: val,
+                    onChange: function (e) { aplicarCambio(e.target.value); },
+                  }));
+              }
+              if (f.k === 'codigo_referencia' && typeof window.NormaInput === 'function') {
+                return _r('td', { key: iFis, style: cellStyle },
+                  _r(window.NormaInput, {
+                    tipo: 'impacto', categoria: 'referencia',
+                    style: inputStyle, placeholder: f.placeholder,
+                    value: val,
+                    onChange: function (e) { aplicarCambio(e.target.value); },
+                  }));
+              }
+              return _r('td', { key: iFis, style: cellStyle },
+                _r('input', {
+                  style: inputStyle, placeholder: f.placeholder || '',
+                  value: val,
+                  onChange: function (e) { aplicarCambio(e.target.value); },
+                }));
+            })
+          );
         }))
+      )
     )
   ) : null;
 
   return _r('div', { style: S.sheet },
     _r('div', { style: S.twoCol }, norm11, verif),
     resSection,
-    obs,
-    seccionMultiOt
+    blockCondProbeta,
+    obs
   );
 }
 
