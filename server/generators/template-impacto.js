@@ -103,14 +103,18 @@ function construirTablaImpacto(grupos, incluirZona, incluirTemp, incluirProbeta)
   const headerRow = `<w:tr><w:trPr><w:jc w:val="center"/></w:trPr>${headers.join('')}</w:tr>`;
 
   // Aplanar a lista de filas anotando si cada celda debe ser restart/continue/null.
-  // Primero filtramos subgrupos con probetas válidas.
+  // Filtro: una fila se emite si trae AL MENOS UN dato cargado (energía, N°
+  // probeta, o temperatura si esa columna está activa). Antes se exigía
+  // energia, con lo cual filas con solo N° probeta o solo temp desaparecían.
   const subgrupos = grupos.map(g => ({
     label: g.label || '',
     temperatura: g.temperatura != null ? String(g.temperatura) : '',
-    probetas: (g.probetas || []).filter(p =>
-      (p.energia != null && String(p.energia).trim() !== '') ||
-      (incluirTemp && p.temperatura != null && String(p.temperatura).trim() !== '')
-    ),
+    probetas: (g.probetas || []).filter(p => {
+      const tieneEnergia = p.energia != null && String(p.energia).trim() !== '';
+      const tieneProbeta = incluirProbeta && p.probeta != null && String(p.probeta).trim() !== '';
+      const tieneTemp    = incluirTemp && p.temperatura != null && String(p.temperatura).trim() !== '';
+      return tieneEnergia || tieneProbeta || tieneTemp;
+    }),
   })).filter(sg => sg.probetas.length > 0);
 
   // Para zona: contar cuántas filas consecutivas comparten la misma label.
