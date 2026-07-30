@@ -394,6 +394,9 @@ function OTDetail(props) {
     var estado = {
       total: listas.length, hecho: 0, fallidos: [], skipped: skipped,
       actual: null, carpeta: carpetaDestino, confirmarVersionGlobal: false,
+      // Modo aplicado a los conflictos de archivo (ARCHIVO_YA_EXISTE) — se
+      // pregunta 1 vez y se aplica al resto del batch: 'sobrescribir' | 'sufijo'.
+      modoConflictoGlobal: '',
       generados: [],
     };
     setBatchState(estado);
@@ -407,11 +410,13 @@ function OTDetail(props) {
     }
 
     function generarUno(nroOt, filename, extraOpts) {
+      var modoC = (extraOpts && extraOpts.modoConflicto) || estado.modoConflictoGlobal || '';
       var qs = '?solo_drive=true'
              + '&carpeta_destino=' + encodeURIComponent(carpetaDestino)
              + '&filename=' + encodeURIComponent(filename)
              + (opts.forzar ? '&forzar=true' : '')
-             + (extraOpts && extraOpts.confirmarVersion ? '&confirmar_version_nueva=true' : '');
+             + (extraOpts && extraOpts.confirmarVersion ? '&confirmar_version_nueva=true' : '')
+             + (modoC ? '&modo_conflicto=' + encodeURIComponent(modoC) : '');
       return fetch('/api/generate/' + nroOt + qs, { method: 'POST' })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); });
     }
@@ -455,7 +460,6 @@ function OTDetail(props) {
             onConfirm: function () {
               setMdl(null);
               estado.confirmarVersionGlobal = true;
-              // Reintentar la actual con confirmar=true.
               detectarFilename(nroOt).then(function (fn) {
                 return generarUno(nroOt, fn, { confirmarVersion: true });
               }).then(procesarRespuesta.bind(null, nroOt, i)).catch(function (e) {
@@ -467,6 +471,63 @@ function OTDetail(props) {
               setMdl(null);
               toast('Batch cancelado en OT ' + nroOt, 'warning');
               setBatchState(null); setGen(''); refresh();
+            },
+          });
+          return;
+        }
+        // 409 ARCHIVO_YA_EXISTE: pausar la primera vez y preguntar sobrescribir
+        // vs sufijo -N. La respuesta se aplica al resto del batch automáticamente
+        // vía estado.modoConflictoGlobal.
+        if (r.status === 409 && r.d && r.d.code === 'ARCHIVO_YA_EXISTE') {
+          // Si ya hay modo elegido (no debería llegar acá, pero por si acaso),
+          // reintentar con ese modo.
+          if (estado.modoConflictoGlobal) {
+            generarUno(nroOt, r.d.filename || (nroOt + '.docx'), { modoConflicto: estado.modoConflictoGlobal })
+              .then(procesarRespuesta.bind(null, nroOt, i))
+              .catch(function (e) {
+                estado.fallidos.push({ nro_ot: nroOt, error: e.message });
+                siguiente(i + 1);
+              });
+            return;
+          }
+          setMdl({
+            title: 'El archivo ya existe (OT ' + nroOt + ')',
+            message: 'Ya hay un "' + (r.d.filename || '') + '" en la carpeta destino.\n\n' +
+                     '• Sobrescribir: reemplaza el archivo existente.\n' +
+                     '• Usar sufijo -N: guarda como "' + (r.d.filename_sugerido || '') + '" y deja intacto el anterior.\n\n' +
+                     'La opción elegida se aplicará a TODAS las OTs de este batch que tengan el mismo conflicto.',
+            tone: 'warning',
+            confirmLabel: 'Usar sufijo -N', confirmIcon: 'filePlus',
+            cancelLabel: 'Sobrescribir',
+            // Uso un tercer boton via extraButtons si el modal lo soporta; sino,
+            // mapeamos: confirm='sufijo', cancel='sobrescribir'. Botón "Cancelar
+            // batch" en el modal se maneja con onClose custom.
+            extraButtons: [
+              { label: 'Cancelar batch', tone: 'danger', onClick: function () {
+                setMdl(null);
+                toast('Batch cancelado en OT ' + nroOt, 'warning');
+                setBatchState(null); setGen(''); refresh();
+              } },
+            ],
+            onConfirm: function () {
+              setMdl(null);
+              estado.modoConflictoGlobal = 'sufijo';
+              detectarFilename(nroOt).then(function (fn) {
+                return generarUno(nroOt, fn, { modoConflicto: 'sufijo' });
+              }).then(procesarRespuesta.bind(null, nroOt, i)).catch(function (e) {
+                estado.fallidos.push({ nro_ot: nroOt, error: e.message });
+                siguiente(i + 1);
+              });
+            },
+            onCancel: function () {
+              setMdl(null);
+              estado.modoConflictoGlobal = 'sobrescribir';
+              detectarFilename(nroOt).then(function (fn) {
+                return generarUno(nroOt, fn, { modoConflicto: 'sobrescribir' });
+              }).then(procesarRespuesta.bind(null, nroOt, i)).catch(function (e) {
+                estado.fallidos.push({ nro_ot: nroOt, error: e.message });
+                siguiente(i + 1);
+              });
             },
           });
           return;
@@ -926,6 +987,7 @@ function OTDetail(props) {
       confirmIcon:  mdl.confirmIcon,
       cancelLabel:  mdl.cancelLabel || 'Cancelar',
       hideCancel:   !!mdl.hideCancel,
+      extraButtons: mdl.extraButtons,
       onConfirm:    mdl.onConfirm,
       onCancel:     mdl.onCancel,
     }) : null,

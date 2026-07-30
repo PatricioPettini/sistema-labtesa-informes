@@ -376,6 +376,15 @@ function ConfirmModal(props) {
       )
     ),
     React.createElement('div', { className: 'modal-actions' },
+      // Botones extra (para casos con más de 2 opciones). Aparecen a la izquierda
+      // del Cancelar. Formato: [{ label, tone?, icon?, onClick }].
+      (props.extraButtons || []).map(function (b, i) {
+        var variant = b.tone === 'danger' ? 'danger'
+                    : b.tone === 'primary' ? 'primary'
+                    : b.tone === 'warning' ? 'warning'
+                    : 'soft';
+        return React.createElement(Button, { key: 'extra-' + i, variant: variant, icon: b.icon, onClick: b.onClick }, b.label);
+      }),
       props.hideCancel ? null
         : React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, props.cancelLabel || 'Cancelar'),
       React.createElement(Button, { variant: confirmVariant, icon: props.confirmIcon, onClick: props.onConfirm }, props.confirmLabel || 'Aceptar')
