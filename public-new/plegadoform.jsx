@@ -17,27 +17,31 @@
 
 var _r = React.createElement;
 
+// Defaults precargados desde informes reales de referencia
+// (server/agents/informes-referencia/plegado/*.docx). Se eligió el TAG más
+// frecuente para cada equipo por variante. El técnico puede editarlo si el
+// ensayo particular usa otro (por calibración cruzada, etc.).
 var PLEGADO_EQ_EMIC = [
   { key: 'maquina_emic',       nombre: 'MÁQUINA DE TRACCIÓN EMIC', tagDefault: 'MM-203' },
-  { key: 'mandril',            nombre: 'MANDRIL',                  tagDefault: '' },
-  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',          tagDefault: '' },
+  { key: 'mandril',            nombre: 'MANDRIL',                  tagDefault: 'MM-803' },
+  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',          tagDefault: 'MM-571' },
   { key: 'termohigro_545',     nombre: 'TERMOHIGRÓMETRO',          tagDefault: 'PCAL-545' },
-  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',   tagDefault: '' },
+  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',   tagDefault: 'MM-779' },
 ];
 var PLEGADO_EQ_TORNE = [
   { key: 'prensa_torne',       nombre: 'PRENSA PLEGADORA TORNE Y MEC', tagDefault: 'MM-913' },
-  { key: 'mandril',            nombre: 'MANDRIL',                       tagDefault: '' },
-  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',               tagDefault: '' },
-  { key: 'termohigro_545',     nombre: 'TERMOHIGRÓMETRO',               tagDefault: 'PCAL-545' },
-  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',        tagDefault: '' },
+  { key: 'mandril',            nombre: 'MANDRIL',                       tagDefault: 'MM-930' },
+  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',               tagDefault: 'MM-694' },
+  { key: 'termohigro_545',     nombre: 'TERMOHIGRÓMETRO',               tagDefault: 'MM-794' },
+  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',        tagDefault: 'MM-779' },
 ];
-var PLEGADO_EQ_SHIMADZU = [  // Neuquén — set Shimadzu
+var PLEGADO_EQ_SHIMADZU = [  // Neuquén — set Shimadzu (mismo mandril/calibre que TORNE)
   { key: 'maquina_shimadzu',   nombre: 'MÁQUINA DE TRACCIÓN SHIMADZU',  tagDefault: 'MM-151' },
   { key: 'prensa_torne',       nombre: 'PRENSA PLEGADORA TORNE Y MEC',  tagDefault: 'MM-913' },
-  { key: 'mandril',            nombre: 'MANDRIL',                       tagDefault: '' },
-  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',               tagDefault: '' },
+  { key: 'mandril',            nombre: 'MANDRIL',                       tagDefault: 'MM-930' },
+  { key: 'calibre',            nombre: 'CALIBRE DIGITAL',               tagDefault: 'MM-694' },
   { key: 'termohigro_794',     nombre: 'TERMOHIGRÓMETRO',               tagDefault: 'MM-794' },
-  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',        tagDefault: '' },
+  { key: 'dispositivo_plegado',nombre: 'DISPOSITIVO DE PLEGADO',        tagDefault: 'MM-779' },
 ];
 
 function PlegadoForm(props) {
