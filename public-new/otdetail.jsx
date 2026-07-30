@@ -752,24 +752,35 @@ function OTDetail(props) {
       onConfirm:    mdl.onConfirm,
       onCancel:     mdl.onCancel,
     }) : null,
-    // Modal específico de colisión de nombre de archivo (3 opciones).
+    // Modal específico de colisión de nombre de archivo (radios + nombre editable).
     archExiste ? React.createElement(ArchivoExistenteModal, {
       filename: archExiste.filename,
       filenameSugerido: archExiste.filenameSugerido,
       carpeta:  archExiste.carpeta,
-      onSobrescribir: function () {
+      onSubmit: function (res) {
         var it = archExiste; setArchExiste(null);
-        ejecutarGenerarWord(it.carpeta, it.filename, Object.assign({}, it.opts, { modoConflicto: 'sobrescribir' }));
-      },
-      onSufijo: function () {
-        var it = archExiste; setArchExiste(null);
-        ejecutarGenerarWord(it.carpeta, it.filename, Object.assign({}, it.opts, { modoConflicto: 'sufijo' }));
-      },
-      onRenombrar: function (nuevoNombre) {
-        var it = archExiste; setArchExiste(null);
-        // nombreCustom=true evita que el backend re-aplique la convención por
-        // cliente sobre el nombre que el técnico eligió.
-        ejecutarGenerarWord(it.carpeta, nuevoNombre, Object.assign({}, it.opts, { nombreCustom: true }));
+        // res: { modo: 'sufijo' | 'sobrescribir' | 'renombrar', filename }
+        var opts = Object.assign({}, it.opts);
+        if (res.modo === 'sobrescribir') {
+          // Sobrescribir usa el filename tal cual escribió el técnico.
+          opts.modoConflicto = 'sobrescribir';
+          opts.nombreCustom  = res.filename !== it.filename; // si editó, es custom
+          ejecutarGenerarWord(it.carpeta, res.filename, opts);
+        } else if (res.modo === 'renombrar') {
+          // nombreCustom=true evita que el backend re-aplique la convención.
+          opts.nombreCustom = true;
+          ejecutarGenerarWord(it.carpeta, res.filename, opts);
+        } else {
+          // sufijo: si el técnico editó el nombre respecto al sugerido, tratarlo
+          // como custom. Sino, dejar que el backend arme el sufijo automático.
+          if (res.filename !== (it.filenameSugerido || it.filename)) {
+            opts.nombreCustom = true;
+            ejecutarGenerarWord(it.carpeta, res.filename, opts);
+          } else {
+            opts.modoConflicto = 'sufijo';
+            ejecutarGenerarWord(it.carpeta, it.filename, opts);
+          }
+        }
       },
       onCancel: function () { setArchExiste(null); toast('Emisión cancelada.', 'warning'); },
     }) : null
@@ -779,17 +790,31 @@ function OTDetail(props) {
 // Modal persistente que se abre al terminar la emisión de un informe. Muestra
 // la ruta completa y ofrece: abrir la carpeta (Explorer con /select) o copiar
 // la ruta al portapapeles.
-/* Modal de colisión de archivo: aparece cuando ya existe un .docx con ese
-   nombre en la carpeta destino. Ofrece 3 opciones al técnico:
-   - Sobrescribir  → pisa el archivo existente.
-   - Agregar -1    → sufijo automático " (1)" (siguiente número disponible).
-   - Cambiar nombre → input editable, guarda con el nombre nuevo. */
+/* Modal de colisión de archivo. Rediseñado: el técnico elige entre 3 modos
+   con radio buttons, y el nombre del archivo es editable EN CUALQUIER MODO.
+     - "Nueva versión (con -N)"   → agrega el sufijo -N sugerido.
+     - "Sobrescribir"              → pisa el archivo existente (sin sufijo).
+     - "Cambiar nombre"            → nombre libre que escriba el técnico.
+   Al aceptar, el backend recibe el `filename` que quedó en el input +
+   `modo_conflicto` según la opción elegida. */
 function ArchivoExistenteModal(props) {
   var filename = props.filename || '';
-  // Pre-carga con el nombre sugerido por el backend (siguiente -N libre).
-  // Ej: si existen nombre.docx y nombre-1.docx → sugiere nombre-2.docx.
-  var _nn = React.useState(props.filenameSugerido || filename);
+  var filenameSugerido = props.filenameSugerido || filename;
+  // Modo por default: 'sufijo' (crear nueva versión) — es el caso más frecuente.
+  var _modo = React.useState('sufijo');
+  var modo = _modo[0], setModo = _modo[1];
+  // Nombre editable — se sincroniza con el modo al cambiar.
+  var _nn = React.useState(filenameSugerido);
   var nuevoNombre = _nn[0], setNuevoNombre = _nn[1];
+
+  // Al cambiar modo, actualizar el nombre por default (el técnico puede editarlo
+  // después). Sufijo → sugerido, Sobrescribir → original, Renombrar → editable.
+  function seleccionarModo(m) {
+    setModo(m);
+    if (m === 'sufijo')        setNuevoNombre(filenameSugerido);
+    else if (m === 'sobrescribir') setNuevoNombre(filename);
+    // Si es 'renombrar', dejar lo que hay (permite editar).
+  }
 
   var backdrop = {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -798,7 +823,7 @@ function ArchivoExistenteModal(props) {
   };
   var box = {
     background: 'var(--surface)', color: 'var(--text)',
-    borderRadius: 8, width: 'min(90vw, 520px)',
+    borderRadius: 8, width: 'min(90vw, 560px)',
     border: '1px solid var(--border-strong)', boxShadow: 'var(--shadow-lg)',
     display: 'flex', flexDirection: 'column',
   };
@@ -807,18 +832,33 @@ function ArchivoExistenteModal(props) {
   var infoBox = { padding: '10px 12px', background: 'var(--warning-soft)', border: '1px solid var(--warning)', borderRadius: 4, fontFamily: 'Consolas, monospace', fontSize: 12, wordBreak: 'break-all' };
   var inputStyle = { width: '100%', padding: '7px 10px', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text)', borderRadius: 4, fontSize: 12, fontFamily: 'Consolas, monospace' };
   var footer = { padding: '12px 20px', borderTop: '1px solid var(--border-strong)', background: 'var(--surface-2)', display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' };
+  var radioRow = {
+    display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px',
+    borderRadius: 4, cursor: 'pointer',
+  };
 
-  function submitRenombrar() {
+  function submit() {
     var nn = String(nuevoNombre || '').trim();
     if (!nn) return;
-    // Asegurar extensión .docx
     if (!/\.docx$/i.test(nn)) nn += '.docx';
-    props.onRenombrar(nn);
+    if (modo === 'sobrescribir') {
+      // Si el técnico editó el nombre en modo sobrescribir, aplica de todos modos:
+      // usa el nombre elegido y sobrescribe si existe.
+      props.onSubmit && props.onSubmit({ modo: 'sobrescribir', filename: nn });
+    } else if (modo === 'renombrar') {
+      props.onSubmit && props.onSubmit({ modo: 'renombrar', filename: nn });
+    } else {
+      // sufijo: usa el nombre con -N (o el que el técnico haya editado).
+      props.onSubmit && props.onSubmit({ modo: 'sufijo', filename: nn });
+    }
   }
 
-  // Usar onMouseDown (no onClick) para que el modal se cierre ANTES de que el
-  // browser dispatche el click al elemento debajo del backdrop. Previene que
-  // el clic active checkboxes/labels de la card "Generar informe" detrás.
+  var opciones = [
+    { id: 'sufijo',       label: 'Crear nueva versión (con -N)', desc: 'Guarda como ' + filenameSugerido + ' — deja intacto el archivo anterior.' },
+    { id: 'sobrescribir', label: 'Sobrescribir el archivo existente', desc: 'Pisa el archivo actual. El anterior se pierde.', variant: 'danger' },
+    { id: 'renombrar',    label: 'Guardar con otro nombre',    desc: 'Elegís vos el nombre completo.' },
+  ];
+
   return React.createElement('div', {
     style: backdrop,
     onMouseDown: function (e) {
@@ -838,24 +878,47 @@ function ArchivoExistenteModal(props) {
       React.createElement('div', { style: body },
         React.createElement('div', null, 'Ya hay un archivo con este nombre en la carpeta destino:'),
         React.createElement('div', { style: infoBox }, filename),
-        React.createElement('div', { style: { color: 'var(--text-3)', fontSize: 12 } }, '¿Qué querés hacer?'),
+        React.createElement('div', { style: { color: 'var(--text-3)', fontSize: 12, marginTop: 4 } }, '¿Qué querés hacer?'),
+        // Radios
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, border: '1px solid var(--border)', borderRadius: 4, padding: 4 } },
+          opciones.map(function (o) {
+            var seleccionado = modo === o.id;
+            var rowStyle = Object.assign({}, radioRow, {
+              background: seleccionado ? 'var(--surface-2)' : 'transparent',
+              border: seleccionado
+                ? '1px solid ' + (o.variant === 'danger' ? 'var(--danger)' : 'var(--primary)')
+                : '1px solid transparent',
+            });
+            return React.createElement('label', { key: o.id, style: rowStyle },
+              React.createElement('input', {
+                type: 'radio', name: 'archexiste-modo', checked: seleccionado,
+                onChange: function () { seleccionarModo(o.id); },
+                style: { marginTop: 3 },
+              }),
+              React.createElement('div', null,
+                React.createElement('div', { style: { fontWeight: 600, fontSize: 13 } }, o.label),
+                React.createElement('div', { style: { fontSize: 11, color: 'var(--text-3)', marginTop: 2 } }, o.desc)
+              )
+            );
+          })
+        ),
+        // Input de nombre — editable siempre. Muestra qué se va a guardar.
         React.createElement('div', { style: { borderTop: '1px solid var(--border)', paddingTop: 10 } },
-          React.createElement('div', { style: { fontWeight: 600, fontSize: 12, marginBottom: 4 } }, 'Guardar con otro nombre:'),
+          React.createElement('div', { style: { fontWeight: 600, fontSize: 12, marginBottom: 4 } }, 'Nombre del archivo (editable):'),
           React.createElement('input', {
             style: inputStyle,
             value: nuevoNombre,
             onChange: function (e) { setNuevoNombre(e.target.value); },
-            onKeyDown: function (e) { if (e.key === 'Enter') submitRenombrar(); },
-          }),
-          React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end', marginTop: 6 } },
-            React.createElement(Button, { variant: 'primary', size: 'sm', onClick: submitRenombrar }, 'Guardar con este nombre')
-          )
+            onKeyDown: function (e) { if (e.key === 'Enter') submit(); },
+          })
         )
       ),
       React.createElement('div', { style: footer },
         React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, 'Cancelar'),
-        React.createElement(Button, { variant: 'soft', onClick: props.onSufijo }, 'Agregar -1 automático'),
-        React.createElement(Button, { variant: 'danger', icon: 'download', onClick: props.onSobrescribir }, 'Sobrescribir')
+        React.createElement(Button, {
+          variant: modo === 'sobrescribir' ? 'danger' : 'primary',
+          icon: 'download', onClick: submit,
+        }, 'Guardar')
       )
     )
   );
