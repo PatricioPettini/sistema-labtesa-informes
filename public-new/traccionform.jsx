@@ -1492,19 +1492,23 @@ function TraccionForm(props) {
               })));
 
           // ── VERIFICACIÓN DE EXTREMOS (compacta, con chip PASA/NO PASA) ─
+          // gridTemplateColumns con minmax(0, 1fr) para que las columnas se
+          // encojan sin desbordar cuando la card queda estrecha (2 por fila).
+          // Los divs internos también necesitan min-width: 0 y el input width: 100%
+          // + box-sizing: border-box para que el padding entre dentro del borde.
           var verifBlock = _r('div', { style: { marginTop: 6, padding: '6px 8px', border: '1px solid #d0d7de', borderRadius: 4, background: '#fafbfc',
-            display: 'grid', gridTemplateColumns: '110px 1fr 1fr auto', gap: 6, alignItems: 'center', fontSize: 11 } },
+            display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) minmax(0, 1fr) auto', gap: 6, alignItems: 'center', fontSize: 11, boxSizing: 'border-box' } },
             _r('span', { style: { fontWeight: 700, fontSize: 10, color: '#57606a', textTransform: 'uppercase' } }, 'Verif. extremos'),
-            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
-              _r('span', { style: { fontSize: 10, color: '#57606a' } }, extLabel.split(' ')[0] + ' 1'),
-              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, textAlign: 'center' },
+            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 } },
+              _r('span', { style: { fontSize: 10, color: '#57606a', flexShrink: 0 } }, extLabel.split(' ')[0] + ' 1'),
+              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', textAlign: 'center' },
                 'data-sc-nav': '1',
                 value: scGet(idxM, 'ext1'),
                 onKeyDown: scNavKeyDown,
                 onChange: function (e) { setSC(idxM, 'ext1', e.target.value); } })),
-            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
-              _r('span', { style: { fontSize: 10, color: '#57606a' } }, extLabel.split(' ')[0] + ' 2'),
-              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, textAlign: 'center' },
+            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 } },
+              _r('span', { style: { fontSize: 10, color: '#57606a', flexShrink: 0 } }, extLabel.split(' ')[0] + ' 2'),
+              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', textAlign: 'center' },
                 'data-sc-nav': '1',
                 value: scGet(idxM, 'ext2'),
                 onKeyDown: scNavKeyDown,
