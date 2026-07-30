@@ -955,8 +955,22 @@ function insertarInspeccionAntesDeFin(buf, textoInspeccion) {
     `</w:pPr><w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
     '<w:t xml:space="preserve"> </w:t></w:r></w:p>';
 
+  // Verificar si el párrafo INMEDIATAMENTE anterior al punto de inserción ya
+  // es un blank. En ese caso omitimos nuestro propio BLANK para no duplicar
+  // (el técnico veía "2 enter" antes de INSPECCIÓN).
+  const antes = xml.slice(0, pStart);
+  const prevClose = antes.lastIndexOf('</w:p>');
+  let previoEsBlank = false;
+  if (prevClose >= 0) {
+    const prevOpen = antes.lastIndexOf('<w:p', prevClose);
+    if (prevOpen >= 0) {
+      const prevPara = antes.slice(prevOpen, prevClose + '</w:p>'.length);
+      const txts = [...prevPara.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('').trim();
+      previoEsBlank = (txts === '' || /^[\s⁠]+$/.test(txts));
+    }
+  }
   const parrafos = texto.split(/\r?\n/).map(parrafoTexto).join('');
-  const bloque = BLANK + heading + parrafos + BLANK;
+  const bloque = (previoEsBlank ? '' : BLANK) + heading + parrafos + BLANK;
   xml = xml.slice(0, pStart) + bloque + xml.slice(pStart);
   zip.file('word/document.xml', xml);
   return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });

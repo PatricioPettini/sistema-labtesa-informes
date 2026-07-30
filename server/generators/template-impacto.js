@@ -83,11 +83,11 @@ function celdaDatoImpacto(texto, ancho, vMerge) {
 // la misma `label`; la temperatura se mergea sobre las filas del subgrupo.
 // Columnas dinámicas: `incluirZona`, `incluirProbeta`, `incluirTemp` — cada
 // una aparece solo si al menos una fila trae ese dato cargado en el form.
+// La columna "N°" (índice auto) fue REMOVIDA a pedido del laboratorio.
 function construirTablaImpacto(grupos, incluirZona, incluirTemp, incluirProbeta) {
   // Anchos por columna (twips)
-  const W_NUM = 900, W_PROBETA = 1400, W_ZONA = 2000, W_TEMP = 1900, W_ENERGIA = 2100;
+  const W_PROBETA = 1400, W_ZONA = 2000, W_TEMP = 1900, W_ENERGIA = 2100;
   const cols = [];
-  cols.push({ w: W_NUM });          // columna "N°" (índice auto — siempre)
   if (incluirZona)    cols.push({ w: W_ZONA });
   if (incluirProbeta) cols.push({ w: W_PROBETA });
   if (incluirTemp)    cols.push({ w: W_TEMP });
@@ -96,7 +96,6 @@ function construirTablaImpacto(grupos, incluirZona, incluirTemp, incluirProbeta)
 
   // Encabezado
   const headers = [];
-  headers.push(celdaHeaderImpacto('N°', W_NUM));
   if (incluirZona)    headers.push(celdaHeaderImpacto('Zona', W_ZONA));
   if (incluirProbeta) headers.push(celdaHeaderImpacto('N° probeta', W_PROBETA));
   if (incluirTemp)    headers.push(celdaHeaderImpacto('Temperatura de ensayo (°C)', W_TEMP));
@@ -153,15 +152,12 @@ function construirTablaImpacto(grupos, incluirZona, incluirTemp, incluirProbeta)
     i = j;
   }
 
-  // Filas de datos. Numeración global "N°" (1..N) contando todas las filas.
+  // Filas de datos (sin columna "N°" — removida por pedido del laboratorio).
   const dataRows = [];
   let rowIdx = 0;
-  let numGlobal = 0;
   subgrupos.forEach(sg => {
     sg.probetas.forEach((p, pi) => {
-      numGlobal++;
       const celdas = [];
-      celdas.push(celdaDatoImpacto(String(numGlobal), W_NUM, null));
       if (incluirZona) {
         const vm = zonaMerge[rowIdx];
         const txt = (vm === 'restart' || vm === null) ? sg.label : '';
