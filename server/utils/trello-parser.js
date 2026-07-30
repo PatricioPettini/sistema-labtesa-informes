@@ -123,11 +123,18 @@ function parsearOtsDeDesc(desc) {
       if (mm[2]) muestrasEnLinea.push(mm[2]);
     }
 
-    // Extraer descripción (después del último ":", o después de "ID:").
-    let descTexto = trim;
-    const colonIdx = trim.lastIndexOf(':');
-    if (colonIdx >= 0) descTexto = trim.slice(colonIdx + 1).trim();
-    descTexto = descTexto.replace(/^ID:\s*/i, '').trim();
+    // Extraer descripción. Estrategia:
+    //   1. Sacar "(OT: NNN)" — sino, el lastIndexOf(':') caía en "OT:" y el
+    //      descTexto quedaba como "NNN) LOTE …" (bug reportado).
+    //   2. Sacar prefijo "M<n>" / "Muestra <n>" (con opcional "y M<m>").
+    //   3. Sacar ":" o "ID:" que hayan quedado al inicio.
+    let descTexto = trim
+      .replace(/\(\s*O\.?T\.?\s*:?\s*\d+\s*\)/gi, '')
+      .replace(/^\s*(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+(?:\s+y\s+(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+)?\s*/i, '')
+      .replace(/^\s*:\s*/, '')
+      .replace(/^\s*ID:\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     if (muestrasEnLinea.length > 0) {
       cerrarActual();
