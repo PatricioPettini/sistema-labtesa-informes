@@ -71,6 +71,103 @@ function ImpactoForm(props) {
     ? window.LabStore.listOtsBySolicitud(solActual)
     : (otActualObj ? [otActualObj] : []);
 
+  // ── Contexto multi-OT NIVEL 2: tabs + condiciones/textos por OT ─────────
+  // otsEnEnsayo = OTs que tienen al menos una fila O están en la solicitud.
+  var otsEnEnsayo = (function () {
+    var lista = (props.datos && Array.isArray(props.datos.resultados)) ? props.datos.resultados : [];
+    var setOts = {};
+    lista.forEach(function (r) {
+      var over = String((r && r.nro_ot_override) || '').trim();
+      var dest = over || String(otNroActual || '');
+      if (dest) setOts[dest] = true;
+    });
+    (otsDisponibles || []).forEach(function (o) {
+      var n = String(o.nro_ot || ''); if (n) setOts[n] = true;
+    });
+    var out = Object.keys(setOts);
+    if (out.length === 0 && otNroActual) out.push(String(otNroActual));
+    out.sort(function (a, b) {
+      if (a === otNroActual) return -1;
+      if (b === otNroActual) return 1;
+      return String(a).localeCompare(String(b));
+    });
+    return out;
+  })();
+  var textosPorOt = (datos && datos.textos_por_ot) || {};
+  var condPorOt = (datos && datos.condiciones_por_ot) || {};
+  var _otTx = React.useState(function () { return otNroActual || (otsEnEnsayo[0] || ''); });
+  var otActiva = _otTx[0], setOtActiva = _otTx[1];
+  if (otsEnEnsayo.length > 0 && otsEnEnsayo.indexOf(otActiva) < 0) {
+    otActiva = otNroActual || otsEnEnsayo[0];
+  }
+  var _copyOpen = React.useState(''); var copyOpen = _copyOpen[0], setCopyOpen = _copyOpen[1];
+  var _copyDest = React.useState([]); var copyDest = _copyDest[0], setCopyDest = _copyDest[1];
+
+  // Getters/setters de textos por OT (evaluación libre por OT).
+  function getTextoOt(nroOt, key) {
+    var m = textosPorOt[nroOt];
+    if (m && m[key] !== undefined) return m[key];
+    if (nroOt === otNroActual) return datos[key];
+    return '';
+  }
+  function setTextoOt(nroOt, key, val) {
+    var mapa = Object.assign({}, textosPorOt);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt][key] = val;
+    if (nroOt === otNroActual) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  function copiarTextoAOts(fromNro, toNros, key) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, textosPorOt);
+    var val = getTextoOt(fromNro, key);
+    var pisaActual = false;
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      mapa[nroOt][key] = val;
+      if (nroOt === otNroActual) pisaActual = true;
+    });
+    if (pisaActual) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  // Getters/setters de condiciones por OT (norma, código de referencia).
+  function getCondOt(nroOt, key) {
+    var m = condPorOt[nroOt];
+    return (m && m[key] != null) ? m[key] : '';
+  }
+  function setCondOt(nroOt, key, val) {
+    var mapa = Object.assign({}, condPorOt);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    if (val === '' || val == null) delete mapa[nroOt][key];
+    else mapa[nroOt][key] = val;
+    if (Object.keys(mapa[nroOt]).length === 0) delete mapa[nroOt];
+    set('condiciones_por_ot', mapa);
+  }
+  function copiarCondAOts(fromNro, toNros, keys) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, condPorOt);
+    keys.forEach(function (key) {
+      var val = getCondOt(fromNro, key);
+      toNros.forEach(function (nroOt) {
+        mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+        if (val === '' || val == null) delete mapa[nroOt][key];
+        else mapa[nroOt][key] = val;
+        if (Object.keys(mapa[nroOt]).length === 0) delete mapa[nroOt];
+      });
+    });
+    set('condiciones_por_ot', mapa);
+  }
+
   // ── Estilos comunes ────────────────────────────────────────────────────
   var S = Object.assign({}, window.FORM_STYLES, {
     // padBox local: la variante de impacto necesita flex-column con gap para
@@ -266,7 +363,8 @@ function ImpactoForm(props) {
             otsDisponibles.length > 1
               ? _r('th', { style: { border: '1px solid #333', padding: 3, width: 90 }, title: 'OT destino de la fila' }, 'OT')
               : null,
-            _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'ZONA / N° PROBETA'),
+            _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'ZONA'),
+            _r('th', { style: { border: '1px solid #333', padding: 3, width: 100 } }, 'N° PROBETA'),
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'VERIF. DIM. (int.)'),
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'ENERGÍA [J]'),
             _r('th', { style: { border: '1px solid #333', padding: 3 } }, 'RESILIENCIA [J/cm²]'),
@@ -313,6 +411,7 @@ function ImpactoForm(props) {
                       })))
                 : null,
               _r('td', { style: tdIn }, _r('input', { style: inp, value: r.zona || '', onChange: function (e) { setRow(i, 'zona', e.target.value); } })),
+              _r('td', { style: tdIn }, _r('input', { style: inp, value: r.probeta || '', placeholder: '', onChange: function (e) { setRow(i, 'probeta', e.target.value); } })),
               _r('td', { style: tdIn }, _r('select', { style: inp, value: r.verif_dimensional || '',
                 onChange: function (e) { setRow(i, 'verif_dimensional', e.target.value); } },
                 _r('option', { value: '' }, '—'),
@@ -372,10 +471,148 @@ function ImpactoForm(props) {
     )
   );
 
+  // ── 1.7 CONDICIONES Y EVALUACIÓN POR OT (NIVEL 2 multi-OT) ──────────────
+  // Solo aparece si hay ≥2 OTs hermanas. Permite editar norma, código de
+  // referencia y evaluación específicos POR OT. Con tab selector y popover
+  // "Copiar a otras OTs" al lado de cada campo.
+  var multiOt = otsEnEnsayo.length > 1;
+  function popoverCopiarBtn(clave, onCopiar) {
+    return _r('div', { style: { position: 'relative' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDest([]);
+          setCopyOpen(copyOpen === clave ? '' : clave);
+        },
+        title: 'Copiar a otras OTs',
+        style: {
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          color: 'var(--text-2)',
+        },
+      }, 'Copiar →'),
+      copyOpen === clave
+        ? _r('div', {
+            style: {
+              position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+              background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: 6,
+              boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
+            },
+          },
+            _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a otras OTs'),
+            _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+              otsEnEnsayo.filter(function (n) { return n !== otActiva; }).map(function (nro) {
+                var checked = copyDest.indexOf(nro) >= 0;
+                return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+                  _r('input', {
+                    type: 'checkbox', checked: checked,
+                    onChange: function () {
+                      setCopyDest(checked ? copyDest.filter(function (n) { return n !== nro; }) : copyDest.concat([nro]));
+                    },
+                  }),
+                  _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+              })
+            ),
+            _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+              _r('button', {
+                type: 'button', onClick: function () { setCopyOpen(''); },
+                style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' },
+              }, 'Cancelar'),
+              _r('button', {
+                type: 'button',
+                onClick: function () {
+                  var destinos = copyDest.slice();
+                  if (destinos.length === 0) destinos = otsEnEnsayo.filter(function (n) { return n !== otActiva; });
+                  onCopiar(destinos);
+                  setCopyOpen(''); setCopyDest([]);
+                },
+                style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 },
+              }, 'Copiar'))
+          )
+        : null
+    );
+  }
+
+  var seccionMultiOt = multiOt ? _r('div', null,
+    _r('div', { style: S.headTitle }, '1.7  CONDICIONES Y EVALUACIÓN POR OT'),
+    // Tab bar
+    _r('div', {
+      style: {
+        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        padding: '8px 12px', background: 'var(--warning-soft)',
+        borderTop: '1px solid var(--border-strong)', fontSize: 11,
+      },
+    },
+      _r('span', { style: { fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '.05em', fontSize: 10 } }, 'Editando OT:'),
+      _r('div', { style: { display: 'inline-flex', border: '1px solid var(--border-strong)', borderRadius: 4, overflow: 'hidden', background: 'var(--surface)' } },
+        otsEnEnsayo.map(function (nro, i) {
+          var activa = nro === otActiva;
+          var esActual = nro === otNroActual;
+          return _r('button', {
+            key: nro, type: 'button',
+            onClick: function () { setOtActiva(nro); },
+            style: {
+              border: 'none',
+              borderLeft: i === 0 ? 'none' : '1px solid var(--border-strong)',
+              background: activa ? 'var(--accent)' : 'var(--surface)',
+              color: activa ? '#fff' : 'var(--text)',
+              padding: '5px 12px', fontSize: 12, fontWeight: activa ? 700 : 500,
+              cursor: activa ? 'default' : 'pointer',
+              fontFamily: 'ui-monospace, Consolas, monospace',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+            },
+          }, nro, esActual ? _r('span', { style: { fontSize: 9, opacity: 0.8, fontFamily: 'system-ui' } }, '· actual') : null);
+        })),
+      _r('span', { style: { fontSize: 10, color: 'var(--text-3)' } }, 'Cada OT puede tener condiciones y evaluación distintas.')
+    ),
+    // Norma de ensayo OT-específica
+    _r('div', { style: { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 } },
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        _r('span', { style: { fontWeight: 600, fontSize: 11, minWidth: 130 } }, 'Norma de ensayo:'),
+        _r('input', {
+          style: Object.assign({}, S.inputCell, { flex: 1 }),
+          placeholder: 'Ej.: ISO 148-1:2016 (deja vacío para heredar global)',
+          value: getCondOt(otActiva, 'norma_ensayo_ot') || '',
+          onChange: function (e) { setCondOt(otActiva, 'norma_ensayo_ot', e.target.value); },
+        }),
+        popoverCopiarBtn('norma_' + otActiva, function (destinos) {
+          copiarCondAOts(otActiva, destinos, ['norma_ensayo_ot']);
+        })
+      ),
+      // Código de referencia OT-específico
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        _r('span', { style: { fontWeight: 600, fontSize: 11, minWidth: 130 } }, 'Código de referencia:'),
+        _r('input', {
+          style: Object.assign({}, S.inputCell, { flex: 1 }),
+          placeholder: 'Ej.: ASME BPVC Sección IX (deja vacío para heredar global)',
+          value: getCondOt(otActiva, 'codigo_referencia_ot') || '',
+          onChange: function (e) { setCondOt(otActiva, 'codigo_referencia_ot', e.target.value); },
+        }),
+        popoverCopiarBtn('cod_' + otActiva, function (destinos) {
+          copiarCondAOts(otActiva, destinos, ['codigo_referencia_ot']);
+        })
+      ),
+      // Evaluación libre OT-específica
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          _r('span', { style: { fontWeight: 600, fontSize: 11 } }, 'Texto de evaluación (OT ' + otActiva + '):'),
+          popoverCopiarBtn('eval_' + otActiva, function (destinos) {
+            copiarTextoAOts(otActiva, destinos, 'evaluacion_texto');
+          })),
+        _r('textarea', {
+          style: Object.assign({}, S.inputCell, { width: '100%', minHeight: 70, resize: 'vertical' }),
+          placeholder: 'Escribí acá la evaluación específica para esta OT (deja vacío para heredar global)',
+          value: getTextoOt(otActiva, 'evaluacion_texto') || '',
+          onChange: function (e) { setTextoOt(otActiva, 'evaluacion_texto', e.target.value); },
+        }))
+    )
+  ) : null;
+
   return _r('div', { style: S.sheet },
     _r('div', { style: S.twoCol }, norm11, verif),
     resSection,
-    obs
+    obs,
+    seccionMultiOt
   );
 }
 

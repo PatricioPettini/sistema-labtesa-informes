@@ -78,25 +78,29 @@ function celdaDatoImpacto(texto, ancho, vMerge) {
 }
 
 // Construye el <w:tbl> completo según los grupos y columnas opcionales.
-// `grupos` es un array de subgrupos: { label, temperatura, probetas: [{energia}] }.
+// `grupos` es un array de subgrupos: { label, temperatura, probetas: [{probeta, energia}] }.
 // La zona se mergea verticalmente sobre todos los subgrupos consecutivos con
 // la misma `label`; la temperatura se mergea sobre las filas del subgrupo.
-function construirTablaImpacto(grupos, incluirZona, incluirTemp) {
+// Columnas dinámicas: `incluirZona`, `incluirProbeta`, `incluirTemp` — cada
+// una aparece solo si al menos una fila trae ese dato cargado en el form.
+function construirTablaImpacto(grupos, incluirZona, incluirTemp, incluirProbeta) {
   // Anchos por columna (twips)
-  const W_PROBETA = 1200, W_ZONA = 2000, W_TEMP = 1900, W_ENERGIA = 2100;
+  const W_NUM = 900, W_PROBETA = 1400, W_ZONA = 2000, W_TEMP = 1900, W_ENERGIA = 2100;
   const cols = [];
-  cols.push({ w: W_PROBETA });
-  if (incluirZona) cols.push({ w: W_ZONA });
-  if (incluirTemp) cols.push({ w: W_TEMP });
+  cols.push({ w: W_NUM });          // columna "N°" (índice auto — siempre)
+  if (incluirZona)    cols.push({ w: W_ZONA });
+  if (incluirProbeta) cols.push({ w: W_PROBETA });
+  if (incluirTemp)    cols.push({ w: W_TEMP });
   cols.push({ w: W_ENERGIA });
   const totalW = cols.reduce((a, c) => a + c.w, 0);
 
   // Encabezado
   const headers = [];
-  headers.push(celdaHeaderImpacto('Probeta', W_PROBETA));
-  if (incluirZona) headers.push(celdaHeaderImpacto('Zona', W_ZONA));
-  if (incluirTemp) headers.push(celdaHeaderImpacto('Temperatura de ensayo (°C)', W_TEMP));
-  headers.push(celdaHeaderImpacto('Energía Abs.(Joule)', W_ENERGIA));
+  headers.push(celdaHeaderImpacto('N°', W_NUM));
+  if (incluirZona)    headers.push(celdaHeaderImpacto('Zona', W_ZONA));
+  if (incluirProbeta) headers.push(celdaHeaderImpacto('N° probeta', W_PROBETA));
+  if (incluirTemp)    headers.push(celdaHeaderImpacto('Temperatura de ensayo (°C)', W_TEMP));
+  headers.push(celdaHeaderImpacto('Energía Abs. (Joule)', W_ENERGIA));
   const headerRow = `<w:tr><w:trPr><w:jc w:val="center"/></w:trPr>${headers.join('')}</w:tr>`;
 
   // Aplanar a lista de filas anotando si cada celda debe ser restart/continue/null.
@@ -149,17 +153,22 @@ function construirTablaImpacto(grupos, incluirZona, incluirTemp) {
     i = j;
   }
 
-  // Filas de datos
+  // Filas de datos. Numeración global "N°" (1..N) contando todas las filas.
   const dataRows = [];
   let rowIdx = 0;
+  let numGlobal = 0;
   subgrupos.forEach(sg => {
     sg.probetas.forEach((p, pi) => {
+      numGlobal++;
       const celdas = [];
-      celdas.push(celdaDatoImpacto(String(pi + 1), W_PROBETA, null));
+      celdas.push(celdaDatoImpacto(String(numGlobal), W_NUM, null));
       if (incluirZona) {
         const vm = zonaMerge[rowIdx];
         const txt = (vm === 'restart' || vm === null) ? sg.label : '';
         celdas.push(celdaDatoImpacto(txt, W_ZONA, vm));
+      }
+      if (incluirProbeta) {
+        celdas.push(celdaDatoImpacto(String(p.probeta || ''), W_PROBETA, null));
       }
       if (incluirTemp) {
         // Temperatura: vMerge sobre las filas del subgrupo
@@ -256,8 +265,28 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
     if (textosOt) {
       datos = Object.assign({}, datos);
       ['evaluacion_texto'].forEach(k => {
-        if (textosOt[k] !== undefined) datos[k] = textosOt[k];
+        if (textosOt[k] !== undefined && String(textosOt[k]).trim() !== '') {
+          datos[k] = textosOt[k];
+        }
       });
+    }
+  }
+
+  // ── Aplicar condiciones_por_ot: overrides de norma/código para la OT que
+  // se está emitiendo. Los overrides se pasan como flags internos que los
+  // constructores de líneas de abajo consultan; si están vacíos, se usa el
+  // valor global.
+  if (datos && datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+    const nroOtActualCond = String(ot.nro_ot || '');
+    const condOt = datos.condiciones_por_ot[nroOtActualCond];
+    if (condOt) {
+      datos = Object.assign({}, datos);
+      if (condOt.norma_ensayo_ot && String(condOt.norma_ensayo_ot).trim()) {
+        datos._norma_ensayo_override = String(condOt.norma_ensayo_ot).trim();
+      }
+      if (condOt.codigo_referencia_ot && String(condOt.codigo_referencia_ot).trim()) {
+        datos._codigo_referencia_override = String(condOt.codigo_referencia_ot).trim();
+      }
     }
   }
 
@@ -290,7 +319,10 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
         acumulador[key] = { label: zona, temperatura: temp, probetas: [] };
         orden.push(key);
       }
-      acumulador[key].probetas.push({ energia: r.energia || '' });
+      acumulador[key].probetas.push({
+        energia: r.energia || '',
+        probeta: (r && r.probeta != null) ? String(r.probeta).trim() : '',
+      });
     });
     grupos = orden.map(k => acumulador[k]);
   }
@@ -322,26 +354,36 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
   }
   // Orden CONDICIONES: Norma de ensayo primero, Metodología al final
   // (el Código de referencia va en su propio placeholder, antes que este).
-  if (datos.norma_iso148_1)    pushDedup(`Norma de ensayo: ISO 148-1${sufAnio('norma_iso148_1')}`);
-  if (datos.norma_astm_e23)    pushDedup(`Norma de ensayo: ASTM E23${sufAnio('norma_astm_e23')}`);
-  if (datos.norma_din_10045)   pushDedup(`Norma de ensayo: DIN EN 10045${sufAnio('norma_din_10045')}`);
-  if (normaEnsayoLegacy)       pushDedup(`Norma de ensayo: ${normaEnsayoLegacy}`);
-  if (normaLibre)              pushDedup(`Norma de ensayo: ${normaLibre}`);
-  if (metodologia)             pushDedup(`Metodología de ensayo: ${metodologia}`);
+  // Override multi-OT: si datos._norma_ensayo_override tiene contenido, esa
+  // línea REEMPLAZA todas las normas globales (checkboxes + texto libre).
+  if (datos._norma_ensayo_override) {
+    pushDedup(`Norma de ensayo: ${datos._norma_ensayo_override}`);
+  } else {
+    if (datos.norma_iso148_1)    pushDedup(`Norma de ensayo: ISO 148-1${sufAnio('norma_iso148_1')}`);
+    if (datos.norma_astm_e23)    pushDedup(`Norma de ensayo: ASTM E23${sufAnio('norma_astm_e23')}`);
+    if (datos.norma_din_10045)   pushDedup(`Norma de ensayo: DIN EN 10045${sufAnio('norma_din_10045')}`);
+    if (normaEnsayoLegacy)       pushDedup(`Norma de ensayo: ${normaEnsayoLegacy}`);
+    if (normaLibre)              pushDedup(`Norma de ensayo: ${normaLibre}`);
+  }
+  if (metodologia)               pushDedup(`Metodología de ensayo: ${metodologia}`);
   const normas_seleccionadas_linea = normas.length ? normas.join('\n') : '__SECTION_HIDE__';
 
-  // Códigos de referencia
+  // Códigos de referencia. Override multi-OT: si _codigo_referencia_override
+  // tiene contenido, esa línea REEMPLAZA todos los códigos globales.
   const codigos = [];
-  if (datos.cod_asme)    codigos.push(`Código de referencia: ASME BPVC Sección IX Ed.${datos.ed_asme || '2025'}`);
-  if (datos.cod_api1104) codigos.push('Código de referencia: API 1104 Ed.22-2021 (E1-2023)');
-  if (datos.cod_api5l)   codigos.push('Código de referencia: API 5L');
-  if (datos.cod_aws_d11) codigos.push('Código de referencia: AWS D1.1/D1.1M-2020');
-  // Códigos extra libres: una línea por código. Se antepone "Código de
-  // referencia: " si el usuario no lo escribió.
-  if (datos.cod_extra) {
-    String(datos.cod_extra).split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(linea => {
-      codigos.push(/^c[oó]digo de referencia\s*:/i.test(linea) ? linea : `Código de referencia: ${linea}`);
-    });
+  if (datos._codigo_referencia_override) {
+    codigos.push(`Código de referencia: ${datos._codigo_referencia_override}`);
+  } else {
+    if (datos.cod_asme)    codigos.push(`Código de referencia: ASME BPVC Sección IX Ed.${datos.ed_asme || '2025'}`);
+    if (datos.cod_api1104) codigos.push('Código de referencia: API 1104 Ed.22-2021 (E1-2023)');
+    if (datos.cod_api5l)   codigos.push('Código de referencia: API 5L');
+    if (datos.cod_aws_d11) codigos.push('Código de referencia: AWS D1.1/D1.1M-2020');
+    // Códigos extra libres: una línea por código.
+    if (datos.cod_extra) {
+      String(datos.cod_extra).split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(linea => {
+        codigos.push(/^c[oó]digo de referencia\s*:/i.test(linea) ? linea : `Código de referencia: ${linea}`);
+      });
+    }
   }
   const codigo_referencia_linea = codigos.length ? codigos.join('\n') : '__SECTION_HIDE__';
 
@@ -459,12 +501,11 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
     equipSlots[`equipamiento_${i}`] = listaEquipos[i - 1] || '__SECTION_HIDE__';
   }
 
-  // ── Resultados: la tabla se construye dinámicamente en post-proceso ───────
-  // (ver construirTablaImpacto). Aquí solo dejamos los slots del template en
-  // un estado neutro; la tabla del template será reemplazada completa.
-  // Columna Zona: se incluye solo si al menos una fila trae zona cargada.
-  // Chequeo directo contra las filas crudas del form — sólo se incluye la
-  // columna si al menos una fila tiene zona cargada.
+  // ── Resultados: tabla dinámica ─────────────────────────────────────────────
+  // Columnas ZONA y N° PROBETA aparecen SOLO si al menos una fila del form
+  // las trae cargadas. Si están vacías en todas las filas, la columna se
+  // omite del Word — regla pedida por el técnico para no generar columnas
+  // ruidosas.
   const algunaConZonaResultados = Array.isArray(datos.resultados) && datos.resultados.some(function (r) {
     return r && r.zona != null && String(r.zona).trim() !== '';
   });
@@ -472,10 +513,14 @@ function generarImpactoDesdeTemplate(ot, datos, fotosCaratula) {
   const algunaConZona = algunaConZonaResultados || algunaConZonaGrupos;
   const incluirZona = (datos.incluir_zona === false) ? false
                     : (datos.incluir_zona === true ? true : algunaConZona);
-  // Columna Temperatura: REMOVIDA DEFINITIVAMENTE del informe. La temperatura
-  // sigue apareciendo en la línea "Temperatura de ensayo: X °C" arriba de la
-  // tabla; ya no se genera como columna nunca.
-  const tablaImpactoXml = construirTablaImpacto(grupos, incluirZona, false);
+  const algunaConProbeta = Array.isArray(datos.resultados) && datos.resultados.some(function (r) {
+    return r && r.probeta != null && String(r.probeta).trim() !== '';
+  });
+  const incluirProbeta = (datos.incluir_probeta === false) ? false
+                       : (datos.incluir_probeta === true ? true : algunaConProbeta);
+  // Columna Temperatura: sigue removida como columna. La temperatura sigue
+  // apareciendo en la línea "Temperatura de ensayo: X °C" arriba de la tabla.
+  const tablaImpactoXml = construirTablaImpacto(grupos, incluirZona, false, incluirProbeta);
 
   // ── Observaciones / Notas ─────────────────────────────────────────────────
   const lineasObs = [];
