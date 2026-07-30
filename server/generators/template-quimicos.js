@@ -246,6 +246,7 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos.norma_e2994) normasASM.push(`ASTM E2994${suf('norma_e2994', '')}`);
   if (datos.norma_e3047) normasASM.push(`ASTM E3047${suf('norma_e3047', '-20')}`);
   if (datos.norma_a751)  normasASM.push(`ASTM A751${suf('norma_a751',  '-25')}`);
+  if (datos.norma_e1024) normasASM.push(`ASTM E1024${suf('norma_e1024', '')}`);
   // "Otra norma": basta con que haya texto, sin requerir checkbox.
   if (datos.norma_otra && datos.norma_otra.trim()) normasASM.push(datos.norma_otra.trim());
 
@@ -290,12 +291,17 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
     temperatura_ensayo = `Temperatura de ensayo: ${datos.temperatura} ˚C`;
   }
 
-  const patron = (datos.patron || '').trim()
+  // "Patrón utilizado" ahora se emite dentro del bloque EQUIPAMIENTO UTILIZADO,
+  // no en CONDICIONES. Ocultamos el placeholder viejo del template y agregamos
+  // la línea al array de equipos más abajo.
+  const patron = '__SECTION_HIDE__';
+  const patronLinea = (datos.patron || '').trim()
     ? `Patrón utilizado N˚${datos.patron.trim()}`
-    : '__SECTION_HIDE__';
+    : '';
 
   // Equipamiento
   const listaEquipos = EQUIPO.filter(e => equipo[e.key]).map(e => e.label);
+  if (patronLinea) listaEquipos.push(patronLinea);
 
   // Equipos extra del catálogo (DB, agregados desde el form via equipamiento_extra)
   if (Array.isArray(datos.equipamiento_extra)) {

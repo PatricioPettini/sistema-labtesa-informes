@@ -39,6 +39,8 @@ var QUIMICOS_NORMAS = [
   { key: 'norma_e2994',    label: 'ESPECTOMETRIA DE EMISION OPTICA - ASTM E 2994*' },
   { key: 'norma_e3047',    label: 'ESPECTOMETRIA DE EMISION OPTICA - ASTM E 3047*' },
   { key: 'norma_e1019',    label: 'COMBUSTION Y ABSORCION INF. - ASTM E 1019*' },
+  { key: 'norma_a751',     label: 'ANALISIS QUIMICO - ASTM A 751*' },
+  { key: 'norma_e1024',    label: 'ANALISIS QUIMICO - ASTM E 1024*' },
 ];
 
 // Elementos químicos — orden y labels IDÉNTICAS a la planilla FM-033.
@@ -186,20 +188,14 @@ function QuimicosForm(props) {
           style: Object.assign({}, S.input, { flex: 1 }),
           value: datos.norma_otra || '', placeholder: 'Empezá a escribir (ej: ASTM…)',
           onChange: function (e) { upd('norma_otra', e.target.value); } })),
-      // Temperatura y Patrón como parte de 1.1 (así están en la planilla FM-033).
+      // Temperatura como parte de 1.1 (así está en la planilla FM-033).
+      // El "Patrón utilizado" se movió a la sección 1.3 EQUIPAMIENTO UTILIZADO.
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
         _r('span', { style: { fontWeight: 700, fontSize: 10 } }, 'Temperatura de ensayo:'),
         _r('input', { style: Object.assign({}, S.input, S.num, { width: 60, fontSize: 10 }),
           value: datos.temperatura || '',
           onChange: function (e) { upd('temperatura', e.target.value); } }),
-        _r('span', { style: { fontSize: 10 } }, '°C')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('label', { style: Object.assign({}, S.label, { fontSize: 10 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.patron_chk, onChange: function (e) { updBool('patron_chk', e.target.checked); } }),
-          _r('span', { style: { fontWeight: 700 } }, 'Patrón:')),
-        _r('input', { style: Object.assign({}, S.input, { flex: 1, fontSize: 10 }),
-          value: datos.patron || '',
-          onChange: function (e) { upd('patron', e.target.value); } }))
+        _r('span', { style: { fontSize: 10 } }, '°C'))
     )
   );
 
@@ -266,7 +262,16 @@ function QuimicosForm(props) {
           _r(window.OtrosEquiposBlock, { embed: true,
             value: datos.otros_equipos || [],
             onChange: function (arr) { upd('otros_equipos', arr); } }))
-      : null
+      : null,
+    // Patrón utilizado — movido desde 1.1 a este bloque de equipamiento.
+    _r('div', { style: { padding: '0 8px 8px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5 } },
+      _r('label', { style: Object.assign({}, S.label, { fontSize: 10 }) },
+        _r('input', { type: 'checkbox', checked: !!datos.patron_chk,
+          onChange: function (e) { updBool('patron_chk', e.target.checked); } }),
+        _r('span', { style: { fontWeight: 700 } }, 'Patrón utilizado:')),
+      _r('input', { style: Object.assign({}, S.input, { flex: 1, fontSize: 10 }),
+        value: datos.patron || '',
+        onChange: function (e) { upd('patron', e.target.value); } }))
   );
 
   // ── 1.4 RESULTADOS OBTENIDOS ──────────────────────────────────────────
