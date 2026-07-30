@@ -125,6 +125,190 @@ function MetalografiaGeneralForm(props) {
     setMigInit(true);
   }, [imgsLegacyHidratadas, imgsLegacyLen]);
 
+  // ── Multi-OT: hermanas, estado activo, helpers para copiar a otras OTs ──
+  // (Se declara ARRIBA de los blocks 1.1-1.4 para que `multiOtMg`,
+  //  `botonCopiarSeccion` y `popoverCopiarMg` estén disponibles al construirlos.)
+  var otsHermMg = (function () {
+    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+    var otA = window.LabStore.getOt(props.nroOt);
+    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+  })();
+  var multiOtMg = otsHermMg && otsHermMg.length > 1;
+  var otNroActualMg = String(props.nroOt || '');
+  var _otActivaMg = React.useState(function () { return otNroActualMg; });
+  var otActivaMg = _otActivaMg[0], setOtActivaMg = _otActivaMg[1];
+  var textosPorOtMg = (datos && datos.textos_por_ot) || {};
+  var _copyMg = React.useState(''); var copyOpenMg = _copyMg[0], setCopyOpenMg = _copyMg[1];
+  var _copyDestMg = React.useState([]); var copyDestMg = _copyDestMg[0], setCopyDestMg = _copyDestMg[1];
+  function copiarResultadoAOts(fromNro, toNros, key) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, textosPorOtMg);
+    var val = getResultadoOt(fromNro, key);
+    var pisaActual = false;
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
+      mapa[nroOt].resultados_seccion[key] = val;
+      if (nroOt === otNroActualMg) pisaActual = true;
+    });
+    if (pisaActual) {
+      var seccActual = Object.assign({}, datos.resultados_seccion || {});
+      seccActual[key] = val;
+      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  function popoverCopiarMg(claveKey, keyResult) {
+    if (!multiOtMg) return null;
+    var otrasOts = otsHermMg.map(function (o) { return String(o.nro_ot); }).filter(function (n) { return n !== otActivaMg; });
+    if (otrasOts.length === 0) return null;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestMg([]);
+          setCopyOpenMg(copyOpenMg === claveKey ? '' : claveKey);
+        },
+        style: {
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          color: 'var(--text-2)',
+        },
+      }, 'Copiar → otras OTs'),
+      copyOpenMg === claveKey ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a:'),
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otrasOts.map(function (nro) {
+            var checked = copyDestMg.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestMg(checked ? copyDestMg.filter(function (n) { return n !== nro; }) : copyDestMg.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenMg(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } },
+            'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestMg.slice();
+              if (destinos.length === 0) destinos = otrasOts;
+              copiarResultadoAOts(otActivaMg, destinos, keyResult);
+              setCopyOpenMg(''); setCopyDestMg([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } },
+            'Copiar'))
+      ) : null
+    );
+  }
+  function getResultadoOt(nroOt, key) {
+    var tot = textosPorOtMg[nroOt];
+    if (tot && tot.resultados_seccion && tot.resultados_seccion[key] !== undefined) {
+      return tot.resultados_seccion[key];
+    }
+    if (nroOt === otNroActualMg) {
+      return (datos.resultados_seccion && datos.resultados_seccion[key]) || '';
+    }
+    return '';
+  }
+  function setResultadoOt(nroOt, key, val) {
+    if (!multiOtMg) {
+      upd('resultados_seccion.' + key, val);
+      return;
+    }
+    var mapa = Object.assign({}, textosPorOtMg);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
+    mapa[nroOt].resultados_seccion[key] = val;
+    if (nroOt === otNroActualMg) {
+      var seccActual = Object.assign({}, datos.resultados_seccion || {});
+      seccActual[key] = val;
+      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  var _copyOpenKey = React.useState(''); var copyOpenKey = _copyOpenKey[0], setCopyOpenKey = _copyOpenKey[1];
+  var _copyDestGen = React.useState([]); var copyDestGen = _copyDestGen[0], setCopyDestGen = _copyDestGen[1];
+  function copiarCamposAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+  }
+  function botonCopiarSeccion(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtMg) return null;
+    var abierto = copyOpenKey === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestGen([]);
+          setCopyOpenKey(abierto ? '' : claveUnica);
+        },
+        style: {
+          border: '1px solid var(--accent)', background: 'var(--surface)',
+          color: 'var(--accent)', padding: '3px 8px', fontSize: 10,
+          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGen.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGen(checked ? copyDestGen.filter(function (n) { return n !== nro; }) : copyDestGen.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKey(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGen.slice();
+              if (destinos.length === 0) {
+                destinos = otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposAOts(destinos, camposList);
+              setCopyOpenKey(''); setCopyDestGen([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
   var block11 = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
@@ -289,196 +473,8 @@ function MetalografiaGeneralForm(props) {
     )
   );
 
-  // ── 1.4 RESULTADOS (con tabs por OT — nivel 2 multi-OT) ─────────────────
-  // Si la solicitud tiene ≥2 OTs, los textos de resultado son editables por
-  // OT (cada muestra puede describir cosas distintas). Las NORMAS y
-  // METODOLOGÍAS de la sección 1.1 quedan globales — se comparten entre OTs.
-  var otsHermMg = (function () {
-    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
-    var otA = window.LabStore.getOt(props.nroOt);
-    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
-    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
-  })();
-  var multiOtMg = otsHermMg && otsHermMg.length > 1;
-  var otNroActualMg = String(props.nroOt || '');
-  var _otActivaMg = React.useState(function () { return otNroActualMg; });
-  var otActivaMg = _otActivaMg[0], setOtActivaMg = _otActivaMg[1];
-  var textosPorOtMg = (datos && datos.textos_por_ot) || {};
-  var _copyMg = React.useState(''); var copyOpenMg = _copyMg[0], setCopyOpenMg = _copyMg[1];
-  var _copyDestMg = React.useState([]); var copyDestMg = _copyDestMg[0], setCopyDestMg = _copyDestMg[1];
-  function copiarResultadoAOts(fromNro, toNros, key) {
-    if (!toNros || toNros.length === 0) return;
-    var mapa = Object.assign({}, textosPorOtMg);
-    var val = getResultadoOt(fromNro, key);
-    var pisaActual = false;
-    toNros.forEach(function (nroOt) {
-      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
-      mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
-      mapa[nroOt].resultados_seccion[key] = val;
-      if (nroOt === otNroActualMg) pisaActual = true;
-    });
-    if (pisaActual) {
-      var seccActual = Object.assign({}, datos.resultados_seccion || {});
-      seccActual[key] = val;
-      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
-    } else {
-      set('textos_por_ot', mapa);
-    }
-  }
-  function popoverCopiarMg(claveKey, keyResult) {
-    if (!multiOtMg) return null;
-    var otrasOts = otsHermMg.map(function (o) { return String(o.nro_ot); }).filter(function (n) { return n !== otActivaMg; });
-    if (otrasOts.length === 0) return null;
-    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
-      _r('button', {
-        type: 'button',
-        onClick: function () {
-          setCopyDestMg([]);
-          setCopyOpenMg(copyOpenMg === claveKey ? '' : claveKey);
-        },
-        style: {
-          border: '1px solid var(--border)', background: 'var(--surface)',
-          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-          color: 'var(--text-2)',
-        },
-      }, 'Copiar → otras OTs'),
-      copyOpenMg === claveKey ? _r('div', {
-        style: {
-          position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
-          background: 'var(--surface)', border: '1px solid var(--border-strong)',
-          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
-        },
-      },
-        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a:'),
-        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-          otrasOts.map(function (nro) {
-            var checked = copyDestMg.indexOf(nro) >= 0;
-            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-              _r('input', { type: 'checkbox', checked: checked,
-                onChange: function () {
-                  setCopyDestMg(checked ? copyDestMg.filter(function (n) { return n !== nro; }) : copyDestMg.concat([nro]));
-                } }),
-              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-          })),
-        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-          _r('button', { type: 'button', onClick: function () { setCopyOpenMg(''); },
-            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } },
-            'Cancelar'),
-          _r('button', { type: 'button',
-            onClick: function () {
-              var destinos = copyDestMg.slice();
-              if (destinos.length === 0) destinos = otrasOts;
-              copiarResultadoAOts(otActivaMg, destinos, keyResult);
-              setCopyOpenMg(''); setCopyDestMg([]);
-            },
-            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } },
-            'Copiar'))
-      ) : null
-    );
-  }
-  function getResultadoOt(nroOt, key) {
-    var tot = textosPorOtMg[nroOt];
-    if (tot && tot.resultados_seccion && tot.resultados_seccion[key] !== undefined) {
-      return tot.resultados_seccion[key];
-    }
-    if (nroOt === otNroActualMg) {
-      return (datos.resultados_seccion && datos.resultados_seccion[key]) || '';
-    }
-    return '';
-  }
-  function setResultadoOt(nroOt, key, val) {
-    if (!multiOtMg) {
-      // Modo single-OT: guardar en raíz (comportamiento anterior).
-      upd('resultados_seccion.' + key, val);
-      return;
-    }
-    var mapa = Object.assign({}, textosPorOtMg);
-    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
-    mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
-    mapa[nroOt].resultados_seccion[key] = val;
-    if (nroOt === otNroActualMg) {
-      // Escribir ambos: en el mapa Y en la raíz (así la OT actual sigue OK
-      // aunque no se aplique la lógica de textos_por_ot).
-      var seccActual = Object.assign({}, datos.resultados_seccion || {});
-      seccActual[key] = val;
-      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
-    } else {
-      set('textos_por_ot', mapa);
-    }
-  }
-  // Helper: crea un botón + popover para copiar un subset de campos a otras OTs.
-  // Cada sección del form llama a este helper con SUS campos específicos.
-  // Ej: 1.1 → ['analisis'], 1.2 → ['temperatura', 'zona_ensayo', ...], etc.
-  var _copyOpenKey = React.useState(''); var copyOpenKey = _copyOpenKey[0], setCopyOpenKey = _copyOpenKey[1];
-  var _copyDestGen = React.useState([]); var copyDestGen = _copyDestGen[0], setCopyDestGen = _copyDestGen[1];
-  function copiarCamposAOts(destinos, campos) {
-    if (!destinos || destinos.length === 0) return;
-    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
-    destinos.forEach(function (nroOt) {
-      var entry = Object.assign({}, mapaCond[nroOt] || {});
-      campos.forEach(function (k) {
-        if (datos[k] !== undefined) {
-          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
-            ? Object.assign({}, datos[k])
-            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
-        }
-      });
-      mapaCond[nroOt] = entry;
-    });
-    set('condiciones_por_ot', mapaCond);
-  }
-  function botonCopiarSeccion(claveUnica, etiqueta, camposList, descripcion) {
-    if (!multiOtMg) return null;
-    var abierto = copyOpenKey === claveUnica;
-    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
-      _r('button', {
-        type: 'button',
-        onClick: function () {
-          setCopyDestGen([]);
-          setCopyOpenKey(abierto ? '' : claveUnica);
-        },
-        style: {
-          border: '1px solid var(--accent)', background: 'var(--surface)',
-          color: 'var(--accent)', padding: '3px 8px', fontSize: 10,
-          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
-        },
-      }, '📋 ' + etiqueta),
-      abierto ? _r('div', {
-        style: {
-          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
-          background: 'var(--surface)', border: '1px solid var(--border-strong)',
-          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 240, fontSize: 11,
-        },
-      },
-        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, etiqueta + ' a:'),
-        descripcion ? _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } }, descripcion) : null,
-        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-          otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) {
-            var nro = String(o.nro_ot);
-            var checked = copyDestGen.indexOf(nro) >= 0;
-            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-              _r('input', { type: 'checkbox', checked: checked,
-                onChange: function () {
-                  setCopyDestGen(checked ? copyDestGen.filter(function (n) { return n !== nro; }) : copyDestGen.concat([nro]));
-                } }),
-              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-          })),
-        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-          _r('button', { type: 'button', onClick: function () { setCopyOpenKey(''); },
-            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
-          _r('button', { type: 'button',
-            onClick: function () {
-              var destinos = copyDestGen.slice();
-              if (destinos.length === 0) {
-                destinos = otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) { return String(o.nro_ot); });
-              }
-              copiarCamposAOts(destinos, camposList);
-              setCopyOpenKey(''); setCopyDestGen([]);
-            },
-            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
-      ) : null
-    );
-  }
+  // ── 1.4 RESULTADOS (con tabs por OT — nivel 2 multi-OT) ────
+  // (helpers multi-OT declarados arriba, antes del bloque 1.1)
 
   var tabsOtMg = multiOtMg ? _r('div', {
     style: {

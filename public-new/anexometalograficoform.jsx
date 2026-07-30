@@ -46,6 +46,181 @@ function AnexoMetalograficoForm(props) {
   var grano = datos.grano || {};
   var inclu = datos.inclu || {};
 
+  // ── Multi-OT: hermanas, estado activo, helpers para copiar a otras OTs ──
+  // (Se declara ARRIBA de los blocks 1.1-1.4 para que `multiOtAnx`,
+  //  `botonCopiarSeccionAnx` y `popoverCopiarAnx` estén disponibles al construirlos.)
+  var otsHermAnx = (function () {
+    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+    var otA = window.LabStore.getOt(props.nroOt);
+    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+  })();
+  var multiOtAnx = otsHermAnx && otsHermAnx.length > 1;
+  var otNroActualAnx = String(props.nroOt || '');
+  var _otActAnx = React.useState(function () { return otNroActualAnx; });
+  var otActivaAnx = _otActAnx[0], setOtActivaAnx = _otActAnx[1];
+  var textosPorOtAnx = (datos && datos.textos_por_ot) || {};
+  var _copyAnx = React.useState(''); var copyOpenAnx = _copyAnx[0], setCopyOpenAnx = _copyAnx[1];
+  var _copyDestAnx = React.useState([]); var copyDestAnx = _copyDestAnx[0], setCopyDestAnx = _copyDestAnx[1];
+  function copiarTextoAnxAOts(fromNro, toNros, key) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, textosPorOtAnx);
+    var val = getTextoAnx(fromNro, key);
+    var pisaActual = false;
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      mapa[nroOt][key] = val;
+      if (nroOt === otNroActualAnx) pisaActual = true;
+    });
+    if (pisaActual) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  function popoverCopiarAnx(claveKey, keyResult) {
+    if (!multiOtAnx) return null;
+    var otrasOts = otsHermAnx.map(function (o) { return String(o.nro_ot); }).filter(function (n) { return n !== otActivaAnx; });
+    if (otrasOts.length === 0) return null;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestAnx([]);
+          setCopyOpenAnx(copyOpenAnx === claveKey ? '' : claveKey);
+        },
+        style: {
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          color: 'var(--text-2)',
+        },
+      }, 'Copiar → otras OTs'),
+      copyOpenAnx === claveKey ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a:'),
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otrasOts.map(function (nro) {
+            var checked = copyDestAnx.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestAnx(checked ? copyDestAnx.filter(function (n) { return n !== nro; }) : copyDestAnx.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenAnx(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } },
+            'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestAnx.slice();
+              if (destinos.length === 0) destinos = otrasOts;
+              copiarTextoAnxAOts(otActivaAnx, destinos, keyResult);
+              setCopyOpenAnx(''); setCopyDestAnx([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } },
+            'Copiar'))
+      ) : null
+    );
+  }
+  function getTextoAnx(nroOt, key) {
+    var tot = textosPorOtAnx[nroOt];
+    if (tot && tot[key] !== undefined) return tot[key];
+    if (nroOt === otNroActualAnx) return datos[key] || '';
+    return '';
+  }
+  function setTextoAnx(nroOt, key, val) {
+    if (!multiOtAnx) { upd(key, val); return; }
+    var mapa = Object.assign({}, textosPorOtAnx);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt][key] = val;
+    if (nroOt === otNroActualAnx) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  var _copyOpenKeyA = React.useState(''); var copyOpenKeyA = _copyOpenKeyA[0], setCopyOpenKeyA = _copyOpenKeyA[1];
+  var _copyDestGenA = React.useState([]); var copyDestGenA = _copyDestGenA[0], setCopyDestGenA = _copyDestGenA[1];
+  function copiarCamposAnxAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+  }
+  function botonCopiarSeccionAnx(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtAnx) return null;
+    var abierto = copyOpenKeyA === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestGenA([]);
+          setCopyOpenKeyA(abierto ? '' : claveUnica);
+        },
+        style: {
+          border: '1px solid var(--accent)', background: 'var(--surface)',
+          color: 'var(--accent)', padding: '3px 8px', fontSize: 10,
+          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenA.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenA(checked ? copyDestGenA.filter(function (n) { return n !== nro; }) : copyDestGenA.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyA(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenA.slice();
+              if (destinos.length === 0) {
+                destinos = otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposAnxAOts(destinos, camposList);
+              setCopyOpenKeyA(''); setCopyDestGenA([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
   // ── 1.1 NORMAS ──────────────────────────────────────────────────────────
   var block11 = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
@@ -229,181 +404,7 @@ function AnexoMetalograficoForm(props) {
     { key: 'd', label: 'Ox.Globulares (D)' },
   ];
 
-  // Tabs por OT para editar textos de resultado (grano + tenor inclusionario).
-  // Las normas y la tabla ASTM E45 quedan globales (compartidas entre OTs).
-  var otsHermAnx = (function () {
-    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
-    var otA = window.LabStore.getOt(props.nroOt);
-    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
-    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
-  })();
-  var multiOtAnx = otsHermAnx && otsHermAnx.length > 1;
-  var otNroActualAnx = String(props.nroOt || '');
-  var _otActAnx = React.useState(function () { return otNroActualAnx; });
-  var otActivaAnx = _otActAnx[0], setOtActivaAnx = _otActAnx[1];
-  var textosPorOtAnx = (datos && datos.textos_por_ot) || {};
-  var _copyAnx = React.useState(''); var copyOpenAnx = _copyAnx[0], setCopyOpenAnx = _copyAnx[1];
-  var _copyDestAnx = React.useState([]); var copyDestAnx = _copyDestAnx[0], setCopyDestAnx = _copyDestAnx[1];
-  function copiarTextoAnxAOts(fromNro, toNros, key) {
-    if (!toNros || toNros.length === 0) return;
-    var mapa = Object.assign({}, textosPorOtAnx);
-    var val = getTextoAnx(fromNro, key);
-    var pisaActual = false;
-    toNros.forEach(function (nroOt) {
-      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
-      mapa[nroOt][key] = val;
-      if (nroOt === otNroActualAnx) pisaActual = true;
-    });
-    if (pisaActual) {
-      var patch = { textos_por_ot: mapa };
-      patch[key] = val;
-      set(patch);
-    } else {
-      set('textos_por_ot', mapa);
-    }
-  }
-  function popoverCopiarAnx(claveKey, keyResult) {
-    if (!multiOtAnx) return null;
-    var otrasOts = otsHermAnx.map(function (o) { return String(o.nro_ot); }).filter(function (n) { return n !== otActivaAnx; });
-    if (otrasOts.length === 0) return null;
-    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
-      _r('button', {
-        type: 'button',
-        onClick: function () {
-          setCopyDestAnx([]);
-          setCopyOpenAnx(copyOpenAnx === claveKey ? '' : claveKey);
-        },
-        style: {
-          border: '1px solid var(--border)', background: 'var(--surface)',
-          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-          color: 'var(--text-2)',
-        },
-      }, 'Copiar → otras OTs'),
-      copyOpenAnx === claveKey ? _r('div', {
-        style: {
-          position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
-          background: 'var(--surface)', border: '1px solid var(--border-strong)',
-          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
-        },
-      },
-        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a:'),
-        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-          otrasOts.map(function (nro) {
-            var checked = copyDestAnx.indexOf(nro) >= 0;
-            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-              _r('input', { type: 'checkbox', checked: checked,
-                onChange: function () {
-                  setCopyDestAnx(checked ? copyDestAnx.filter(function (n) { return n !== nro; }) : copyDestAnx.concat([nro]));
-                } }),
-              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-          })),
-        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-          _r('button', { type: 'button', onClick: function () { setCopyOpenAnx(''); },
-            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } },
-            'Cancelar'),
-          _r('button', { type: 'button',
-            onClick: function () {
-              var destinos = copyDestAnx.slice();
-              if (destinos.length === 0) destinos = otrasOts;
-              copiarTextoAnxAOts(otActivaAnx, destinos, keyResult);
-              setCopyOpenAnx(''); setCopyDestAnx([]);
-            },
-            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } },
-            'Copiar'))
-      ) : null
-    );
-  }
-  function getTextoAnx(nroOt, key) {
-    var tot = textosPorOtAnx[nroOt];
-    if (tot && tot[key] !== undefined) return tot[key];
-    if (nroOt === otNroActualAnx) return datos[key] || '';
-    return '';
-  }
-  function setTextoAnx(nroOt, key, val) {
-    if (!multiOtAnx) { upd(key, val); return; }
-    var mapa = Object.assign({}, textosPorOtAnx);
-    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
-    mapa[nroOt][key] = val;
-    if (nroOt === otNroActualAnx) {
-      var patch = { textos_por_ot: mapa };
-      patch[key] = val;
-      set(patch);
-    } else {
-      set('textos_por_ot', mapa);
-    }
-  }
-  // Helper genérico: botón + popover para copiar UN subset de campos a otras OTs.
-  // Cada sección del form llama a este helper con SUS campos específicos.
-  var _copyOpenKeyA = React.useState(''); var copyOpenKeyA = _copyOpenKeyA[0], setCopyOpenKeyA = _copyOpenKeyA[1];
-  var _copyDestGenA = React.useState([]); var copyDestGenA = _copyDestGenA[0], setCopyDestGenA = _copyDestGenA[1];
-  function copiarCamposAnxAOts(destinos, campos) {
-    if (!destinos || destinos.length === 0) return;
-    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
-    destinos.forEach(function (nroOt) {
-      var entry = Object.assign({}, mapaCond[nroOt] || {});
-      campos.forEach(function (k) {
-        if (datos[k] !== undefined) {
-          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
-            ? Object.assign({}, datos[k])
-            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
-        }
-      });
-      mapaCond[nroOt] = entry;
-    });
-    set('condiciones_por_ot', mapaCond);
-  }
-  function botonCopiarSeccionAnx(claveUnica, etiqueta, camposList, descripcion) {
-    if (!multiOtAnx) return null;
-    var abierto = copyOpenKeyA === claveUnica;
-    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
-      _r('button', {
-        type: 'button',
-        onClick: function () {
-          setCopyDestGenA([]);
-          setCopyOpenKeyA(abierto ? '' : claveUnica);
-        },
-        style: {
-          border: '1px solid var(--accent)', background: 'var(--surface)',
-          color: 'var(--accent)', padding: '3px 8px', fontSize: 10,
-          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
-        },
-      }, '📋 ' + etiqueta),
-      abierto ? _r('div', {
-        style: {
-          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
-          background: 'var(--surface)', border: '1px solid var(--border-strong)',
-          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 240, fontSize: 11,
-        },
-      },
-        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, etiqueta + ' a:'),
-        descripcion ? _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } }, descripcion) : null,
-        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-          otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) {
-            var nro = String(o.nro_ot);
-            var checked = copyDestGenA.indexOf(nro) >= 0;
-            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-              _r('input', { type: 'checkbox', checked: checked,
-                onChange: function () {
-                  setCopyDestGenA(checked ? copyDestGenA.filter(function (n) { return n !== nro; }) : copyDestGenA.concat([nro]));
-                } }),
-              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-          })),
-        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyA(''); },
-            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
-          _r('button', { type: 'button',
-            onClick: function () {
-              var destinos = copyDestGenA.slice();
-              if (destinos.length === 0) {
-                destinos = otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) { return String(o.nro_ot); });
-              }
-              copiarCamposAnxAOts(destinos, camposList);
-              setCopyOpenKeyA(''); setCopyDestGenA([]);
-            },
-            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
-      ) : null
-    );
-  }
+  // (helpers multi-OT declarados arriba, antes del bloque 1.1)
 
   var tabsOtAnx = multiOtAnx ? _r('div', {
     style: {
