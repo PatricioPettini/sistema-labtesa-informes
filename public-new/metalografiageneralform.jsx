@@ -283,6 +283,78 @@ function MetalografiaGeneralForm(props) {
   var _otActivaMg = React.useState(function () { return otNroActualMg; });
   var otActivaMg = _otActivaMg[0], setOtActivaMg = _otActivaMg[1];
   var textosPorOtMg = (datos && datos.textos_por_ot) || {};
+  var _copyMg = React.useState(''); var copyOpenMg = _copyMg[0], setCopyOpenMg = _copyMg[1];
+  var _copyDestMg = React.useState([]); var copyDestMg = _copyDestMg[0], setCopyDestMg = _copyDestMg[1];
+  function copiarResultadoAOts(fromNro, toNros, key) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, textosPorOtMg);
+    var val = getResultadoOt(fromNro, key);
+    var pisaActual = false;
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
+      mapa[nroOt].resultados_seccion[key] = val;
+      if (nroOt === otNroActualMg) pisaActual = true;
+    });
+    if (pisaActual) {
+      var seccActual = Object.assign({}, datos.resultados_seccion || {});
+      seccActual[key] = val;
+      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  function popoverCopiarMg(claveKey, keyResult) {
+    if (!multiOtMg) return null;
+    var otrasOts = otsHermMg.map(function (o) { return String(o.nro_ot); }).filter(function (n) { return n !== otActivaMg; });
+    if (otrasOts.length === 0) return null;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestMg([]);
+          setCopyOpenMg(copyOpenMg === claveKey ? '' : claveKey);
+        },
+        style: {
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          color: 'var(--text-2)',
+        },
+      }, 'Copiar → otras OTs'),
+      copyOpenMg === claveKey ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 220, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar a:'),
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otrasOts.map(function (nro) {
+            var checked = copyDestMg.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestMg(checked ? copyDestMg.filter(function (n) { return n !== nro; }) : copyDestMg.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenMg(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } },
+            'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestMg.slice();
+              if (destinos.length === 0) destinos = otrasOts;
+              copiarResultadoAOts(otActivaMg, destinos, keyResult);
+              setCopyOpenMg(''); setCopyDestMg([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } },
+            'Copiar'))
+      ) : null
+    );
+  }
   function getResultadoOt(nroOt, key) {
     var tot = textosPorOtMg[nroOt];
     if (tot && tot.resultados_seccion && tot.resultados_seccion[key] !== undefined) {
@@ -349,7 +421,10 @@ function MetalografiaGeneralForm(props) {
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 10 } },
       MG_RESULTADOS.map(function (r) {
         return _r('div', { key: r.key },
-          _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 3 } }, r.label),
+          _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+            _r('span', null, r.label),
+            popoverCopiarMg(r.key, r.key)
+          ),
           _r('textarea', { style: { width: '100%', minHeight: 56, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
             value: getResultadoOt(otActivaMg, r.key), placeholder: r.placeholder,
             onChange: function (e) { setResultadoOt(otActivaMg, r.key, e.target.value); } }));
