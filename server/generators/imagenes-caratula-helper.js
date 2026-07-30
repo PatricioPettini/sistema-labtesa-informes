@@ -244,7 +244,7 @@ function manejarImagenesCaratula(processedZip, outXml, fotos, tipoPrefix, rIdBas
     const celdas = [];
     lista.forEach((foto, i) => {
       const ext     = detectarExtImagen(foto);
-      const imgName = `imagen_${tipoPrefix}_${i + 1}.${ext}`;
+      const imgName = `imagen_${tipoPrefix}_${rIdBase + i}.${ext}`;
       processedZip.file(`word/media/${imgName}`, foto);
       const rId = `rId${rIdBase + i}`;
       if (!relsXml.includes(`Id="${rId}"`)) {
@@ -269,7 +269,7 @@ function manejarImagenesCaratula(processedZip, outXml, fotos, tipoPrefix, rIdBas
 
     lista.forEach((foto, i) => {
       const ext     = detectarExtImagen(foto);
-      const imgName = `imagen_${tipoPrefix}_${i + 1}.${ext}`;
+      const imgName = `imagen_${tipoPrefix}_${rIdBase + i}.${ext}`;
       processedZip.file(`word/media/${imgName}`, foto);
 
       const rId = `rId${rIdBase + i}`;
@@ -304,7 +304,9 @@ function insertarImagenEnsayo(processedZip, outXml, foto, tipoPrefix, marker, po
   outXml = garantizarNamespaces(outXml);
 
   const ext = detectarExtImagen(foto);
-  const imgName = `imagen_${tipoPrefix}.${ext}`;
+  // rIdBase se incorpora al filename para evitar colisiones cuando el mismo
+  // generator llama a esta función más de una vez con el mismo tipoPrefix.
+  const imgName = `imagen_${tipoPrefix}_${rIdBase}.${ext}`;
   processedZip.file(`word/media/${imgName}`, foto);
 
   const rId = `rId${rIdBase}`;
@@ -517,7 +519,9 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
     const buf = f && f.buffer ? f.buffer : (Buffer.isBuffer(f) ? f : null);
     if (!buf) return;
     const ext = detectarExtImagen(buf);
-    const imgName = `imagen_${tipoPrefix}_${i + 1}.${ext}`;
+    // rIdBase + i garantiza filename único aunque otro generador use el mismo
+    // tipoPrefix con rIdBase distinto (evita colisiones en word/media/*).
+    const imgName = `imagen_${tipoPrefix}_${rIdBase + i}.${ext}`;
     processedZip.file(`word/media/${imgName}`, buf);
     const rId = `rId${rIdBase + i}`;
     if (!relsXml.includes(`Id="${rId}"`)) {
