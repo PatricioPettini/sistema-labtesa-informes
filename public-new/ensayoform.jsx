@@ -144,10 +144,19 @@ function EnsayoForm(props) {
     // Solo dispara con strings no vacíos.
     if (typeof v !== 'string' || !v.trim()) return;
     var chkKey = _pareChkKey(k);
-    if (!chkKey) return;
+    if (!chkKey) {
+      // DEBUG: sin par asociado — no se aplica auto-chk. Se comenta cuando
+      // esté todo estable. Descomentar si el técnico reporta que no funciona.
+      // console.log('[auto-chk] sin par para "' + k + '" val="' + v.slice(0,30) + '"');
+      return;
+    }
     var actual = _leerCampo(n, chkKey);
-    if (actual) return;
+    if (actual) {
+      console.log('[auto-chk] "' + k + '" → "' + chkKey + '" ya tildado, skip');
+      return;
+    }
     _escribirCampo(n, chkKey, true);
+    console.log('[auto-chk] "' + k + '" → tildó "' + chkKey + '"');
   }
 
   function set(k, v) {
@@ -1008,6 +1017,7 @@ function AutoLoadPhotosBtn(props) {
         setMsg(msgTxt);
         // Propagar a hermanas de la solicitud (crea/actualiza sus ensayos con
         // sus fotos correspondientes). Skip si nroOt no está en props.
+        console.log('[fotos-batch] disparo propagación', { nroOt: nroOt, tipo: tipo });
         if (nroOt && tipo) {
           fetch('/api/fotos-auto-solicitud', {
             method: 'POST',
@@ -1016,16 +1026,32 @@ function AutoLoadPhotosBtn(props) {
           })
             .then(function (r2) { return r2.json().then(function (d2) { return { ok: r2.ok, d: d2 }; }); })
             .then(function (r2) {
-              if (!r2.ok) return;
+              console.log('[fotos-batch] respuesta', r2);
+              if (!r2.ok) {
+                setMsg(function (prev) { return prev + ' · Error propagación: ' + (r2.d.error || 'desconocido'); });
+                return;
+              }
               var items = (r2.d && r2.d.items) || [];
               var conFotos = items.filter(function (it) { return it.accion === 'creado' || it.accion === 'actualizado'; });
-              if (conFotos.length === 0) return;
+              if (conFotos.length === 0) {
+                // Mostrar detalle igual — todas las hermanas están registradas.
+                var resumenNulo = items.map(function (it) { return 'OT ' + it.nro_ot + ' (' + it.accion + ')'; }).join('; ');
+                if (items.length > 0) {
+                  setMsg(function (prev) { return prev + ' · ' + items.length + ' hermana(s) revisada(s) sin cambios: ' + resumenNulo; });
+                }
+                return;
+              }
               var extra = conFotos.map(function (it) {
                 return it.cantidad + ' → OT ' + it.nro_ot + ' (' + it.accion + ')';
               }).join('; ');
               setMsg(function (prev) { return prev + ' · Propagado: ' + extra; });
             })
-            .catch(function () { /* silencioso */ });
+            .catch(function (e) {
+              console.error('[fotos-batch] error', e);
+              setMsg(function (prev) { return prev + ' · Error red propagación'; });
+            });
+        } else {
+          console.log('[fotos-batch] NO se propaga: falta nroOt o tipo', { nroOt: nroOt, tipo: tipo });
         }
       })
       .catch(function (e) { setMsg('Error: ' + e.message); })
