@@ -769,11 +769,24 @@ const _REGLAS_FOTOS_AUTO = {
 // filtro del endpoint /ot/:nro_ot/fotos-auto para excluir fotos que están en
 // subcarpetas de sección de ensayo (MICROESTRUCTURA/, INCLUSIONES/, etc.) o
 // cuyo nombre contiene keywords de sección (inclusiones.png, macrografia.jpg).
-const _SECCION_ENSAYO_RE = /\b(microestructura|micrograf|macrograf|espesor|recubrimiento|grafito|decarbur|descarburaci|grano|inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|vickers|microdureza|rockwell|brinell|penetrant|revelador|indicacion|tratamient|revenido[_\s]|temple[_\s]|recocido|solubiliz|ferrita|nick[_\s-]*break|impacto|tracci[oó]n)/i;
+// Palabras clave que identifican una carpeta o archivo como perteneciente a
+// una sección de ensayo (metalografía general, macrografía, dureza, etc.).
+// Se agregó "metalograf" que faltaba y otras variantes con acento.
+const _SECCION_ENSAYO_RE = /\b(metalograf|microestructura|micrograf|macrograf|espesor|recubrimiento|grafito|decarbur|descarburaci|grano|inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|vickers|microdureza|rockwell|brinell|penetrant|revelador|indicacion|tratamient|revenido[_\s]|temple[_\s]|recocido|solubiliz|ferrita|nick[_\s-]*break|impacto|tracci[oó]n)/i;
+// Normaliza acentos para que "METALOGRAFÍA" matchee con "metalograf".
+function _normSinAcentos(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
 function _esFotoDeEnsayo(it) {
   const folders = it.folders || [];
-  if (folders.some(f => _SECCION_ENSAYO_RE.test(f))) return true;
-  const base = pathMod.basename(it.abs).replace(/\.[a-z0-9]{2,5}$/i, '');
+  // Regla dura: si la foto está EN CUALQUIER subcarpeta (folders.length > 0)
+  // y NO estamos en modo "carpeta OT propia", asumir que es de ensayo. La
+  // convención del laboratorio es: fotos de recepción sueltas en la raíz,
+  // fotos de ensayo en subcarpetas (METALOGRAFÍA/, MACROGRAFÍA/, etc.).
+  if (folders.length > 0) return true;
+  // Complemento: si un archivo suelto tiene nombre de sección, también es
+  // ensayo (ej. "inclusiones.png" tirada en la raíz).
+  const base = _normSinAcentos(pathMod.basename(it.abs)).replace(/\.[a-z0-9]{2,5}$/i, '');
   if (_SECCION_ENSAYO_RE.test(base)) return true;
   return false;
 }
