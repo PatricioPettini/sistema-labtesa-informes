@@ -292,7 +292,11 @@ function ImpactoForm(props) {
     next[i][key] = val;
     set('resultados', next);
   }
-  function addRow() { set('resultados', resultados.concat([{}])); }
+  function addRow() {
+    // Auto-numerar N° probeta con el siguiente correlativo (editable).
+    var siguiente = String(resultados.length + 1);
+    set('resultados', resultados.concat([{ probeta: siguiente }]));
+  }
   function delRow(i) { set('resultados', resultados.filter(function (_, idx) { return idx !== i; })); }
 
   var resSection = _r('div', null,
@@ -434,15 +438,12 @@ function ImpactoForm(props) {
     if (curr.length > n) {
       curr = curr.slice(0, n);
     } else {
-      // Al agregar, propagar norma/código de M1 (M0) a las nuevas filas para
-      // que arranquen con el mismo valor y el técnico las pueda diferenciar
-      // manualmente si necesita.
-      var m1 = curr[0] || {};
+      // Filas nuevas: N° probeta auto-numerado (editable), sin propagar
+      // norma/código de M1 — la propagación solo ocurre cuando el técnico
+      // EDITA la columna M1 explícitamente (mismo patrón que tracción).
       while (curr.length < n) {
-        curr.push({
-          norma: m1.norma || '',
-          codigo_referencia: m1.codigo_referencia || '',
-        });
+        var idx = curr.length; // 0-based del nuevo
+        curr.push({ probeta: String(idx + 1) });
       }
     }
     set('resultados', curr);
