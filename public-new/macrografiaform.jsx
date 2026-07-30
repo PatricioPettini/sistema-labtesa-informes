@@ -41,6 +41,16 @@ function MacrografiaForm(props) {
   var set = props.set;
   function upd(k, v) { set(k, v); }
   function updBool(k, checked) { set(k, !!checked); }
+  // Auto-tilda un checkbox cuando el técnico escribe en su input asociado.
+  // Patrón "[checkbox] Label [input]" — si hay texto, el checkbox se enciende.
+  // Si el input queda vacío, NO se destilda (el técnico puede haberlo tildado
+  // manualmente por otra razón).
+  function updConAutoCheck(campoTexto, campoCheck, val) {
+    var patch = {};
+    patch[campoTexto] = val;
+    if (val && String(val).trim() && !datos[campoCheck]) patch[campoCheck] = true;
+    set(patch);
+  }
 
   var frases = Array.isArray(datos.frases_disponibles) ? datos.frases_disponibles.slice() : [];
   // Inicializar con las 10 frases default si no hay data cargada.
@@ -69,7 +79,7 @@ function MacrografiaForm(props) {
             onChange: function (e) { updBool('metodo_soldadura_chk', e.target.checked); } }),
           'Soldadura:',
           _r('input', { style: S.inline, placeholder: '……………………', value: datos.metodo_soldadura_text || '',
-            onChange: function (e) { upd('metodo_soldadura_text', e.target.value); } })),
+            onChange: function (e) { updConAutoCheck('metodo_soldadura_text', 'metodo_soldadura_chk', e.target.value); } })),
         _r('label', { style: S.label },
           _r('input', { type: 'checkbox', checked: !!datos.metodo_macro_general_chk,
             onChange: function (e) { updBool('metodo_macro_general_chk', e.target.checked); } }),

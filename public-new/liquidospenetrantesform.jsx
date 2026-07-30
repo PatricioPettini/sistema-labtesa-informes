@@ -73,7 +73,14 @@ function LiquidosPenetrantesForm(props) {
             _r('span', { style: { fontWeight: 600 } }, e.nombre)),
           _r('span', { style: { color: '#555' } }, 'TAG N°:'),
           _r('input', { style: Object.assign({}, S.input, { width: 84 }), value: tagVal,
-            onChange: function (ev) { upd('instrumentos_tags.' + e.key, ev.target.value); } }));
+            onChange: function (ev) {
+              var val = ev.target.value;
+              upd('instrumentos_tags.' + e.key, val);
+              // Auto-tilda el checkbox si escribieron un TAG.
+              if (val && val.trim() && !checked) {
+                upd('instrumentos.' + e.key, true);
+              }
+            } }));
       })
     ),
     typeof window.OtrosEquiposBlock === 'function'
@@ -109,7 +116,11 @@ function LiquidosPenetrantesForm(props) {
         'Otro:',
         _r(window.NormaInput, { tipo: 'liquidos-penetrantes', categoria: 'ensayo', style: S.inline, placeholder: 'Empezá a escribir (ej: ASTM…)',
           value: datos.norma_otra || '',
-          onChange: function (e) { upd('norma_otra', e.target.value); } })),
+          onChange: function (e) {
+            var val = e.target.value;
+            upd('norma_otra', val);
+            if (val && val.trim() && !datos.norma_otra_chk) upd('norma_otra_chk', true);
+          } })),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 } },
         _r('span', { style: { fontWeight: 600 } }, 'LIMPIEZA PREVIA:'),
         _r('input', { style: S.inline, placeholder: '……', value: datos.limpieza_previa || '',

@@ -99,12 +99,68 @@ function EnsayoForm(props) {
       .catch(function () { /* silencioso — el técnico verá el widget vacío */ });
   }, [existing && existing.id]);
 
+  // Auto-tildado: cuando el técnico escribe en un input que tiene un checkbox
+  // "hermano" asociado, tildar automáticamente el checkbox. Se detecta por
+  // patrones de nombres del par (campo texto, campo checkbox):
+  //   1) `<X>_text`      ↔  `<X>_chk`           (ej. metodo_soldadura_text ↔ metodo_soldadura_chk)
+  //   2) `<X>_otra`      ↔  `<X>_otra_chk`      (ej. norma_otra ↔ norma_otra_chk)
+  //   3) `<X>_otro`      ↔  `<X>_otro_chk`      (ej. cod_otro ↔ cod_otro_chk)
+  //   4) `instrumentos_tags.<K>`  ↔  `instrumentos.<K>`
+  //   5) `equipamiento_tags.<K>`  ↔  `equipamiento.<K>`
+  // Solo tilda (no destilda) — así el técnico puede destildar manualmente
+  // sin que se vuelva a tildar por su propio texto.
+  function _pareChkKey(k) {
+    if (typeof k !== 'string') return null;
+    if (/^(.+)_text$/.test(k))  return k.replace(/_text$/, '_chk');
+    if (/^(.+)_otra$/.test(k))  return k + '_chk';
+    if (/^(.+)_otro$/.test(k))  return k + '_chk';
+    // dot-notation: instrumentos_tags.foo → instrumentos.foo
+    var mTag = k.match(/^(instrumentos|equipamiento)_tags\.(.+)$/);
+    if (mTag) return mTag[1] + '.' + mTag[2];
+    return null;
+  }
+  function _leerCampo(obj, path) {
+    if (!path) return undefined;
+    if (path.indexOf('.') < 0) return obj[path];
+    var parts = path.split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null) return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+  function _escribirCampo(obj, path, val) {
+    if (path.indexOf('.') < 0) { obj[path] = val; return; }
+    var parts = path.split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length - 1; i++) {
+      cur[parts[i]] = Object.assign({}, cur[parts[i]] || {});
+      cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = val;
+  }
+  function _aplicarAutoChk(n, k, v) {
+    // Solo dispara con strings no vacíos.
+    if (typeof v !== 'string' || !v.trim()) return;
+    var chkKey = _pareChkKey(k);
+    if (!chkKey) return;
+    var actual = _leerCampo(n, chkKey);
+    if (actual) return;
+    _escribirCampo(n, chkKey, true);
+  }
+
   function set(k, v) {
     // Forma callback: set(function(prev) { return next; })
     if (typeof k === 'function') { setDatos(k); return; }
     setDatos(function (d) {
       var n = Object.assign({}, d);
-      if (typeof k === 'object') { Object.assign(n, k); return n; }
+      if (typeof k === 'object') {
+        Object.assign(n, k);
+        // Auto-chk para cada key del objeto patch.
+        Object.keys(k).forEach(function (kk) { _aplicarAutoChk(n, kk, k[kk]); });
+        return n;
+      }
       // Soporte dot-notation: 'equipamiento.foo' setea n.equipamiento = { ...n.equipamiento, foo: v }
       if (typeof k === 'string' && k.indexOf('.') > 0) {
         var parts = k.split('.');
@@ -114,9 +170,11 @@ function EnsayoForm(props) {
           cur = cur[parts[i]];
         }
         cur[parts[parts.length - 1]] = v;
+        _aplicarAutoChk(n, k, v);
         return n;
       }
       n[k] = v;
+      _aplicarAutoChk(n, k, v);
       return n;
     });
   }

@@ -89,7 +89,11 @@ function BrinellForm(props) {
         'Otro:',
         _r(window.NormaInput, { tipo: 'dureza-brinell', categoria: 'ensayo', style: S.inline, placeholder: 'Empezá a escribir (ej: ASTM…)',
           value: datos.norma_otra || '',
-          onChange: function (e) { upd('norma_otra', e.target.value); } }))
+          onChange: function (e) {
+            var val = e.target.value;
+            upd('norma_otra', val);
+            if (val && val.trim() && !datos.norma_otra_chk) upd('norma_otra_chk', true);
+          } }))
     )
   );
 
