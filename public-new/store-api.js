@@ -784,12 +784,18 @@
             datosY = armarDatosPara(nroY, datosPrev);
           } else {
             accion = 'creado';
-            // Copiar condiciones globales del ensayo actual (reactivos, equipamiento,
-            // temperatura, aumentos, muestra ensayada, etc.).
-            datosY = armarDatosPara(nroY, null);
+            // Orden CORRECTO:
+            //   1) Aplicar condiciones globales (temperatura, reactivos,
+            //      equipamiento, etc.) como base.
+            //   2) DESPUÉS, armarDatosPara (que aplica overrides de
+            //      condiciones_por_ot y textos_por_ot) — esto GANA sobre lo
+            //      global. Antes se hacía al revés: el forEach pisaba los
+            //      overrides copiados con el botón "Copiar condiciones".
+            datosY = {};
             (CONDICIONES_GLOBALES || []).forEach(function (k) {
               if (datos[k] !== undefined) datosY[k] = datos[k];
             });
+            datosY = armarDatosPara(nroY, datosY);
           }
           // Contar cuántas imágenes reciben para el toast.
           var cantidad = 0;
