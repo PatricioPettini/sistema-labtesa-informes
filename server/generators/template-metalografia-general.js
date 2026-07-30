@@ -156,8 +156,16 @@ function construirBloqueEnsayo(datos) {
 
       // ── CONDICIONES DE ENSAYO ─────────────────────────────────────
       partes.push(pHeading('CONDICIONES DE ENSAYO'));
-      if (ref)          partes.push(pLinea(`Norma de ensayo: ${ref}`));
-      if (refOtra)      partes.push(pLinea(`Norma de ensayo: ${refOtra}`));
+      // Norma principal + "otra norma" opcional. Si ambas están cargadas, se
+      // emite una sola línea "Norma de ensayo: X y Y". Si solo hay una, se
+      // emite normal. Si no hay ninguna, nada.
+      if (ref && refOtra) {
+        partes.push(pLinea(`Norma de ensayo: ${ref} y ${refOtra}`));
+      } else if (ref) {
+        partes.push(pLinea(`Norma de ensayo: ${ref}`));
+      } else if (refOtra) {
+        partes.push(pLinea(`Norma de ensayo: ${refOtra}`));
+      }
       if (metod)        partes.push(pLinea(`Metodología de ensayo: ${metod}`));
       if (ataqueSec)    partes.push(pLinea(`Ataque utilizado: ${ataqueSec}`));
       if (zonaSec)      partes.push(pLinea(`Zonas examinadas: ${zonaSec}`));
