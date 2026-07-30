@@ -246,16 +246,91 @@ function MetalografiaGeneralForm(props) {
     )
   );
 
-  // ── 1.4 RESULTADOS ─────────────────────────────────────────────────────
+  // ── 1.4 RESULTADOS (con tabs por OT — nivel 2 multi-OT) ─────────────────
+  // Si la solicitud tiene ≥2 OTs, los textos de resultado son editables por
+  // OT (cada muestra puede describir cosas distintas). Las NORMAS y
+  // METODOLOGÍAS de la sección 1.1 quedan globales — se comparten entre OTs.
+  var otsHermMg = (function () {
+    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+    var otA = window.LabStore.getOt(props.nroOt);
+    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+  })();
+  var multiOtMg = otsHermMg && otsHermMg.length > 1;
+  var otNroActualMg = String(props.nroOt || '');
+  var _otActivaMg = React.useState(function () { return otNroActualMg; });
+  var otActivaMg = _otActivaMg[0], setOtActivaMg = _otActivaMg[1];
+  var textosPorOtMg = (datos && datos.textos_por_ot) || {};
+  function getResultadoOt(nroOt, key) {
+    var tot = textosPorOtMg[nroOt];
+    if (tot && tot.resultados_seccion && tot.resultados_seccion[key] !== undefined) {
+      return tot.resultados_seccion[key];
+    }
+    if (nroOt === otNroActualMg) {
+      return (datos.resultados_seccion && datos.resultados_seccion[key]) || '';
+    }
+    return '';
+  }
+  function setResultadoOt(nroOt, key, val) {
+    if (!multiOtMg) {
+      // Modo single-OT: guardar en raíz (comportamiento anterior).
+      upd('resultados_seccion.' + key, val);
+      return;
+    }
+    var mapa = Object.assign({}, textosPorOtMg);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt].resultados_seccion = Object.assign({}, mapa[nroOt].resultados_seccion || {});
+    mapa[nroOt].resultados_seccion[key] = val;
+    if (nroOt === otNroActualMg) {
+      // Escribir ambos: en el mapa Y en la raíz (así la OT actual sigue OK
+      // aunque no se aplique la lógica de textos_por_ot).
+      var seccActual = Object.assign({}, datos.resultados_seccion || {});
+      seccActual[key] = val;
+      set({ textos_por_ot: mapa, resultados_seccion: seccActual });
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  var tabsOtMg = multiOtMg ? _r('div', {
+    style: {
+      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+      padding: '6px 10px', background: '#fff8e5', borderBottom: '1px solid #e0c060',
+      fontSize: 11,
+    },
+  },
+    _r('span', { style: { fontWeight: 700, color: '#8a5a00', textTransform: 'uppercase', letterSpacing: '.05em', fontSize: 10 } }, 'Editando resultados de OT:'),
+    _r('div', { style: { display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' } },
+      otsHermMg.map(function (o, i) {
+        var nro = String(o.nro_ot);
+        var activa = nro === otActivaMg;
+        var esActual = nro === otNroActualMg;
+        return _r('button', {
+          key: nro, type: 'button',
+          onClick: function () { setOtActivaMg(nro); },
+          style: {
+            border: 'none',
+            borderLeft: i === 0 ? 'none' : '1px solid var(--border)',
+            background: activa ? 'var(--accent)' : 'var(--surface)',
+            color: activa ? '#fff' : 'var(--text)',
+            padding: '4px 10px', fontSize: 11, fontWeight: activa ? 700 : 500,
+            cursor: activa ? 'default' : 'pointer',
+            fontFamily: 'ui-monospace, Consolas, monospace',
+          },
+        }, nro, esActual ? ' · actual' : '');
+      })),
+    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos.')
+  ) : null;
+
   var block14 = _r('div', null,
     _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
+    tabsOtMg,
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 10 } },
       MG_RESULTADOS.map(function (r) {
         return _r('div', { key: r.key },
           _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 3 } }, r.label),
           _r('textarea', { style: { width: '100%', minHeight: 56, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
-            value: (datos.resultados_seccion && datos.resultados_seccion[r.key]) || '', placeholder: r.placeholder,
-            onChange: function (e) { upd('resultados_seccion.' + r.key, e.target.value); } }));
+            value: getResultadoOt(otActivaMg, r.key), placeholder: r.placeholder,
+            onChange: function (e) { setResultadoOt(otActivaMg, r.key, e.target.value); } }));
       })
     )
   );

@@ -182,20 +182,83 @@ function AnexoMetalograficoForm(props) {
     { key: 'd', label: 'Ox.Globulares (D)' },
   ];
 
+  // Tabs por OT para editar textos de resultado (grano + tenor inclusionario).
+  // Las normas y la tabla ASTM E45 quedan globales (compartidas entre OTs).
+  var otsHermAnx = (function () {
+    if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+    var otA = window.LabStore.getOt(props.nroOt);
+    if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+    return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+  })();
+  var multiOtAnx = otsHermAnx && otsHermAnx.length > 1;
+  var otNroActualAnx = String(props.nroOt || '');
+  var _otActAnx = React.useState(function () { return otNroActualAnx; });
+  var otActivaAnx = _otActAnx[0], setOtActivaAnx = _otActAnx[1];
+  var textosPorOtAnx = (datos && datos.textos_por_ot) || {};
+  function getTextoAnx(nroOt, key) {
+    var tot = textosPorOtAnx[nroOt];
+    if (tot && tot[key] !== undefined) return tot[key];
+    if (nroOt === otNroActualAnx) return datos[key] || '';
+    return '';
+  }
+  function setTextoAnx(nroOt, key, val) {
+    if (!multiOtAnx) { upd(key, val); return; }
+    var mapa = Object.assign({}, textosPorOtAnx);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt][key] = val;
+    if (nroOt === otNroActualAnx) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  var tabsOtAnx = multiOtAnx ? _r('div', {
+    style: {
+      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+      padding: '6px 10px', background: '#fff8e5', borderBottom: '1px solid #e0c060',
+      fontSize: 11,
+    },
+  },
+    _r('span', { style: { fontWeight: 700, color: '#8a5a00', textTransform: 'uppercase', letterSpacing: '.05em', fontSize: 10 } }, 'Editando resultados de OT:'),
+    _r('div', { style: { display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' } },
+      otsHermAnx.map(function (o, i) {
+        var nro = String(o.nro_ot);
+        var activa = nro === otActivaAnx;
+        var esActual = nro === otNroActualAnx;
+        return _r('button', {
+          key: nro, type: 'button',
+          onClick: function () { setOtActivaAnx(nro); },
+          style: {
+            border: 'none',
+            borderLeft: i === 0 ? 'none' : '1px solid var(--border)',
+            background: activa ? 'var(--accent)' : 'var(--surface)',
+            color: activa ? '#fff' : 'var(--text)',
+            padding: '4px 10px', fontSize: 11, fontWeight: activa ? 700 : 500,
+            cursor: activa ? 'default' : 'pointer',
+            fontFamily: 'ui-monospace, Consolas, monospace',
+          },
+        }, nro, esActual ? ' · actual' : '');
+      })),
+    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos. La tabla ASTM E45 es común.')
+  ) : null;
+
   var block14 = _r('div', null,
     _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
+    tabsOtAnx,
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 10 } },
       _r('div', null,
         _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 3 } }, 'TAMAÑO DE GRANO'),
         _r('textarea', { style: { width: '100%', minHeight: 60, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
-          value: datos.resultado_grano || '',
+          value: getTextoAnx(otActivaAnx, 'resultado_grano'),
           placeholder: 'Ej: La muestra posee en superficie un tamaño de grano N°7 y en núcleo un tamaño de grano N°6,5 según Plate IB de la norma ASTM E112-25.',
-          onChange: function (e) { upd('resultado_grano', e.target.value); } })),
+          onChange: function (e) { setTextoAnx(otActivaAnx, 'resultado_grano', e.target.value); } })),
       _r('div', null,
         _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 3 } }, 'TENOR INCLUSIONARIO'),
         _r('textarea', { style: { width: '100%', minHeight: 60, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
-          value: datos.resultado_inclusionario || '', placeholder: 'Texto libre opcional (los valores numéricos van en la tabla).',
-          onChange: function (e) { upd('resultado_inclusionario', e.target.value); } }),
+          value: getTextoAnx(otActivaAnx, 'resultado_inclusionario'), placeholder: 'Texto libre opcional (los valores numéricos van en la tabla).',
+          onChange: function (e) { setTextoAnx(otActivaAnx, 'resultado_inclusionario', e.target.value); } }),
         _r('div', { style: { marginTop: 8, fontSize: 10, color: '#555' } },
           'Tabla — ASTM E45 · Serie Fina / Serie Gruesa × Sulfuros (A) / Aluminatos (B) / Silicatos (C) / Ox.Globulares (D)'),
         _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10.5, marginTop: 4 } },

@@ -306,6 +306,11 @@ function generarAnexoMetalograficoDesdeTemplate(ot, datos, fotosCaratula) {
     const t = datos.textos_por_ot[nroOtActual];
     if (t) {
       datos = Object.assign({}, datos);
+      // Textos específicos del anexo: grano y tenor inclusionario. Cada OT
+      // puede tener textos distintos; si el mapa está poblado los aplicamos.
+      if (t.resultado_grano !== undefined) datos.resultado_grano = t.resultado_grano;
+      if (t.resultado_inclusionario !== undefined) datos.resultado_inclusionario = t.resultado_inclusionario;
+      // Backward-compat: mapa antiguo de metalografía general.
       if (t.resultados_seccion !== undefined) datos.resultados_seccion = t.resultados_seccion;
     }
   }

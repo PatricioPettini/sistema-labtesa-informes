@@ -696,17 +696,19 @@
             otsDest[dest] = true;
           });
         });
-        // Textos por OT (resultados_seccion).
+        // Textos por OT. Aplanamos todos los campos del mapa (genéricos):
+        // - metalografía general: `resultados_seccion` (objeto por sección).
+        // - anexo metalográfico: `resultado_grano` y `resultado_inclusionario`
+        //   (strings sueltos).
         var mapaTextos = (datos && datos.textos_por_ot) || {};
+        var TEXTO_KEYS = ['resultados_seccion', 'resultado_grano', 'resultado_inclusionario'];
         function aplanarTextosPara(nroOt) {
           var m = mapaTextos[nroOt] || {};
           var out = {};
-          if (m.resultados_seccion !== undefined) out.resultados_seccion = m.resultados_seccion;
-          else if (nroOt === otActualStr && datos.resultados_seccion !== undefined) {
-            out.resultados_seccion = datos.resultados_seccion;
-          } else {
-            out.resultados_seccion = {};
-          }
+          TEXTO_KEYS.forEach(function (k) {
+            if (m[k] !== undefined) out[k] = m[k];
+            else if (nroOt === otActualStr && datos[k] !== undefined) out[k] = datos[k];
+          });
           return out;
         }
         // Condiciones por OT (analisis por sección: on, ref, metodologia).
