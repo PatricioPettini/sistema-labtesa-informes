@@ -340,10 +340,49 @@ function QuimicosForm(props) {
         // ── Cuerpo ──────────────────────────────────────────────────────
         _r('tbody', null,
           // (Filas "OT N°" y "Muestra N°" eliminadas a pedido — no se completan)
-          // Filas por elemento
-          QUIMICOS_ELEMENTS.map(function (el) {
-            return _r('tr', { key: el.k },
-              _r('td', { style: { border: '1px solid var(--border-strong)', padding: '2px 6px', fontWeight: 600, background: 'var(--surface-2)' } }, el.label),
+          // Filas por elemento — fijas + custom. Cada label es editable.
+          // Fijas: viven en QUIMICOS_ELEMENTS. El técnico puede override el label
+          // vía datos.elementos_labels[k]. Custom: viven en datos.elementos_extra
+          // como {k, label} y se pueden borrar con el botón ×.
+          (function () {
+            var labelsOverride = datos.elementos_labels || {};
+            var extra = Array.isArray(datos.elementos_extra) ? datos.elementos_extra : [];
+            var todos = QUIMICOS_ELEMENTS.map(function (el) {
+              return { k: el.k, label: labelsOverride[el.k] != null ? labelsOverride[el.k] : el.label, esCustom: false };
+            }).concat(extra.map(function (el) {
+              return { k: el.k, label: el.label || '', esCustom: true };
+            }));
+            function updLabelFijo(k, nuevoLabel) {
+              var next = Object.assign({}, labelsOverride);
+              next[k] = nuevoLabel;
+              upd('elementos_labels', next);
+            }
+            function updLabelCustom(k, nuevoLabel) {
+              var next = extra.map(function (e) { return e.k === k ? Object.assign({}, e, { label: nuevoLabel }) : e; });
+              upd('elementos_extra', next);
+            }
+            function delCustom(k) {
+              upd('elementos_extra', extra.filter(function (e) { return e.k !== k; }));
+            }
+            return todos.map(function (el) {
+              return _r('tr', { key: el.k },
+                _r('td', {
+                  style: { border: '1px solid var(--border-strong)', padding: '2px 4px', fontWeight: 600, background: 'var(--surface-2)', position: 'relative' },
+                },
+                  _r('input', {
+                    style: { border: 'none', background: 'transparent', fontWeight: 600, fontSize: 10.5, width: el.esCustom ? 'calc(100% - 16px)' : '100%', padding: 0 },
+                    value: el.label,
+                    onChange: function (e) {
+                      if (el.esCustom) updLabelCustom(el.k, e.target.value);
+                      else updLabelFijo(el.k, e.target.value);
+                    },
+                  }),
+                  el.esCustom
+                    ? _r('button', {
+                        onClick: function () { delCustom(el.k); }, title: 'Quitar fila',
+                        style: { position: 'absolute', top: 0, right: 2, border: 'none', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '0 3px', lineHeight: 1 },
+                      }, '×')
+                    : null),
               [0, 1, 2].map(function (i) {
                 var val = (muestras[i] && muestras[i][el.k]) || '';
                 return _r('td', { key: i, style: { border: '1px solid var(--border-strong)', padding: 0 } },
@@ -380,7 +419,26 @@ function QuimicosForm(props) {
                 celdaInput(null, (datos.espec && datos.espec[el.k] && datos.espec[el.k].max) || '',
                   function (e) { upd('espec.' + el.k + '.max', e.target.value); }))
             );
-          }),
+          });
+          })(),
+          // Fila "+ Agregar fila" — sólo la columna del label, spans todas.
+          _r('tr', { key: '__add__' },
+            _r('td', {
+              colSpan: 3 + (3 * (patrones.length || 1)) + 2,
+              style: { border: '1px solid var(--border-strong)', padding: 4, background: 'var(--surface-2)', textAlign: 'left' },
+            },
+              _r('button', {
+                type: 'button',
+                onClick: function () {
+                  var extra = Array.isArray(datos.elementos_extra) ? datos.elementos_extra.slice() : [];
+                  var nuevaK = 'extra_' + Date.now();
+                  extra.push({ k: nuevaK, label: '' });
+                  upd('elementos_extra', extra);
+                },
+                style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3 },
+              }, '+ Agregar fila')
+            )
+          ),
           // Fila TIPO
           _r('tr', null,
             _r('td', { style: { border: '1px solid var(--border-strong)', padding: '2px 6px', fontWeight: 800, background: 'var(--surface-2)' } }, 'TIPO'),
