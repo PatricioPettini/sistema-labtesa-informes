@@ -55,35 +55,65 @@ function tokensSignificativos(s) {
     );
 }
 
+// Normaliza plurales simples para comparación tolerante:
+//   LABORATORIO ↔ LABORATORIOS ✓ (misma "raíz" con/sin S final)
+//   INDUSTRIA ↔ INDUSTRIAS ✓
+//   Sólo aplica a tokens de más de 4 caracteres para no confundir siglas
+//   (ej. YPF, TGS, ADM, etc.).
+function _tokenPlural(t) {
+  if (t.length > 4 && t.endsWith('S')) return t.slice(0, -1);
+  return t;
+}
+function _tokensMatchean(a, b) {
+  if (a === b) return true;
+  return _tokenPlural(a) === _tokenPlural(b);
+}
+function _setIncluyeToken(setPlural, t) {
+  return setPlural.has(_tokenPlural(t));
+}
+
 // Puntaje de match entre razón social y nombre de carpeta.
-// Solo acepta matches EXACTOS de token (case-insensitive, sin acentos).
+// Solo acepta matches EXACTOS de token (case-insensitive, sin acentos)
+// con tolerancia a plural (S al final para tokens >4 chars).
 // Prefijos parciales dan falsos positivos (ej. DUNLOP vs DU PONT).
 //
 // Regla principal: el PRIMER token significativo de la razón social es la
 // MARCA (el distintivo). Si coincide con el primer token de la carpeta, casi
 // seguro es la carpeta correcta — le damos bonus fuerte para que gane aunque
 // otras carpetas compartan más tokens genéricos (HNOS, METALURGICA, etc.).
-// Ejemplo: RS="CINTOLO HNOS METALURGICA SAIC" → CINTOLO gana sobre
-// "METALURGICA BRUNO HNOS" (que sin bonus matchea 2 tokens genéricos).
+//
+// SEGUNDO token: si el primer token es genérico ("LABORATORIO", "INDUSTRIA")
+// y ambos comparten SOLO ese primer token, el ganador debería tener también
+// el SEGUNDO token igual. Ej: "LABORATORIO SEIT" no matchea con "LABORATORIO
+// CUENCA" con solo 1.3 vs "LABORATORIOS SEIT" con 0.5 → hay que subir el peso
+// del segundo token cuando coincide.
 function puntajeMatch(razonSocial, nombreCarpeta) {
   const tokensRS  = tokensSignificativos(razonSocial);
   const tokensCarpeta = tokensSignificativos(nombreCarpeta);
   if (tokensRS.length === 0 || tokensCarpeta.length === 0) return 0;
-  const setCarpeta = new Set(tokensCarpeta);
+  const setCarpetaPlural = new Set(tokensCarpeta.map(_tokenPlural));
   let matches = 0;
   for (const t of tokensRS) {
-    if (setCarpeta.has(t)) matches++;
+    if (_setIncluyeToken(setCarpetaPlural, t)) matches++;
   }
   const ratio = matches / tokensRS.length;
   // Bonus FUERTE: el primer token de la RS coincide con el primer token de
-  // la carpeta (mismo distintivo al inicio de ambos). +0.8 sobre el ratio
-  // asegura que cualquier "CINTOLO" gane sobre otras carpetas con más
-  // matches de palabras genéricas.
-  const bonusPrimero = tokensRS[0] === tokensCarpeta[0] ? 0.8 : 0;
+  // la carpeta (con tolerancia plural).
+  const bonusPrimero = _tokensMatchean(tokensRS[0], tokensCarpeta[0]) ? 0.8 : 0;
   // Bonus pequeño: el primer token de RS aparece en la carpeta (no en primer
   // lugar). Solo si no se activó el bonus fuerte.
-  const bonusEnCarpeta = (bonusPrimero === 0 && setCarpeta.has(tokensRS[0])) ? 0.15 : 0;
-  return ratio + bonusPrimero + bonusEnCarpeta;
+  const bonusEnCarpeta = (bonusPrimero === 0 && _setIncluyeToken(setCarpetaPlural, tokensRS[0])) ? 0.15 : 0;
+  // Bonus FUERTE por SEGUNDO token: si tanto RS como carpeta tienen ≥2 tokens
+  // y el segundo token coincide, +0.6. Cubre el caso "LABORATORIO SEIT" ↔
+  // "LABORATORIOS SEIT" donde el primer token es genérico y lo distintivo es
+  // el segundo. Sin este bonus, "LABORATORIO CUENCA" (que solo comparte "LAB")
+  // gana con 1.3 sobre "LABORATORIOS SEIT" (0.5) por diferencia de plural.
+  let bonusSegundo = 0;
+  if (tokensRS.length >= 2 && tokensCarpeta.length >= 2 &&
+      _tokensMatchean(tokensRS[1], tokensCarpeta[1])) {
+    bonusSegundo = 0.6;
+  }
+  return ratio + bonusPrimero + bonusEnCarpeta + bonusSegundo;
 }
 
 // Overrides explícitos: si un token significativo de la razón social matchea
