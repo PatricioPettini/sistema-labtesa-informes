@@ -43,10 +43,17 @@ function OTForm(props) {
   }
   function blur(k) { setTouched(function (t) { var n = Object.assign({}, t); n[k] = true; return n; }); }
 
+  // Placeholder típico del bot cuando la tarjeta no traía nro_ot ("PEND-<sol>-M<n>").
+  // Se permite editarlo desde la pantalla de "Editar OT" para reemplazarlo por
+  // el número real cuando llegue de gerencia.
+  var esNroPlaceholder = /^PEND[-_]/i.test(String(props.nro_ot || ''));
+  var editable_nro_ot = !editing || esNroPlaceholder;
+
   var errors = {};
   if (!form.nro_ot.trim()) errors.nro_ot = 'Requerido';
   else if (!/^[0-9]{4,8}$/.test(form.nro_ot.trim())) errors.nro_ot = 'Debe ser numérico (4–8 dígitos)';
   else if (!editing && window.LabStore.getOt(form.nro_ot.trim())) errors.nro_ot = 'Ya existe una OT con ese número';
+  else if (editing && form.nro_ot.trim() !== String(props.nro_ot || '').trim() && window.LabStore.getOt(form.nro_ot.trim())) errors.nro_ot = 'Ya existe una OT con ese número';
   if (!form.nro_solicitud.trim()) errors.nro_solicitud = 'Requerido';
   if (!form.razon_social.trim()) errors.razon_social = 'Requerido';
   // Fecha de aprobación obligatoria (marca de gerencia sobre cuándo empezar).
@@ -312,7 +319,9 @@ function OTForm(props) {
           React.createElement(TextInput, { value: form.nro_solicitud, onChange: function (v) { set('nro_solicitud', v); }, onKeyDown: function () {}, mono: true, placeholder: 'SOL-2026-0000', invalid: err('nro_solicitud') })),
         React.createElement(Field, { label: 'N° de OT', required: true, hint: err('nro_ot') },
           React.createElement('div', { onBlur: function () { blur('nro_ot'); } },
-            React.createElement(TextInput, { value: form.nro_ot, onChange: function (v) { set('nro_ot', v); }, mono: true, placeholder: '534432', disabled: editing, invalid: err('nro_ot') })))
+            React.createElement(TextInput, { value: form.nro_ot, onChange: function (v) { set('nro_ot', v); }, mono: true, placeholder: '534432', disabled: !editable_nro_ot, invalid: err('nro_ot') }),
+            esNroPlaceholder ? React.createElement('div', { style: { fontSize: 11, color: '#8a5a00', marginTop: 4 } },
+              '⚠ N° provisorio del bot. Escribí el N° real (4–8 dígitos).') : null))
       ),
       React.createElement(Field, { label: 'Razón social', required: true, hint: err('razon_social') },
         React.createElement('div', { onBlur: function () { blur('razon_social'); } },
