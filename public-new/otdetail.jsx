@@ -86,7 +86,10 @@ function OTDetail(props) {
   var _gen = React.useState(''); var gen = _gen[0], setGen = _gen[1]; // '', 'word', 'qa', 'preemision'
   var _dup = React.useState(false); var dup = _dup[0], setDup = _dup[1];
   // Modal de confirmación de carpeta para generar Word.
-  var _saveDlg = React.useState(null); var saveDlg = _saveDlg[0], setSaveDlg = _saveDlg[1]; // null | 'word' | 'qa'
+  var _saveDlg = React.useState(null); var saveDlg = _saveDlg[0], setSaveDlg = _saveDlg[1]; // null | 'word' | 'word-batch' | 'qa'
+  // Progreso del batch "Generar todos". null cuando no hay batch activo.
+  // { total, hecho, fallidos:[], skipped:[], actual: nro_ot|null, carpeta, confirmarVersionGlobal }
+  var _batch = React.useState(null); var batchState = _batch[0], setBatchState = _batch[1];
   // Modal persistente que se muestra después de emitir un informe con la ruta guardada.
   var _informeEmitido = React.useState(null);
   var informeEmitido = _informeEmitido[0], setInformeEmitido = _informeEmitido[1];
@@ -348,6 +351,151 @@ function OTDetail(props) {
         setGen(''); refresh();
       })
       .catch(function (e) { setGen(''); toast('Error al generar: ' + e.message, 'danger'); });
+  }
+
+  // ── BATCH: Generar los N informes de todas las OTs de la solicitud ──────
+  // Verifica si una OT (con ensayos hidratados) está lista para emitir:
+  // - tiene al menos 1 ensayo
+  // - todos sus ensayos están firmados (revisado/autorizado/firmado)
+  // - no tiene datos_faltantes (nro_ot / id_muestra)
+  function esOtLista(otObj) {
+    if (!otObj || !Array.isArray(otObj.ensayos) || otObj.ensayos.length === 0) return false;
+    var firmados = otObj.ensayos.filter(function (e) {
+      return e.estado_firma === 'revisado' || e.estado_firma === 'autorizado' || e.estado_firma === 'firmado';
+    }).length;
+    if (firmados !== otObj.ensayos.length) return false;
+    var falt = [];
+    try { falt = otObj.datos_faltantes ? JSON.parse(otObj.datos_faltantes) : []; } catch (_) {}
+    if (!Array.isArray(falt)) falt = [];
+    return falt.length === 0;
+  }
+
+  function abrirGenerarBatch() {
+    // Filtra OTs listas de las hermanas antes de abrir el diálogo, para poder
+    // avisar si ninguna está en condiciones de emitirse.
+    var hermanasFull = otsHermanas.map(function (h) { return window.LabStore.getOt(h.nro_ot); }).filter(Boolean);
+    var listas = hermanasFull.filter(esOtLista);
+    if (listas.length === 0) {
+      toast('Ninguna OT de la solicitud está lista (falta firma o datos)', 'warning');
+      return;
+    }
+    setSaveDlg('word-batch');
+  }
+
+  // Genera secuencialmente el informe de cada OT lista de la solicitud en la
+  // MISMA carpeta destino. Si aparece un conflicto de versión (409), pausa y
+  // pregunta al usuario; su respuesta se aplica al resto del batch.
+  function ejecutarGenerarWordBatch(carpetaDestino, _filenameOtActual, opts) {
+    opts = opts || {};
+    setSaveDlg(null);
+    var hermanasFull = otsHermanas.map(function (h) { return window.LabStore.getOt(h.nro_ot); }).filter(Boolean);
+    var listas = hermanasFull.filter(esOtLista);
+    var skipped = hermanasFull.filter(function (o) { return !esOtLista(o); }).map(function (o) { return o.nro_ot; });
+    var estado = {
+      total: listas.length, hecho: 0, fallidos: [], skipped: skipped,
+      actual: null, carpeta: carpetaDestino, confirmarVersionGlobal: false,
+      generados: [],
+    };
+    setBatchState(estado);
+    setGen('word');
+
+    function detectarFilename(nroOt) {
+      return fetch('/api/generate/' + nroOt + '/detectar-carpeta')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { return d && d.filename ? d.filename : (nroOt + '.docx'); })
+        .catch(function () { return nroOt + '.docx'; });
+    }
+
+    function generarUno(nroOt, filename, extraOpts) {
+      var qs = '?solo_drive=true'
+             + '&carpeta_destino=' + encodeURIComponent(carpetaDestino)
+             + '&filename=' + encodeURIComponent(filename)
+             + (opts.forzar ? '&forzar=true' : '')
+             + (extraOpts && extraOpts.confirmarVersion ? '&confirmar_version_nueva=true' : '');
+      return fetch('/api/generate/' + nroOt + qs, { method: 'POST' })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); });
+    }
+
+    function siguiente(i) {
+      if (i >= listas.length) {
+        // Fin del batch.
+        setBatchState(null);
+        setGen('');
+        var resumen = 'Batch terminado: ' + estado.hecho + '/' + estado.total + ' generados';
+        if (estado.fallidos.length) resumen += ', ' + estado.fallidos.length + ' con error';
+        if (estado.skipped.length)  resumen += ', ' + estado.skipped.length + ' skippeados';
+        toast(resumen, estado.fallidos.length ? 'warning' : 'success');
+        if (estado.generados.length) {
+          // Modal resumen con lista de rutas.
+          setInformeEmitido({
+            batch: true,
+            total: estado.hecho,
+            generados: estado.generados,
+            fallidos: estado.fallidos,
+            skipped: estado.skipped,
+          });
+        }
+        refresh();
+        return;
+      }
+      var otObj = listas[i];
+      var nroOt = otObj.nro_ot;
+      setBatchState(function (prev) { return Object.assign({}, prev, { actual: nroOt }); });
+      detectarFilename(nroOt).then(function (filename) {
+        return generarUno(nroOt, filename, { confirmarVersion: estado.confirmarVersionGlobal });
+      }).then(function (r) {
+        // 409 CONFIRMAR_VERSION_NUEVA: pausar y preguntar (solo la primera vez).
+        if (r.status === 409 && r.d && r.d.code === 'CONFIRMAR_VERSION_NUEVA') {
+          setMdl({
+            title: 'Conflicto de versión en OT ' + nroOt,
+            message: 'Ya existe un informe vigente para la OT ' + nroOt + '. Si continuás, se emitirá como nueva versión y la anterior irá a SUPERADO/. ¿Aplicar esto a TODAS las OTs de este batch que tengan conflicto?',
+            tone: 'warning',
+            confirmLabel: 'Emitir nuevas versiones', confirmIcon: 'download',
+            cancelLabel: 'Cancelar batch',
+            onConfirm: function () {
+              setMdl(null);
+              estado.confirmarVersionGlobal = true;
+              // Reintentar la actual con confirmar=true.
+              detectarFilename(nroOt).then(function (fn) {
+                return generarUno(nroOt, fn, { confirmarVersion: true });
+              }).then(procesarRespuesta.bind(null, nroOt, i)).catch(function (e) {
+                estado.fallidos.push({ nro_ot: nroOt, error: e.message });
+                siguiente(i + 1);
+              });
+            },
+            onCancel: function () {
+              setMdl(null);
+              toast('Batch cancelado en OT ' + nroOt, 'warning');
+              setBatchState(null); setGen(''); refresh();
+            },
+          });
+          return;
+        }
+        procesarRespuesta(nroOt, i, r);
+      }).catch(function (e) {
+        estado.fallidos.push({ nro_ot: nroOt, error: e.message });
+        siguiente(i + 1);
+      });
+    }
+
+    function procesarRespuesta(nroOt, i, r) {
+      if (!r.ok) {
+        estado.fallidos.push({ nro_ot: nroOt, error: (r.d && r.d.error) || ('HTTP ' + r.status) });
+      } else {
+        estado.hecho += 1;
+        estado.generados.push({
+          nro_ot: nroOt,
+          ruta: r.d.ruta,
+          filename: r.d.filename || (r.d.ruta ? r.d.ruta.split(/[\\/]/).pop() : ''),
+          version: r.d.version,
+        });
+        window.LabStore.logEvento(nroOt, 'Informe Word generado (batch solicitud)', 'fileDoc');
+      }
+      setBatchState(function (prev) { return Object.assign({}, prev, { hecho: estado.hecho, fallidos: estado.fallidos.slice() }); });
+      siguiente(i + 1);
+    }
+
+    siguiente(0);
   }
 
   // Agente pre-emisión: análisis de coherencia con Claude.
@@ -669,11 +817,30 @@ function OTDetail(props) {
             React.createElement('div', { className: 'report-actions' },
               React.createElement(Button, {
                 variant: 'primary', block: true, icon: 'download',
-                loading: gen === 'word',
-                disabled: !listos,
+                loading: gen === 'word' && !batchState,
+                disabled: !listos || !!batchState,
                 title: tooltipGen,
                 onClick: genWord,
               }, 'Generar informe'),
+              // Botón batch: aparece solo si hay >1 OTs hermanas.
+              otsHermanas.length > 1 ? (function () {
+                var hermanasFull = otsHermanas.map(function (h) { return window.LabStore.getOt(h.nro_ot); }).filter(Boolean);
+                var nListas = hermanasFull.filter(esOtLista).length;
+                var totalHerm = hermanasFull.length;
+                var disabled = nListas === 0 || !!batchState;
+                var tipBatch = nListas === 0
+                  ? 'Ninguna OT de la solicitud está lista (falta firma o datos)'
+                  : (nListas < totalHerm ? ('Se generarán ' + nListas + '/' + totalHerm + ' OTs (' + (totalHerm - nListas) + ' no listas)') : 'Genera los ' + totalHerm + ' informes en la misma carpeta');
+                return React.createElement(Button, {
+                  variant: 'soft', block: true, icon: 'download',
+                  loading: !!batchState,
+                  disabled: disabled,
+                  title: tipBatch,
+                  onClick: abrirGenerarBatch,
+                }, batchState
+                    ? ('Generando ' + (batchState.hecho + (batchState.actual ? 1 : 0)) + '/' + batchState.total + '…')
+                    : ('Generar los ' + nListas + ' informes'));
+              })() : null,
               React.createElement(Button, { variant: 'soft', block: true, icon: 'clipboard', loading: gen === 'qa', onClick: genQA }, 'Control de calidad'),
               React.createElement(Button, { variant: 'soft', block: true, icon: 'sparkles', loading: gen === 'preemision', onClick: genPreEmision, title: 'Análisis de coherencia con IA (Claude): rangos, unidades, normas, valores imposibles' }, 'Análisis IA')
             ),
@@ -733,7 +900,17 @@ function OTDetail(props) {
     saveDlg && typeof window.GuardarCarpetaDialog === 'function'
       ? React.createElement(window.GuardarCarpetaDialog, {
           nroOt: ot.nro_ot,
-          onConfirm: function (carpeta, filename, opts) { ejecutarGenerarWord(carpeta, filename, opts); },
+          // En modo batch, usamos la OT actual solo para detectar la carpeta
+          // (la solicitud comparte cliente/carpeta). El filename se recalcula
+          // por OT dentro del handler batch.
+          batchInfo: saveDlg === 'word-batch' ? {
+            total: otsHermanas.length,
+            listas: otsHermanas.map(function (h) { return window.LabStore.getOt(h.nro_ot); }).filter(Boolean).filter(esOtLista).map(function (o) { return o.nro_ot; }),
+          } : null,
+          onConfirm: function (carpeta, filename, opts) {
+            if (saveDlg === 'word-batch') ejecutarGenerarWordBatch(carpeta, filename, opts);
+            else ejecutarGenerarWord(carpeta, filename, opts);
+          },
           onCancel: function () { setSaveDlg(null); },
         })
       : null,
@@ -934,6 +1111,76 @@ function unc2Local(ruta) {
 
 function InformeEmitidoModal(props) {
   var info = props.info || {};
+  // Modo batch: mostrar un resumen con la lista de OTs generadas + skippeadas
+  // + fallidas. La ruta a copiar es la carpeta común (todos van a la misma).
+  if (info.batch) {
+    var generados = info.generados || [];
+    var fallidos  = info.fallidos  || [];
+    var skipped   = info.skipped   || [];
+    var carpetaComun = generados.length ? (function () {
+      var idx = Math.max(String(generados[0].ruta).lastIndexOf('\\'), String(generados[0].ruta).lastIndexOf('/'));
+      return idx >= 0 ? generados[0].ruta.slice(0, idx) : '';
+    })() : '';
+    var carpetaLocal = unc2Local(carpetaComun);
+    function abrirCarpetaBatch() {
+      if (!carpetaLocal) return;
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = 'labopen://' + carpetaLocal.replace(/\\/g, '/');
+      document.body.appendChild(iframe);
+      setTimeout(function () { try { document.body.removeChild(iframe); } catch (_) {} }, 500);
+    }
+    return React.createElement('div', {
+      style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
+               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+      onClick: function (e) { if (e.target === e.currentTarget) props.onClose(); },
+    },
+      React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(92vw, 720px)', overflow: 'hidden', maxHeight: '85vh', display: 'flex', flexDirection: 'column' } },
+        React.createElement('div', { style: { background: '#f0fff4', borderBottom: '1px solid #c6f6d5', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
+          React.createElement(Icon, { name: 'check', size: 20, style: { color: '#0f7d3a' } }),
+          React.createElement('div', null,
+            React.createElement('h3', { style: { margin: 0, color: '#0f7d3a' } }, 'Batch de solicitud emitido'),
+            React.createElement('div', { style: { fontSize: 12, color: '#0f7d3a99', marginTop: 2 } },
+              generados.length + ' generados · ' + fallidos.length + ' con error · ' + skipped.length + ' skippeados')
+          )
+        ),
+        React.createElement('div', { style: { padding: 16, overflow: 'auto' } },
+          carpetaComun ? React.createElement('div', { style: { marginBottom: 12 } },
+            React.createElement('div', { style: { fontSize: 11, color: 'var(--text-3)', marginBottom: 4 } }, 'Carpeta destino:'),
+            React.createElement('div', { style: { fontFamily: 'ui-monospace, monospace', fontSize: 11, wordBreak: 'break-all', background: '#f6f8fa', padding: '6px 8px', borderRadius: 4 } }, carpetaLocal)
+          ) : null,
+          generados.length ? React.createElement('div', { style: { marginBottom: 12 } },
+            React.createElement('div', { style: { fontSize: 12, fontWeight: 700, color: '#0f7d3a', marginBottom: 6 } }, '✓ Generados (' + generados.length + '):'),
+            React.createElement('ul', { style: { margin: 0, padding: '0 0 0 18px', fontSize: 12 } },
+              generados.map(function (g) {
+                return React.createElement('li', { key: g.nro_ot, style: { marginBottom: 3 } },
+                  React.createElement('span', { style: { fontFamily: 'ui-monospace, monospace', fontWeight: 600 } }, g.nro_ot),
+                  ' — ',
+                  React.createElement('span', { style: { color: 'var(--text-2)' } }, g.filename || ''),
+                  g.version ? React.createElement('span', { style: { color: 'var(--text-3)', marginLeft: 6 } }, '(v' + g.version + ')') : null);
+              }))
+          ) : null,
+          fallidos.length ? React.createElement('div', { style: { marginBottom: 12 } },
+            React.createElement('div', { style: { fontSize: 12, fontWeight: 700, color: '#b02a2a', marginBottom: 6 } }, '✗ Fallidos (' + fallidos.length + '):'),
+            React.createElement('ul', { style: { margin: 0, padding: '0 0 0 18px', fontSize: 12 } },
+              fallidos.map(function (f) {
+                return React.createElement('li', { key: f.nro_ot, style: { marginBottom: 3 } },
+                  React.createElement('span', { style: { fontFamily: 'ui-monospace, monospace', fontWeight: 600 } }, f.nro_ot),
+                  ' — ', React.createElement('span', { style: { color: '#b02a2a' } }, f.error || ''));
+              }))
+          ) : null,
+          skipped.length ? React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 12, fontWeight: 700, color: '#8a5a00', marginBottom: 6 } }, '⊘ Skippeados por falta de firma/datos (' + skipped.length + '):'),
+            React.createElement('div', { style: { fontSize: 12, fontFamily: 'ui-monospace, monospace', color: 'var(--text-2)' } }, skipped.join(', '))
+          ) : null
+        ),
+        React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+          carpetaLocal ? React.createElement(Button, { variant: 'soft', icon: 'folder', onClick: abrirCarpetaBatch }, 'Abrir carpeta') : null,
+          React.createElement(Button, { variant: 'primary', onClick: props.onClose }, 'Cerrar')
+        )
+      )
+    );
+  }
   var rutaLocal = unc2Local(info.ruta);
   var _copiado = React.useState(false);
   var copiado = _copiado[0], setCopiado = _copiado[1];

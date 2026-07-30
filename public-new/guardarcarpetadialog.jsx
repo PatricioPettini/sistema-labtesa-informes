@@ -20,6 +20,9 @@ function GuardarCarpetaDialog(props) {
   var nroOt = props.nroOt;
   var onConfirm = props.onConfirm;
   var onCancel = props.onCancel;
+  // Modo batch: se van a generar TODOS los informes de la solicitud en la
+  // misma carpeta. El filename se recalcula por OT dentro del handler.
+  var batchInfo = props.batchInfo || null;
 
   var _s = React.useState({
     loading: true,
@@ -204,8 +207,28 @@ function GuardarCarpetaDialog(props) {
     color: 'var(--text)',
   };
 
+  // ── Banner de modo batch ────────────────────────────────────────────────
+  var bannerBatch = batchInfo ? _r('div', {
+    style: {
+      padding: '10px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      borderRadius: 4, marginBottom: 10, fontSize: 12, color: '#0550ae',
+      fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📦'),
+    _r('div', null,
+      'Batch de solicitud — se generarán ' + (batchInfo.listas ? batchInfo.listas.length : 0) + ' informes en esta carpeta',
+      batchInfo.listas && batchInfo.listas.length < batchInfo.total
+        ? _r('div', { style: { fontSize: 10.5, fontWeight: 400, color: '#0550aea0', marginTop: 3 } },
+            'De ' + batchInfo.total + ' OTs, ' + (batchInfo.total - batchInfo.listas.length) + ' no están listas y serán skippeadas.')
+        : null,
+      _r('div', { style: { fontSize: 10.5, fontWeight: 400, color: '#0550aea0', marginTop: 3 } },
+        'El nombre del archivo se calcula automáticamente para cada OT.'))
+  ) : null;
+
   // ── Modo confirmar: propuesta ──────────────────────────────────────────
   var contenidoConfirmar = st.info ? _r('div', null,
+    bannerBatch,
     // Badge acreditado: informe con todos los ensayos bajo alcance OAA →
     // se guarda en subcarpeta "1. OAA" del drive.
     st.info.acreditado
@@ -238,6 +261,7 @@ function GuardarCarpetaDialog(props) {
   // ── Modo navegar: path bar + breadcrumb + lista ─────────────────────────
   var crumbs = breadcrumbs(st.navPath);
   var contenidoNavegar = _r('div', null,
+    bannerBatch,
     // Botones de navegación
     _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 } },
       _r('button', {
