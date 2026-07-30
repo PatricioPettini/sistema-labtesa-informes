@@ -282,7 +282,12 @@ function EnsayoForm(props) {
         var over = String((m && m.nro_ot_override) || '').trim();
         return over && over !== String(ot.nro_ot);
       });
-      if (hayOverrideOtra && typeof window.LabStore.saveEnsayoTraccionMultiOt === 'function') {
+      // Split también si hay condiciones_por_ot con datos para OTs hermanas
+      // (permite propagar la sección 1.2 sin tener overrides de muestras).
+      var hayCondsOtrasTx = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        return n !== String(ot.nro_ot) && Object.keys(clean.condiciones_por_ot[n] || {}).length > 0;
+      });
+      if ((hayOverrideOtra || hayCondsOtrasTx) && typeof window.LabStore.saveEnsayoTraccionMultiOt === 'function') {
         window.LabStore.saveEnsayoTraccionMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
           .then(function (resumen) {
             var msg = 'Tracción guardada · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;

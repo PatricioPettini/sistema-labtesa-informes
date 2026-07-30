@@ -377,11 +377,26 @@
         });
         return out;
       }
+      // Condiciones de la sección 1.2 (norma checkboxes, ITM, temperatura,
+      // equipamiento, notas fijas). Se copian a hermanas via botón "Copiar
+      // condiciones a otras OT" que escribe en condiciones_por_ot[<destino>].
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      function condsPara(nroOt) {
+        var m = mapaCond[nroOt];
+        return (m && Object.keys(m).length > 0) ? Object.assign({}, m) : null;
+      }
       // 1) Datos para la OT actual: solo su grupo + sus textos aplanados.
-      var otsDest = Object.keys(grupos);
+      // También incluimos como destinos las OTs que aparezcan en
+      // condiciones_por_ot (permite propagar la 1.2 aunque no haya split de
+      // muestras hacia esa hermana).
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
       var idxActual = grupos[otActualStr] || [];
       var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr));
       delete datosActual.textos_por_ot;
+      delete datosActual.condiciones_por_ot;
       var subActual = extraerGrupo(idxActual);
       datosActual.muestras = subActual.muestras;
       datosActual.seccion_calc = subActual.seccion_calc;
@@ -392,11 +407,14 @@
       //    las muestras nuevas (concatenando a las que ya tenía).
       var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
       var promsHermanas = hermanas.map(function (nroY) {
-        var sub = extraerGrupo(grupos[nroY]);
+        // Si esta OT solo está en el destino por condiciones_por_ot (no por
+        // muestras override), grupos[nroY] no existe → sub es vacío.
+        var sub = grupos[nroY] ? extraerGrupo(grupos[nroY]) : { muestras: [], seccion_calc: [] };
         // Buscar ensayo tracción existente en OT Y.
         var existente = _db.ensayos.find(function (e) {
           return String(e.nro_ot) === String(nroY) && e.tipo === 'traccion';
         });
+        var overrideY = condsPara(nroY);
         var accion, datosY, existingIdY;
         if (existente) {
           accion = 'actualizado';
@@ -422,7 +440,11 @@
             muestras: muestrasPrev.concat(muestrasNuevasReindex),
             seccion_calc: seccionPrev.concat(sub.seccion_calc),
           });
+          // Aplicar overrides de la sección 1.2 al final (pisan lo previo)
+          // para que la copia explícita del botón "Copiar condiciones" gane.
+          if (overrideY) Object.assign(datosY, overrideY);
           delete datosY.textos_por_ot;
+          delete datosY.condiciones_por_ot;
         } else {
           accion = 'creado';
           // Copiar condiciones globales del ensayo actual (norma checkboxes,
@@ -444,6 +466,7 @@
           CONDICIONES_GLOBALES.forEach(function (k) {
             if (datos[k] !== undefined) datosY[k] = datos[k];
           });
+          if (overrideY) Object.assign(datosY, overrideY);
         }
         return self.saveEnsayoAsync(nroY, 'traccion', datosY, existingIdY).then(function (row) {
           return { nro_ot: nroY, accion: accion, cantidad: sub.muestras.length, id: row && row.id };

@@ -226,6 +226,84 @@ function TraccionForm(props) {
   function upd(key, val) { set(key, val); }
   function updBool(key, checked) { set(key, !!checked); }
 
+  // ── Multi-OT: botones "Copiar a otras OT" por sección ────────────────────
+  // Cada botón copia un subset específico de campos (norma, ITM, etc.) a
+  // `datos.condiciones_por_ot[<destino>]`. Al guardar el ensayo, el saver
+  // multi-OT (saveEnsayoTraccionMultiOt) aplica esos overrides a los ensayos
+  // hermanos existentes o los usa como semilla para los nuevos.
+  var multiOtTr = otsDisponibles.length > 1;
+  var otNroActualStrTr = String(otNroActual || '');
+  var _copyKeyTr = React.useState(''); var copyOpenKeyTr = _copyKeyTr[0], setCopyOpenKeyTr = _copyKeyTr[1];
+  var _copyDestTr = React.useState([]); var copyDestGenTr = _copyDestTr[0], setCopyDestGenTr = _copyDestTr[1];
+  function copiarCamposTrAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+  }
+  function botonCopiarSeccionTr(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtTr) return null;
+    var abierto = copyOpenKeyTr === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestGenTr([]);
+          setCopyOpenKeyTr(abierto ? '' : claveUnica);
+        },
+        style: {
+          border: '1px solid var(--accent, #0969da)', background: '#fff',
+          color: 'var(--accent, #0969da)', padding: '3px 8px', fontSize: 10,
+          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: '#fff', border: '1px solid #d0d7de',
+          borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: '#24292f' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: '#57606a', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrTr; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenTr.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenTr(checked ? copyDestGenTr.filter(function (n) { return n !== nro; }) : copyDestGenTr.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyTr(''); },
+            style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenTr.slice();
+              if (destinos.length === 0) {
+                destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrTr; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposTrAOts(destinos, camposList);
+              setCopyOpenKeyTr(''); setCopyDestGenTr([]);
+            },
+            style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
   // Precargar años default (ISO 2019 / ASTM E8 25). No pisa si el técnico ya
   // los cambió; solo aplica cuando el ensayo es nuevo o el campo está vacío.
   React.useEffect(function () {
@@ -442,7 +520,13 @@ function TraccionForm(props) {
 
   // ── 1.2 CONDICIONES GENERALES (globales al ensayo, iguales para todas las probetas)
   var block11 = _r('div', null,
-    _r('div', { style: S.head }, '1.2  CONDICIONES GENERALES DEL ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.2  CONDICIONES GENERALES DEL ENSAYO'),
+      botonCopiarSeccionTr('cond_12', 'Copiar condiciones a otras OT',
+        ['metodologia', 'temperatura', 'ecuacion_seccion',
+         'estado_superficial', 'verif_alineacion', 'prob_cliente', 'prob_soldada'],
+        'Copia ITM, temperatura, ecuación de sección y checkboxes.')
+    ),
     _r('div', { style: Object.assign({}, S.box, { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }) },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
@@ -628,7 +712,12 @@ function TraccionForm(props) {
   // ── EQUIPAMIENTO ──────────────────────────────────────────────────
   var equipos = datos.variante === 'neuquen' ? TRACCION_EQ_NEUQUEN : TRACCION_EQ_ESTANDAR;
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO ' + (datos.variante === 'neuquen' ? '— Set Shimadzu (Neuquén)' : '— Set EMIC (CABA)')),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.4  EQUIPAMIENTO UTILIZADO ' + (datos.variante === 'neuquen' ? '— Set Shimadzu (Neuquén)' : '— Set EMIC (CABA)')),
+      botonCopiarSeccionTr('equip_14', 'Copiar equipamiento a otras OT',
+        ['equipamiento', 'equipamiento_tags', 'otros_equipos'],
+        'Copia los equipos tildados, sus TAGs y "otros equipos".')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 24px', fontSize: 11 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
