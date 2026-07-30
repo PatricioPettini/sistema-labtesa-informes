@@ -1186,11 +1186,28 @@ function InformeEmitidoModal(props) {
     var carpetaLocal = unc2Local(carpetaComun);
     function abrirCarpetaBatch() {
       if (!carpetaLocal) return;
+      // labopen:// (handler custom instalado en Auditoría) → abre Explorer directo.
       var iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       iframe.src = 'labopen://' + carpetaLocal.replace(/\\/g, '/');
       document.body.appendChild(iframe);
       setTimeout(function () { try { document.body.removeChild(iframe); } catch (_) {} }, 500);
+      var handlerOk = false;
+      try { handlerOk = localStorage.getItem('labopenInstalled') === '1'; } catch (_) {}
+      if (handlerOk) return;
+      // Fallback: descargar un .url que apunta a la carpeta (funciona sin handler).
+      var rutaFile = 'file:///' + carpetaLocal.replace(/\\/g, '/');
+      var contenido = '[InternetShortcut]\r\nURL=' + rutaFile + '\r\n';
+      var last = carpetaLocal.split(/[\\\/]/).filter(Boolean).pop() || 'carpeta';
+      var nombre = 'Abrir_' + last.replace(/[^A-Za-z0-9 _\-]/g, '_').slice(0, 40) + '.url';
+      var blob = new Blob([contenido], { type: 'application/internet-shortcut' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (_) {} }, 500);
+      if (window._labToastOk) window._labToastOk('Descargado ' + nombre + '. Instalá el handler en Auditoría para abrir directo.');
     }
     return React.createElement('div', {
       style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
