@@ -48,7 +48,12 @@ function AnexoMetalograficoForm(props) {
 
   // ── 1.1 NORMAS ──────────────────────────────────────────────────────────
   var block11 = _r('div', null,
-    _r('div', { style: S.head }, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+      botonCopiarSeccionAnx('normas_11', 'Copiar normas a otras OT',
+        ['grano', 'inclu'],
+        'Copia ITM, ASTM, año, método y "otra norma" de ambos análisis.')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 10.5 } },
       // 1.1.1 TAMAÑO DE GRANO
       _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
@@ -117,7 +122,13 @@ function AnexoMetalograficoForm(props) {
 
   // ── 1.2 VERIFICACIONES + 1.2.1 REACTIVO ─────────────────────────────────
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+      botonCopiarSeccionAnx('cond_12', 'Copiar condiciones a otras OT',
+        ['temperatura', 'zona_ensayo', 'muestra_ensayada',
+         'sup_muestra', 'sup_equipo', 'sup_reactivo', 'aumentos'],
+        'Copia temperatura, zona, muestra, estados y aumentos.')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px', fontSize: 10.5 } },
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.sup_muestra,
@@ -146,7 +157,12 @@ function AnexoMetalograficoForm(props) {
         _r('input', { style: S.inline, placeholder: '……', value: datos.muestra_ensayada || '',
           onChange: function (e) { upd('muestra_ensayada', e.target.value); } }))
     ),
-    _r('div', { style: S.subhead }, '1.2.1  REACTIVO UTILIZADO'),
+    _r('div', { style: Object.assign({}, S.subhead, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.2.1  REACTIVO UTILIZADO'),
+      botonCopiarSeccionAnx('reactivo_121', 'Copiar reactivo a otras OT',
+        ['reactivos', 'reactivo_otro'],
+        'Copia la selección de reactivos y el campo "otro".')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px 16px', fontSize: 10.5 } },
       AM_REACTIVOS.map(function (r) {
         return _r('label', { key: r.key, style: S.label },
@@ -163,7 +179,12 @@ function AnexoMetalograficoForm(props) {
 
   // ── 1.3 EQUIPAMIENTO ────────────────────────────────────────────────────
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.3  EQUIPAMIENTO UTILIZADO'),
+      botonCopiarSeccionAnx('equip_13', 'Copiar equipamiento a otras OT',
+        ['equipamiento', 'equipamiento_tags', 'otros_equipos'],
+        'Copia los equipos tildados, sus TAGs y "otros equipos".')
+    ),
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 10.5 } },
       AM_EQUIPOS.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -311,24 +332,16 @@ function AnexoMetalograficoForm(props) {
       set('textos_por_ot', mapa);
     }
   }
-  // Copiar TODAS las condiciones globales (temperatura, zona, muestra,
-  // reactivos, aumentos, equipamiento, grano, inclu) al mapa condiciones_por_ot
-  // para las OTs destino. Se usa cuando las hermanas comparten configuración
-  // pero cada una necesita SU copia editable.
-  var CONDICIONES_ANX_COPIABLES = [
-    'temperatura', 'zona_ensayo', 'muestra_ensayada',
-    'reactivos', 'reactivo_otro', 'aumentos',
-    'equipamiento', 'equipamiento_tags', 'otros_equipos',
-    'grano', 'inclu', 'inclusiones',
-  ];
-  var _copyCondA = React.useState(false); var copyCondOpenA = _copyCondA[0], setCopyCondOpenA = _copyCondA[1];
-  var _copyCondDestA = React.useState([]); var copyCondDestA = _copyCondDestA[0], setCopyCondDestA = _copyCondDestA[1];
-  function copiarCondicionesAnxAOts(destinos) {
+  // Helper genérico: botón + popover para copiar UN subset de campos a otras OTs.
+  // Cada sección del form llama a este helper con SUS campos específicos.
+  var _copyOpenKeyA = React.useState(''); var copyOpenKeyA = _copyOpenKeyA[0], setCopyOpenKeyA = _copyOpenKeyA[1];
+  var _copyDestGenA = React.useState([]); var copyDestGenA = _copyDestGenA[0], setCopyDestGenA = _copyDestGenA[1];
+  function copiarCamposAnxAOts(destinos, campos) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
-      CONDICIONES_ANX_COPIABLES.forEach(function (k) {
+      campos.forEach(function (k) {
         if (datos[k] !== undefined) {
           entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
             ? Object.assign({}, datos[k])
@@ -339,51 +352,58 @@ function AnexoMetalograficoForm(props) {
     });
     set('condiciones_por_ot', mapaCond);
   }
-  var botonCopiarCondAnx = multiOtAnx ? _r('div', { style: { position: 'relative', display: 'inline-block' } },
-    _r('button', {
-      type: 'button',
-      onClick: function () { setCopyCondDestA([]); setCopyCondOpenA(!copyCondOpenA); },
-      style: {
-        border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff',
-        padding: '4px 10px', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontWeight: 600,
+  function botonCopiarSeccionAnx(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtAnx) return null;
+    var abierto = copyOpenKeyA === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () {
+          setCopyDestGenA([]);
+          setCopyOpenKeyA(abierto ? '' : claveUnica);
+        },
+        style: {
+          border: '1px solid var(--accent)', background: 'var(--surface)',
+          color: 'var(--accent)', padding: '3px 8px', fontSize: 10,
+          cursor: 'pointer', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 240, fontSize: 11,
+        },
       },
-    }, '📋 Copiar condiciones a otras OTs'),
-    copyCondOpenA ? _r('div', {
-      style: {
-        position: 'absolute', zIndex: 30, top: '100%', left: 0, marginTop: 4,
-        background: 'var(--surface)', border: '1px solid var(--border-strong)',
-        borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 260, fontSize: 11,
-      },
-    },
-      _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar TODAS las condiciones a:'),
-      _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } },
-        'Temperatura, zona, muestra, reactivos, aumentos, equipamiento y tabla de inclusiones se replican.'),
-      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
-        otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) {
-          var nro = String(o.nro_ot);
-          var checked = copyCondDestA.indexOf(nro) >= 0;
-          return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', checked: checked,
-              onChange: function () {
-                setCopyCondDestA(checked ? copyCondDestA.filter(function (n) { return n !== nro; }) : copyCondDestA.concat([nro]));
-              } }),
-            _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
-        })),
-      _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
-        _r('button', { type: 'button', onClick: function () { setCopyCondOpenA(false); },
-          style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
-        _r('button', { type: 'button',
-          onClick: function () {
-            var destinos = copyCondDestA.slice();
-            if (destinos.length === 0) {
-              destinos = otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) { return String(o.nro_ot); });
-            }
-            copiarCondicionesAnxAOts(destinos);
-            setCopyCondOpenA(false); setCopyCondDestA([]);
-          },
-          style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
-    ) : null
-  ) : null;
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenA.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenA(checked ? copyDestGenA.filter(function (n) { return n !== nro; }) : copyDestGenA.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyA(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenA.slice();
+              if (destinos.length === 0) {
+                destinos = otsHermAnx.filter(function (o) { return String(o.nro_ot) !== otNroActualAnx; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposAnxAOts(destinos, camposList);
+              setCopyOpenKeyA(''); setCopyDestGenA([]);
+            },
+            style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
 
   var tabsOtAnx = multiOtAnx ? _r('div', {
     style: {
@@ -412,8 +432,7 @@ function AnexoMetalograficoForm(props) {
           },
         }, nro, esActual ? ' · actual' : '');
       })),
-    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos. La tabla ASTM E45 es común.'),
-    _r('div', { style: { marginLeft: 'auto' } }, botonCopiarCondAnx)
+    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos. La tabla ASTM E45 es común.')
   ) : null;
 
   var block14 = _r('div', null,
