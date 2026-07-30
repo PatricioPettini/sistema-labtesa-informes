@@ -22,6 +22,11 @@ function OTForm(props) {
   var _trelloUrl = React.useState(''); var trelloUrl = _trelloUrl[0], setTrelloUrl = _trelloUrl[1];
   var _trelloRes = React.useState(null); var trelloRes = _trelloRes[0], setTrelloRes = _trelloRes[1];
   var _trelloLoad = React.useState(false); var trelloLoad = _trelloLoad[0], setTrelloLoad = _trelloLoad[1];
+  // Flag "cargar manualmente" — muestra el form vacío cuando el usuario no
+  // quiere importar de Trello. También se activa automáticamente si Trello
+  // devuelve una tarjeta sin OTs parseables (para permitir cargar el nro_ot
+  // a mano usando lo que sí se pudo leer: nro_solicitud, cliente, etc.).
+  var _manual = React.useState(false); var manual = _manual[0], setManual = _manual[1];
   // Fecha de aprobación aplicada al batch (editable en el modal, se propaga a
   // TODAS las OTs que se creen). Se prellena con la de Trello si viene.
   var _trelloFAp = React.useState(''); var trelloFAp = _trelloFAp[0], setTrelloFAp = _trelloFAp[1];
@@ -80,7 +85,15 @@ function OTForm(props) {
           update.id_muestra = res.ots[0].id_muestra || '';
         }
         setForm(function (f) { return Object.assign({}, f, update); });
-        toast('Datos importados desde Trello', 'success');
+        // Si Trello no devolvió OTs, activar modo manual para que el técnico
+        // pueda igual cargar el nro_ot a mano con los datos del cliente
+        // (nro_solicitud, razón social) ya prellenados.
+        if (!res.ots || res.ots.length === 0) {
+          setManual(true);
+          toast('Datos importados desde Trello — completá el N° de OT manualmente', 'warning');
+        } else {
+          toast('Datos importados desde Trello', 'success');
+        }
       })
       .catch(function (e) {
         setTrelloLoad(false);
@@ -279,12 +292,21 @@ function OTForm(props) {
       ) : null
     ) : null,
 
-    // Form principal (datos administrativos) — solo se muestra si:
+    // Botón "Cargar manualmente" — aparece si estamos en modo Nueva OT, todavía
+    // no se importó nada de Trello y el técnico no activó modo manual. Permite
+    // saltar la importación y llenar los campos a mano.
+    (!editing && !trelloRes && !manual) ? React.createElement('div', { style: { textAlign: 'center', margin: '16px 0' } },
+      React.createElement(Button, {
+        variant: 'ghost', size: 'sm', icon: 'edit',
+        onClick: function () { setManual(true); },
+      }, 'Cargar manualmente (sin Trello)')
+    ) : null,
+
+    // Form principal (datos administrativos) — se muestra si:
     //   - estamos editando una OT existente, o
-    //   - el técnico ya pickeó una muestra del picker de Trello.
-    // Esto minimiza la fricción: si aún no importó Trello ni eligió muestra,
-    // no debe ver ni pensar en los campos administrativos.
-    (editing || (trelloRes && form.nro_ot && form.nro_ot.trim())) ? React.createElement(Card, null,
+    //   - el técnico ya pickeó una muestra del picker de Trello, o
+    //   - se activó modo manual (o Trello devolvió 0 OTs).
+    (editing || (trelloRes && form.nro_ot && form.nro_ot.trim()) || manual) ? React.createElement(Card, null,
       React.createElement('div', { className: 'form-grid cols-2' },
         React.createElement(Field, { label: 'N° de solicitud', required: true, hint: err('nro_solicitud') },
           React.createElement(TextInput, { value: form.nro_solicitud, onChange: function (v) { set('nro_solicitud', v); }, onKeyDown: function () {}, mono: true, placeholder: 'SOL-2026-0000', invalid: err('nro_solicitud') })),
