@@ -143,8 +143,13 @@
       return _db.ots.slice().sort(function (a, b) {
         return (b.creado_en || '').localeCompare(a.creado_en || '');
       }).map(function (ot) {
+        // Comparación laxa (String(...)) porque nro_ot puede venir como
+        // string desde el backend o número desde el cache legacy. Sin esto,
+        // los ensayos hermanos creados vía saveEnsayoXxxMultiOt no aparecían
+        // porque _db.ensayos guarda string y _db.ots guardaba number (o al revés).
+        var otNro = String(ot.nro_ot);
         var tipos = _db.ensayos
-          .filter(function (e) { return e.nro_ot === ot.nro_ot; })
+          .filter(function (e) { return String(e.nro_ot) === otNro; })
           .sort(function (a, b) { return a.orden - b.orden; })
           .map(function (e) { return e.tipo; });
         return Object.assign({}, ot, { tipos_ensayo: tipos });
@@ -152,10 +157,11 @@
     },
 
     getOt: function (nro_ot) {
-      var ot = _db.ots.find(function (o) { return o.nro_ot === nro_ot; });
+      var target = String(nro_ot);
+      var ot = _db.ots.find(function (o) { return String(o.nro_ot) === target; });
       if (!ot) return null;
       var ensayos = _db.ensayos
-        .filter(function (e) { return e.nro_ot === nro_ot; })
+        .filter(function (e) { return String(e.nro_ot) === target; })
         .sort(function (a, b) { return a.orden - b.orden; });
       return Object.assign({}, ot, { ensayos: ensayos });
     },
@@ -380,7 +386,7 @@
         var sub = extraerGrupo(grupos[nroY]);
         // Buscar ensayo tracción existente en OT Y.
         var existente = _db.ensayos.find(function (e) {
-          return e.nro_ot === nroY && e.tipo === 'traccion';
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'traccion';
         });
         var accion, datosY, existingIdY;
         if (existente) {
@@ -505,7 +511,7 @@
       var promsHermanas = hermanas.map(function (nroY) {
         var subResultados = extraerGrupo(grupos[nroY]);
         var existente = _db.ensayos.find(function (e) {
-          return e.nro_ot === nroY && e.tipo === 'plegado';
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'plegado';
         });
         var accion, datosY, existingIdY;
         if (existente) {
@@ -613,7 +619,7 @@
       var promsHermanas = hermanas.map(function (nroY) {
         var subResultados = extraerGrupo(grupos[nroY]);
         var existente = _db.ensayos.find(function (e) {
-          return e.nro_ot === nroY && e.tipo === 'impacto';
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'impacto';
         });
         var accion, datosY, existingIdY;
         if (existente) {
@@ -749,7 +755,7 @@
         var hermanas = Object.keys(otsDest).filter(function (n) { return n !== otActualStr; });
         var promsHermanas = hermanas.map(function (nroY) {
           var existente = _db.ensayos.find(function (e) {
-            return e.nro_ot === nroY && e.tipo === tipo;
+            return String(e.nro_ot) === String(nroY) && e.tipo === tipo;
           });
           var accion, datosY, existingIdY;
           if (existente) {
