@@ -136,6 +136,18 @@ function MetalografiaGeneralForm(props) {
             _r('input', { type: 'checkbox', checked: !!d.on,
               onChange: function (e) { upd('analisis.' + n.key + '.on', e.target.checked); } }),
             n.label),
+          // Nombre custom del análisis (solo para 1.1.5 OTRO). Lo que se
+          // ingrese acá reemplaza "OTRO" en el título "DETERMINACIÓN DE X" del Word.
+          n.key === 'otro'
+            ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },
+                _r('span', { style: { color: '#555', minWidth: 130 } }, 'Nombre del análisis:'),
+                _r('input', {
+                  style: S.inline,
+                  placeholder: 'Ej: DUREZA SUPERFICIAL',
+                  value: d.nombre || '',
+                  onChange: function (e) { upd('analisis.' + n.key + '.nombre', e.target.value); },
+                }))
+            : null,
           // Norma de ensayo — texto libre con datalist opcional para sugerencias.
           _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },
             _r('span', { style: { color: '#555', minWidth: 130 } }, 'Norma de ensayo:'),

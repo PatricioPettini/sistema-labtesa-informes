@@ -152,7 +152,14 @@ function construirBloqueEnsayo(datos) {
       const resultadoSec = (datos.resultados_seccion && datos.resultados_seccion[k] || '').trim();
 
       // Título "DETERMINACIÓN DE X" con asterisco OAA.
-      partes.push(pSeccionHeading('DETERMINACIÓN DE ' + label + asterisco));
+      // Para el análisis `otro` (1.1.5), el técnico puede haber ingresado un
+      // nombre custom en `cfg.nombre` — usarlo si está presente. Sino, "OTRO".
+      let etiquetaSec = label;
+      if (k === 'otro') {
+        const nombreCustom = String(cfg.nombre || '').trim();
+        if (nombreCustom) etiquetaSec = nombreCustom.toUpperCase();
+      }
+      partes.push(pSeccionHeading('DETERMINACIÓN DE ' + etiquetaSec + asterisco));
 
       // ── CONDICIONES DE ENSAYO ─────────────────────────────────────
       partes.push(pHeading('CONDICIONES DE ENSAYO'));
