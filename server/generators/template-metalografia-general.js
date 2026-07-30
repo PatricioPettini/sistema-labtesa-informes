@@ -156,7 +156,15 @@ function construirBloqueEnsayo(datos) {
       const zonaSec = String(cfg.zona || zonaTxt || '').trim();
       const ataqueSec = String(cfg.ataque || '').trim() || reactivoLinea.replace(/^Ataque utilizado:\s*/, '');
       const aumentoSec = String(cfg.aumento || aumentoTextoLibre || '').trim();
-      const resultadoSec = (datos.resultados_seccion && datos.resultados_seccion[k] || '').trim();
+      // El key de resultados_seccion difiere del key de análisis en el front.
+      // Mismo mapeo que metalografiageneralform.jsx _tieneEvidenciaDeUso.
+      // Fallback al mismo key por si en algún ensayo viejo se guardó con el
+      // key de análisis directamente.
+      const _MAPEO_RESULTADO = { micro: 'microestructura', espesor: 'espesor', grafito: 'grafito', decarb: 'decarburacion', otro: 'otro' };
+      const kResult = _MAPEO_RESULTADO[k] || k;
+      const resultadoSec = String(
+        (datos.resultados_seccion && (datos.resultados_seccion[kResult] || datos.resultados_seccion[k])) || ''
+      ).trim();
 
       // Título "DETERMINACIÓN DE X" con asterisco OAA.
       // Para el análisis `otro` (1.1.5), el técnico puede haber ingresado un
