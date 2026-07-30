@@ -144,22 +144,34 @@ function pTituloAnalisis(texto) {
     `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
 }
 
+// Aplica el sufijo de año a un nombre de norma. Si el año trae ":" o "-" al
+// inicio lo respeta; si es un año pelado le antepone "-".
+function _aplicarAnio(nombre, anio) {
+  const v = String(anio || '').trim();
+  if (!v) return nombre;
+  const suf = (v[0] === '-' || v[0] === ':') ? v : '-' + v;
+  return nombre + suf;
+}
+
 // Arma la línea "Norma de ensayo: ..." a partir de los flags del form.
 // Prioridad: si viene `norma_completa` (texto libre), se usa tal cual;
-// si no, se combinan checkboxes + método.
+// si no, se combinan checkboxes con año + método + "otra norma" con "y".
 function armarNorma(bloc, defaultAstm) {
   const completa = (bloc.norma_completa || '').trim();
   if (completa) return completa;
   const partes = [];
-  if (bloc.astm) partes.push(defaultAstm);
+  if (bloc.astm) partes.push(_aplicarAnio(defaultAstm, bloc.astm_year));
   if (bloc.metodo_chk && (bloc.metodo || '').trim()) partes.push(bloc.metodo.trim());
-  return partes.join(' ').trim();
+  // "Otra norma": se concatena con "y" al final de la línea.
+  const otra = (bloc.otra || '').trim();
+  if (otra) partes.push(otra);
+  return partes.join(' y ').trim();
 }
 
 function armarItm(bloc, defaultNum) {
   const explicito = (bloc.itm_numero || '').trim();
-  if (explicito) return explicito;
-  if (bloc.itm) return defaultNum;
+  if (explicito) return _aplicarAnio(explicito, bloc.itm_year);
+  if (bloc.itm) return _aplicarAnio(defaultNum, bloc.itm_year);
   return '';
 }
 
