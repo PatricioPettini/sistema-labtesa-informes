@@ -422,6 +422,52 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   const processedZip = doc.getZip();
   let outXml = processedZip.files['word/document.xml'].asText();
 
+  // Insertar filas custom (datos.elementos_extra) al final de la tabla, antes
+  // de la fila "TIPO". Se hace ANTES del override de labels: usamos la fila
+  // "Plata %" original como molde (si el técnico renombró Plata, el regex no
+  // matchearía). Después el override de labels aplica sobre las filas fijas
+  // que quedan; las nuevas ya tienen el label custom.
+  if (Array.isArray(datos.elementos_extra) && datos.elementos_extra.length > 0) {
+    const rePlata = /<w:tr\b[^>]*>(?:(?!<w:tr\b)[\s\S])*?Plata %(?:(?!<\/w:tr>)[\s\S])*?<\/w:tr>/;
+    const mPlata = outXml.match(rePlata);
+    if (mPlata) {
+      const filaMolde = mPlata[0];
+      const filasNuevas = datos.elementos_extra.map(function (el) {
+        const labelXml = String(el.label || '').trim()
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '';
+        let f = filaMolde.replace(/(<w:t[^>]*>)Plata %(<\/w:t>)/, '$1' + labelXml + '$2');
+        // Valores de las muestras para este elemento custom (los cargó el
+        // técnico en la tabla del form bajo la key `el.k`).
+        const muestrasParaEsta = Array.isArray(datos.muestras) ? datos.muestras : [];
+        const vals = [];
+        for (let i = 0; i < 3; i++) {
+          const m = muestrasParaEsta[i] || {};
+          const v = String(m[el.k] ?? (m.elementos && m.elementos[el.k]) ?? '').trim();
+          vals.push(v);
+        }
+        // Reemplazar el CONTENIDO de cada <w:t> del cuerpo por los valores:
+        //   count 0 = label (ya reemplazado arriba, saltear)
+        //   count 1-3 = muestras M1, M2, M3
+        //   count > 3 = celdas de patrones/MIN/MAX/TIPO → vaciar
+        const rePlaceholder = /(<w:t[^>]*>)([^<]*)(<\/w:t>)/g;
+        let count = -1;
+        f = f.replace(rePlaceholder, function (m, pre, contenido, post) {
+          count++;
+          if (count === 0) return m;
+          if (count >= 1 && count <= 3) return pre + (vals[count - 1] || '') + post;
+          return pre + post;
+        });
+        // Defensivo: eliminar cualquier __HIDE__ residual para que
+        // eliminarFilasOcultas no borre esta fila más adelante.
+        f = f.replace(/__HIDE__/g, '');
+        return f;
+      }).join('');
+      outXml = outXml.replace(rePlata, mPlata[0] + filasNuevas);
+    } else {
+      console.warn('[quimicos] No se encontró fila "Plata %" para clonar filas custom. Elementos extra descartados.');
+    }
+  }
+
   // Aplicar overrides de labels (datos.elementos_labels). El técnico puede
   // haber renombrado "Carbono %" → "C %" u otra variante en el form. Buscamos
   // el texto original de cada elemento en el XML y lo reemplazamos.
@@ -442,59 +488,9 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
       if (!nuevo || !orig || nuevo === orig) return;
       const escOrig = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const escNuevo = nuevo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      // Reemplazar dentro de <w:t>...</w:t>
       const re = new RegExp('(<w:t[^>]*>)' + escOrig + '(</w:t>)', 'g');
       outXml = outXml.replace(re, '$1' + escNuevo + '$2');
     });
-  }
-
-  // Insertar filas custom (datos.elementos_extra) al final de la tabla, antes
-  // de la fila "TIPO". Clonamos la última fila conocida ("Plata %") como
-  // molde: mantiene el mismo formato de celdas y placeholders.
-  if (Array.isArray(datos.elementos_extra) && datos.elementos_extra.length > 0) {
-    // Localizar la fila "Plata %" (última fila estándar) como plantilla.
-    const rePlata = /<w:tr\b[^>]*>(?:(?!<w:tr\b)[\s\S])*?Plata %(?:(?!<\/w:tr>)[\s\S])*?<\/w:tr>/;
-    const mPlata = outXml.match(rePlata);
-    if (mPlata) {
-      const filaMolde = mPlata[0];
-      const filasNuevas = datos.elementos_extra.map(function (el) {
-        const labelXml = String(el.label || '').trim()
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '';
-        // Reemplazar el texto "Plata %" del molde por el nuevo label.
-        let f = filaMolde.replace(/(<w:t[^>]*>)Plata %(<\/w:t>)/, '$1' + labelXml + '$2');
-        // Buscar valores de la muestra para este elemento custom.
-        const muestrasParaEsta = Array.isArray(datos.muestras) ? datos.muestras : [];
-        const vals = [];
-        for (let i = 0; i < 3; i++) {
-          const m = muestrasParaEsta[i] || {};
-          const v = String(m[el.k] ?? (m.elementos && m.elementos[el.k]) ?? '').trim();
-          vals.push(v);
-        }
-        // Reemplazar los placeholders {{resultado_29_1..3}} (Plata) por los
-        // valores del elemento custom. Si el placeholder ya fue reemplazado por
-        // docxtemplater (a un valor concreto de plata), lo dejamos como está.
-        // El caso realista es que la fila de plata queda vacía o con valores
-        // concretos → los borramos y ponemos los nuestros.
-        // Estrategia: buscar los primeros N <w:t> del cuerpo (después del label)
-        // y reemplazar sus contenidos por vals[i].
-        const rePlaceholder = /(<w:t[^>]*>)([^<]*)(<\/w:t>)/g;
-        let count = -1; // -1 = ya matcheamos el label
-        f = f.replace(rePlaceholder, function (m, pre, contenido, post) {
-          count++;
-          if (count === 0) return m; // el label ya fue reemplazado arriba
-          if (count >= 1 && count <= 3) {
-            const idx = count - 1;
-            return pre + (vals[idx] || '') + post;
-          }
-          // Resto de celdas (patrones, MIN, MAX, TIPO): vaciar.
-          return pre + post;
-        });
-        return f;
-      }).join('');
-      // Insertar las filas nuevas justo después de la fila de plata (y antes
-      // de la fila TIPO).
-      outXml = outXml.replace(rePlata, mPlata[0] + filasNuevas);
-    }
   }
 
   // ASTERISCO_TITULO_AUTO — agrega * al título del ensayo si está marcado fuera del alcance OAA
