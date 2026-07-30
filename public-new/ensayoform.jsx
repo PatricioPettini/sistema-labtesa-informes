@@ -109,14 +109,29 @@ function EnsayoForm(props) {
   //   5) `equipamiento_tags.<K>`  ↔  `equipamiento.<K>`
   // Solo tilda (no destilda) — así el técnico puede destildar manualmente
   // sin que se vuelva a tildar por su propio texto.
-  function _pareChkKey(k) {
+  // Pares conocidos "input libre" ↔ "checkbox". Cuando el técnico escribe en
+  // el input, tildar el checkbox. La lista se extiende con cada nuevo par
+  // detectado en un form.
+  var _PARES_CHK_CONOCIDOS = {
+    // Químicos
+    patron: 'patron_chk',
+    calibracion: 'calibracion_chk',
+    seleccion_base: 'seleccion_base_chk',
+  };
+  function _pareChkKey(k, obj) {
     if (typeof k !== 'string') return null;
+    // 1) Diccionario explícito.
+    if (_PARES_CHK_CONOCIDOS[k]) return _PARES_CHK_CONOCIDOS[k];
+    // 2) Sufijos conocidos.
     if (/^(.+)_text$/.test(k))  return k.replace(/_text$/, '_chk');
     if (/^(.+)_otra$/.test(k))  return k + '_chk';
     if (/^(.+)_otro$/.test(k))  return k + '_chk';
-    // dot-notation: instrumentos_tags.foo → instrumentos.foo
+    // 3) Dot-notation: instrumentos_tags.foo → instrumentos.foo
     var mTag = k.match(/^(instrumentos|equipamiento)_tags\.(.+)$/);
     if (mTag) return mTag[1] + '.' + mTag[2];
+    // 4) Heurística dinámica: si <k>_chk existe como key en el estado actual
+    //    (por default o por interacción previa), asumir que es su par.
+    if (obj && Object.prototype.hasOwnProperty.call(obj, k + '_chk')) return k + '_chk';
     return null;
   }
   function _leerCampo(obj, path) {
@@ -143,7 +158,7 @@ function EnsayoForm(props) {
   function _aplicarAutoChk(n, k, v) {
     // Solo dispara con strings no vacíos.
     if (typeof v !== 'string' || !v.trim()) return;
-    var chkKey = _pareChkKey(k);
+    var chkKey = _pareChkKey(k, n);
     if (!chkKey) {
       // DEBUG: sin par asociado — no se aplica auto-chk. Se comenta cuando
       // esté todo estable. Descomentar si el técnico reporta que no funciona.
@@ -1060,7 +1075,7 @@ function AutoLoadPhotosBtn(props) {
 
   return React.createElement('div', {
     style: {
-      padding: '6px 10px', background: '#eef2ff', border: '1px solid #c7d2fe',
+      padding: '6px 10px', background: 'var(--accent-soft)', border: '1px solid var(--accent-soft-2)',
       borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 6,
       marginBottom: 10,
     },
@@ -1068,19 +1083,20 @@ function AutoLoadPhotosBtn(props) {
     React.createElement('div', {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     },
-      React.createElement('div', { style: { fontSize: 11, color: '#3730a3' } },
+      React.createElement('div', { style: { fontSize: 11, color: 'var(--accent)' } },
         props.hint || '⚡ Busca fotos en el drive y las asigna a esta sección automáticamente.'),
       React.createElement('button', {
         type: 'button', onClick: cargar, disabled: loading,
         style: {
-          border: '1px solid #4361ee', background: loading ? '#c7d2fe' : '#4361ee',
+          border: '1px solid var(--accent)',
+          background: loading ? 'var(--accent-soft-2)' : 'var(--accent)',
           color: '#fff', padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
           cursor: loading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
         },
       }, loading ? 'Cargando…' : 'Cargar fotos automáticamente')
     ),
     msg ? React.createElement('div', {
-      style: { fontSize: 10.5, color: '#374151' },
+      style: { fontSize: 10.5, color: 'var(--text-2)' },
     }, msg) : null
   );
 }

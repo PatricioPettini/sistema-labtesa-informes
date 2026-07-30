@@ -146,6 +146,76 @@ html[data-theme="dark"] .main [style*="border: 1px solid #bbb"]{
   border-color:var(--border-strong) !important;
 }
 
+/* Azules pastel violáceos (#eef2ff / #c7d2fe / #3730a3 / #4361ee) usados en
+   banners de carga automática, chips, badges de auditoría, etc. En dark
+   quedan ilegibles (fondo claro + texto azul oscuro). */
+html[data-theme="dark"] [style*="background:#eef2ff"],
+html[data-theme="dark"] [style*="background: #eef2ff"],
+html[data-theme="dark"] [style*="background: rgb(238, 242, 255)"]{
+  background:var(--accent-soft) !important;
+}
+html[data-theme="dark"] [style*="border:1px solid #c7d2fe"],
+html[data-theme="dark"] [style*="border: 1px solid #c7d2fe"]{
+  border-color:var(--accent-soft-2) !important;
+}
+html[data-theme="dark"] [style*="color:#3730a3"],
+html[data-theme="dark"] [style*="color: #3730a3"],
+html[data-theme="dark"] [style*="color:#4361ee"],
+html[data-theme="dark"] [style*="color: #4361ee"]{
+  color:var(--accent) !important;
+}
+html[data-theme="dark"] [style*="color:#374151"],
+html[data-theme="dark"] [style*="color: #374151"]{
+  color:var(--text-2) !important;
+}
+/* Modales genéricos con background:#fff hardcoded (as400modal, auditlog,
+   firmapanel, globalsearch, plantillasbar). El override anterior sólo aplicaba
+   a .main; los modales están fuera. Extiendo el override sin scoping. */
+html[data-theme="dark"] [style*="background:#fff"]:not(.main *):not(button),
+html[data-theme="dark"] [style*="background: #fff"]:not(.main *):not(button){
+  background:var(--surface) !important;
+  color:var(--text);
+}
+html[data-theme="dark"] [style*="background:#fff5f5"],
+html[data-theme="dark"] [style*="background: #fff5f5"],
+html[data-theme="dark"] [style*="background:#ffebe9"],
+html[data-theme="dark"] [style*="background: #ffebe9"]{
+  background:var(--danger-soft) !important;
+  color:var(--text) !important;
+}
+html[data-theme="dark"] [style*="background:#fff8e5"],
+html[data-theme="dark"] [style*="background: #fff8e5"],
+html[data-theme="dark"] [style*="background:#fff8dc"],
+html[data-theme="dark"] [style*="background: #fff8dc"],
+html[data-theme="dark"] [style*="background:#fffbe6"],
+html[data-theme="dark"] [style*="background: #fffbe6"]{
+  background:var(--warning-soft) !important;
+  color:var(--text) !important;
+}
+/* Bordes de badges/chips en tonos claros → oscurecer. */
+html[data-theme="dark"] [style*="border:1px solid #fed7d7"],
+html[data-theme="dark"] [style*="border: 1px solid #fed7d7"],
+html[data-theme="dark"] [style*="border:1px solid #ff8182"],
+html[data-theme="dark"] [style*="border: 1px solid #ff8182"]{
+  border-color:var(--danger) !important;
+}
+html[data-theme="dark"] [style*="border:1px solid #e0c168"],
+html[data-theme="dark"] [style*="border: 1px solid #e0c168"],
+html[data-theme="dark"] [style*="border:1px solid #f0c000"],
+html[data-theme="dark"] [style*="border: 1px solid #f0c000"]{
+  border-color:var(--warning) !important;
+}
+html[data-theme="dark"] [style*="border:1px solid #d0d7de"],
+html[data-theme="dark"] [style*="border: 1px solid #d0d7de"]{
+  border-color:var(--border-strong) !important;
+}
+/* Chip gris azulado #eef1f4 usado en catálogos. */
+html[data-theme="dark"] [style*="background:#eef1f4"],
+html[data-theme="dark"] [style*="background: #eef1f4"]{
+  background:var(--surface-3) !important;
+  color:var(--text) !important;
+}
+
 /* Inputs nativos en dark: color-scheme ya hace el resto (calendarios/pickers). */
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}

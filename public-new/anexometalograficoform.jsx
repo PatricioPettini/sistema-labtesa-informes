@@ -248,7 +248,7 @@ function AnexoMetalograficoForm(props) {
           })
         : null,
       _r('div', null,
-        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: 'var(--text-2)' } },
           'TAMAÑO DE GRANO — imágenes'),
         typeof window.EnsayoPhotos === 'function'
           ? _r(window.EnsayoPhotos, {
@@ -259,7 +259,7 @@ function AnexoMetalograficoForm(props) {
           : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
       ),
       _r('div', null,
-        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: 'var(--text-2)' } },
           'TENOR INCLUSIONARIO — imágenes'),
         typeof window.EnsayoPhotos === 'function'
           ? _r(window.EnsayoPhotos, {

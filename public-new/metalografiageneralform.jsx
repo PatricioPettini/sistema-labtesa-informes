@@ -324,29 +324,30 @@ function MetalografiaGeneralForm(props) {
       // Botón de auto-carga (solo si hay análisis activos y el ensayo tiene id).
       analisisActivos.length > 0 && props.ensayoId ? _r('div', {
         style: {
-          padding: '6px 10px', background: '#eef2ff', border: '1px solid #c7d2fe',
+          padding: '6px 10px', background: 'var(--accent-soft)', border: '1px solid var(--accent-soft-2)',
           borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
         },
       },
-        _r('div', { style: { fontSize: 11, color: '#3730a3' } },
+        _r('div', { style: { fontSize: 11, color: 'var(--accent)' } },
           '⚡ Busca fotos en el drive y las asigna a cada análisis por filename ("microestructura" → micro, "grafito" → grafito, etc.)'),
         _r('button', {
           type: 'button', onClick: cargarFotosAuto, disabled: cargaLoading,
           style: {
-            border: '1px solid #4361ee', background: cargaLoading ? '#c7d2fe' : '#4361ee',
+            border: '1px solid var(--accent)',
+            background: cargaLoading ? 'var(--accent-soft-2)' : 'var(--accent)',
             color: '#fff', padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
             cursor: cargaLoading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
           },
         }, cargaLoading ? 'Cargando…' : 'Cargar fotos automáticamente')
       ) : null,
       analisisActivos.length === 0
-        ? _r('div', { style: { fontSize: 11, color: '#888', textAlign: 'center', padding: 12 } },
+        ? _r('div', { style: { fontSize: 11, color: 'var(--text-3)', textAlign: 'center', padding: 12 } },
             'Activá al menos un análisis en la sección 1.1 para poder cargar imágenes.')
         : analisisActivos.map(function (n) {
             var key = 'imagenes_' + n.key; // imagenes_micro, imagenes_espesor, etc.
             var etiqueta = n.label.replace(/^\d+(\.\d+)*\s+/, ''); // saca "1.1.1 " del prefijo
             return _r('div', { key: n.key },
-              _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+              _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: 'var(--text-2)' } },
                 etiqueta + ' — imágenes'),
               typeof window.EnsayoPhotos === 'function'
                 ? _r(window.EnsayoPhotos, {
