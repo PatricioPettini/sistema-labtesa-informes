@@ -157,10 +157,33 @@ function TokenModal(props) {
       React.createElement('h3', { style: { margin: 0, marginBottom: 14 } }, props.titulo),
       React.createElement('div', { style: { marginBottom: 12 } },
         React.createElement('label', { style: { display: 'block', fontSize: 12, marginBottom: 4, color: 'var(--text-3)' } }, 'Token de firma'),
+        // El value del INPUT DOM son puntos fake (nunca el token real). El
+        // token real queda solo en state de React. Así al abrir F12 el
+        // atributo value muestra "●●●●", no el token. Además al no ser
+        // type="password" Chrome no ofrece "guardar contraseña".
         React.createElement('input', {
-          type: 'password', className: 'input', value: tok, autoFocus: true,
-          onChange: function (e) { setTok(e.target.value); },
-          onKeyDown: function (e) { if (e.key === 'Enter') submit(); }
+          type: 'text', className: 'input', value: '●'.repeat(tok.length), autoFocus: true,
+          autoComplete: 'off',
+          name: 'labtesa_input_' + Math.random().toString(36).slice(2, 10),
+          'data-lpignore': 'true',
+          'data-form-type': 'other',
+          spellCheck: false,
+          onChange: function () { /* dummy — bloqueamos el input estándar */ },
+          onKeyDown: function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); submit(); return; }
+            if (e.key === 'Backspace') { e.preventDefault(); setTok(tok.slice(0, -1)); return; }
+            if (e.key === 'Delete')    { e.preventDefault(); setTok(''); return; }
+            // Solo caracteres imprimibles (sin arrows/tab/shift/ctrl/etc).
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              setTok(tok + e.key);
+            }
+          },
+          onPaste: function (e) {
+            e.preventDefault();
+            var text = (e.clipboardData || window.clipboardData).getData('text');
+            if (text) setTok(tok + text);
+          },
         })
       ),
       props.pedirMotivo ? React.createElement('div', { style: { marginBottom: 12 } },
@@ -295,10 +318,30 @@ function RevisorChecklistModal(props) {
       React.createElement('div', { style: { padding: '14px 20px', borderTop: '1px solid var(--border)' } },
         React.createElement('label', { style: { display: 'block', fontSize: 12, marginBottom: 4, color: 'var(--text-3)' } }, 'Token de firma'),
         React.createElement('input', {
-          type: 'password', className: 'input', value: tok, autoFocus: true,
+          type: 'text', className: 'input', value: '●'.repeat(tok.length), autoFocus: true,
           disabled: !puedeFirmar,
-          onChange: function (e) { setTok(e.target.value); },
-          onKeyDown: function (e) { if (e.key === 'Enter' && puedeFirmar) submit(); }
+          autoComplete: 'off',
+          name: 'labtesa_input_' + Math.random().toString(36).slice(2, 10),
+          'data-lpignore': 'true',
+          'data-form-type': 'other',
+          spellCheck: false,
+          onChange: function () { /* dummy */ },
+          onKeyDown: function (e) {
+            if (!puedeFirmar) return;
+            if (e.key === 'Enter') { e.preventDefault(); submit(); return; }
+            if (e.key === 'Backspace') { e.preventDefault(); setTok(tok.slice(0, -1)); return; }
+            if (e.key === 'Delete')    { e.preventDefault(); setTok(''); return; }
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              setTok(tok + e.key);
+            }
+          },
+          onPaste: function (e) {
+            e.preventDefault();
+            if (!puedeFirmar) return;
+            var text = (e.clipboardData || window.clipboardData).getData('text');
+            if (text) setTok(tok + text);
+          },
         }),
         err ? React.createElement('div', { style: { color: '#b02a2a', fontSize: 12, marginTop: 8 } }, err) : null,
         React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 } },

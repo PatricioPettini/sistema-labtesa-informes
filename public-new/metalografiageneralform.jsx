@@ -17,12 +17,15 @@
 
 var _r = React.createElement;
 
+// Cada análisis tiene ahora DOS campos de texto libre: "Norma de ensayo" y
+// "Metodología de ensayo". Las opciones/placeholder de la norma son sugerencias
+// para el datalist (el técnico puede elegir o escribir libre).
 var MG_ANALISIS = [
-  { key: 'micro',   label: '1.1.1 MICROESTRUCTURA',            refLabel: 'ITM N° / Norma:', defRef: '' },
-  { key: 'espesor', label: '1.1.2 ESPESOR DE RECUBRIMIENTO',    refLabel: 'ITM N°:',         defRef: '' },
-  { key: 'grafito', label: '1.1.3 ESTRUCTURA DE GRAFITO',       refLabel: 'ITM N°:',         defRef: '' },
-  { key: 'decarb',  label: '1.1.4 DECARBURACIÓN',               refLabel: 'ITM N°:',         defRef: '' },
-  { key: 'otro',    label: '1.1.5 OTRO',                        refLabel: 'ITM N°:',         defRef: '' },
+  { key: 'micro',   label: '1.1.1 MICROESTRUCTURA',            placeholder: 'Ej: ASM Metal Handbook Vol.9:2004', metodologiaPlaceholder: 'ITM N°061', opciones: ['ASM Metal Handbook Vol.9:2004'] },
+  { key: 'espesor', label: '1.1.2 ESPESOR DE RECUBRIMIENTO',    placeholder: '……',                                metodologiaPlaceholder: 'ITM N°…' },
+  { key: 'grafito', label: '1.1.3 ESTRUCTURA DE GRAFITO',       placeholder: '……',                                metodologiaPlaceholder: 'ITM N°…' },
+  { key: 'decarb',  label: '1.1.4 DECARBURACIÓN',               placeholder: '……',                                metodologiaPlaceholder: 'ITM N°…' },
+  { key: 'otro',    label: '1.1.5 OTRO',                        placeholder: '……',                                metodologiaPlaceholder: 'ITM N°…' },
 ];
 
 var MG_REACTIVOS = [
@@ -63,6 +66,65 @@ function MetalografiaGeneralForm(props) {
 
   var S = window.FORM_STYLES;
 
+  // Auto-activación de secciones al abrir un ensayo existente. Si el técnico
+  // cargó datos (norma, metodología, texto de resultado o imágenes) pero
+  // olvidó tildar el checkbox "1.1.N", tildarlo automáticamente al abrir.
+  // Sin esto, el bloque 1.6 IMÁGENES DEL ENSAYO oculta las imágenes ya
+  // cargadas ("Activá al menos un análisis…") y el técnico las cree perdidas.
+  function _tieneEvidenciaDeUso(datos, key) {
+    var a = datos.analisis && datos.analisis[key];
+    if (a && (String(a.ref || '').trim() || String(a.metodologia || '').trim())) return true;
+    var textoResultado = datos.resultados_seccion && datos.resultados_seccion[key];
+    if (textoResultado && String(textoResultado).trim()) return true;
+    // key en resultados_seccion puede diferir del key del checkbox
+    var mapeoResultado = { micro: 'microestructura', espesor: 'espesor', grafito: 'grafito', decarb: 'decarburacion', otro: 'otro' };
+    var rk = mapeoResultado[key];
+    var textoAlt = rk && datos.resultados_seccion && datos.resultados_seccion[rk];
+    if (textoAlt && String(textoAlt).trim()) return true;
+    var imgs = datos['imagenes_' + key];
+    if (Array.isArray(imgs) && imgs.length > 0) return true;
+    return false;
+  }
+  // Ejecuta la migración una sola vez, pero espera a que las imágenes estén
+  // HIDRATADAS (con dataUrl) — sino, el fetch lazy del EnsayoForm puede
+  // sobreescribir imagenes_resultado DESPUÉS de que migramos y perderíamos
+  // el dataUrl. Trigger: cambios en imagenes_resultado (cuando se hidrata).
+  var _migInit = React.useState(false); var migInit = _migInit[0], setMigInit = _migInit[1];
+  var imgsLegacyLen = Array.isArray(datos.imagenes_resultado) ? datos.imagenes_resultado.length : 0;
+  var imgsLegacyHidratadas = imgsLegacyLen === 0 || datos.imagenes_resultado.every(function (im) { return !im || !im._dataUrlStripped; });
+  React.useEffect(function () {
+    if (migInit) return;
+    if (!imgsLegacyHidratadas) return; // esperar la hidratación del EnsayoForm
+    var patch = {};
+    MG_ANALISIS.forEach(function (n) {
+      var a = datos.analisis && datos.analisis[n.key];
+      if (a && a.on) return;
+      if (_tieneEvidenciaDeUso(datos, n.key)) {
+        patch['analisis.' + n.key + '.on'] = true;
+      }
+    });
+    // Migración legacy imagenes_resultado → imagenes_<key> si hay UNA sección
+    // activa clara.
+    if (imgsLegacyLen > 0) {
+      var seccionesActivasKeys = MG_ANALISIS.filter(function (n) {
+        var a = datos.analisis && datos.analisis[n.key];
+        return (a && a.on) || _tieneEvidenciaDeUso(datos, n.key);
+      }).map(function (n) { return n.key; });
+      if (seccionesActivasKeys.length === 1) {
+        var targetKey = seccionesActivasKeys[0];
+        var yaTiene = Array.isArray(datos['imagenes_' + targetKey]) && datos['imagenes_' + targetKey].length > 0;
+        if (!yaTiene) {
+          patch['imagenes_' + targetKey] = datos.imagenes_resultado;
+          patch.imagenes_resultado = [];
+        }
+      }
+    }
+    if (Object.keys(patch).length > 0) {
+      Object.keys(patch).forEach(function (k) { set(k, patch[k]); });
+    }
+    setMigInit(true);
+  }, [imgsLegacyHidratadas, imgsLegacyLen]);
+
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
   var block11 = _r('div', null,
     _r('div', { style: S.head }, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
@@ -74,10 +136,31 @@ function MetalografiaGeneralForm(props) {
             _r('input', { type: 'checkbox', checked: !!d.on,
               onChange: function (e) { upd('analisis.' + n.key + '.on', e.target.checked); } }),
             n.label),
+          // Norma de ensayo — texto libre con datalist opcional para sugerencias.
           _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },
-            _r('span', { style: { color: '#555' } }, n.refLabel),
-            _r('input', { style: S.inline, placeholder: '……', value: d.ref || '',
-              onChange: function (e) { upd('analisis.' + n.key + '.ref', e.target.value); } }))
+            _r('span', { style: { color: '#555', minWidth: 130 } }, 'Norma de ensayo:'),
+            _r('input', {
+              style: S.inline,
+              placeholder: n.placeholder || '……',
+              value: d.ref || '',
+              list: n.opciones && n.opciones.length ? 'mg-norm-' + n.key : undefined,
+              onChange: function (e) { upd('analisis.' + n.key + '.ref', e.target.value); },
+            }),
+            n.opciones && n.opciones.length
+              ? _r('datalist', { id: 'mg-norm-' + n.key },
+                  n.opciones.map(function (op, i) { return _r('option', { key: i, value: op }); })
+                )
+              : null),
+          // Metodología de ensayo — segundo campo separado. El generator ya lo
+          // soporta (line "Metodología de ensayo: ${metod}").
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 20 } },
+            _r('span', { style: { color: '#555', minWidth: 130 } }, 'Metodología de ensayo:'),
+            _r('input', {
+              style: S.inline,
+              placeholder: n.metodologiaPlaceholder || 'ITM N°…',
+              value: d.metodologia || '',
+              onChange: function (e) { upd('analisis.' + n.key + '.metodologia', e.target.value); },
+            }))
         );
       })
     )
@@ -187,17 +270,93 @@ function MetalografiaGeneralForm(props) {
         onChange: function (e) { upd('evaluacion_texto', e.target.value); } }))
   );
 
-  // ── 1.6 IMÁGENES DEL ENSAYO ────────────────────────────────────────────
+  // ── 1.6 IMÁGENES POR ANÁLISIS ──────────────────────────────────────────
+  // Un widget por cada análisis activado. Se insertan DENTRO de la sección
+  // correspondiente en el Word (marker __IMG_<KEY>__), no al final del informe.
+  var analisisActivos = MG_ANALISIS.filter(function (n) {
+    return datos.analisis && datos.analisis[n.key] && datos.analisis[n.key].on;
+  });
+  // Botón "Cargar fotos automáticamente" — busca en subcarpetas del drive
+  // (MICROGRAFIAS/M<n>/INFORMAR/*, etc.) y categoriza cada foto por sección
+  // según el filename ("MICROESTRUCTURA" → micro, "GRAFITO" → grafito, etc.).
+  var _cargaLoading = React.useState(false);
+  var cargaLoading = _cargaLoading[0], setCargaLoading = _cargaLoading[1];
+  function cargarFotosAuto() {
+    var ensayoId = props.ensayoId;
+    if (!ensayoId) {
+      alert('Primero guardá el ensayo (aunque sea vacío) para poder cargar fotos automáticamente.');
+      return;
+    }
+    setCargaLoading(true);
+    fetch('/api/ensayo/' + ensayoId + '/fotos-auto')
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.d.error || 'Error');
+        var resumen = [];
+        var patch = {};
+        Object.keys(r.d.resultado || {}).forEach(function (k) {
+          if (k === '_sin_clasificar') return;
+          var arr = r.d.resultado[k] || [];
+          if (arr.length === 0) return;
+          // Concatenar sin duplicar por name.
+          var existente = datos[k] || [];
+          var setNames = new Set(existente.map(function (p) { return String(p.name || '').toLowerCase(); }));
+          var nuevas = arr.filter(function (p) { return !setNames.has(String(p.name || '').toLowerCase()); });
+          if (nuevas.length > 0) {
+            patch[k] = existente.concat(nuevas);
+            resumen.push(nuevas.length + ' en ' + k.replace('imagenes_', ''));
+          }
+        });
+        if (Object.keys(patch).length > 0) set(patch);
+        var sinClas = (r.d.resultado && r.d.resultado._sin_clasificar) || [];
+        var msg = resumen.length > 0
+          ? 'Cargadas: ' + resumen.join(', ') + (sinClas.length > 0 ? ' (' + sinClas.length + ' sin clasificar)' : '')
+          : (sinClas.length > 0 ? 'No se clasificó ninguna foto (' + sinClas.length + ' sin sección detectada)' : 'No se encontraron fotos.');
+        alert(msg);
+      })
+      .catch(function (e) { alert('Error al cargar fotos: ' + e.message); })
+      .finally(function () { setCargaLoading(false); });
+  }
+
   var block16 = _r('div', null,
     _r('div', { style: S.head }, '1.6  IMÁGENES DEL ENSAYO'),
-    _r('div', { style: { padding: 8 } },
-      typeof window.EnsayoPhotos === 'function'
-        ? _r(window.EnsayoPhotos, {
-            photos: datos.imagenes_resultado || [],
-            hint: 'Arrastrá imágenes del ensayo (microestructura, tamaño de grano, inclusiones, etc.)',
-            onChange: function (next) { upd('imagenes_resultado', next); },
+    _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 14 } },
+      // Botón de auto-carga (solo si hay análisis activos y el ensayo tiene id).
+      analisisActivos.length > 0 && props.ensayoId ? _r('div', {
+        style: {
+          padding: '6px 10px', background: '#eef2ff', border: '1px solid #c7d2fe',
+          borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        },
+      },
+        _r('div', { style: { fontSize: 11, color: '#3730a3' } },
+          '⚡ Busca fotos en el drive y las asigna a cada análisis por filename ("microestructura" → micro, "grafito" → grafito, etc.)'),
+        _r('button', {
+          type: 'button', onClick: cargarFotosAuto, disabled: cargaLoading,
+          style: {
+            border: '1px solid #4361ee', background: cargaLoading ? '#c7d2fe' : '#4361ee',
+            color: '#fff', padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+            cursor: cargaLoading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+          },
+        }, cargaLoading ? 'Cargando…' : 'Cargar fotos automáticamente')
+      ) : null,
+      analisisActivos.length === 0
+        ? _r('div', { style: { fontSize: 11, color: '#888', textAlign: 'center', padding: 12 } },
+            'Activá al menos un análisis en la sección 1.1 para poder cargar imágenes.')
+        : analisisActivos.map(function (n) {
+            var key = 'imagenes_' + n.key; // imagenes_micro, imagenes_espesor, etc.
+            var etiqueta = n.label.replace(/^\d+(\.\d+)*\s+/, ''); // saca "1.1.1 " del prefijo
+            return _r('div', { key: n.key },
+              _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+                etiqueta + ' — imágenes'),
+              typeof window.EnsayoPhotos === 'function'
+                ? _r(window.EnsayoPhotos, {
+                    photos: datos[key] || [],
+                    hint: 'Se insertan dentro de la sección "' + etiqueta + '" del Word.',
+                    onChange: function (next) { upd(key, next); },
+                  })
+                : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
+            );
           })
-        : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
     )
   );
 

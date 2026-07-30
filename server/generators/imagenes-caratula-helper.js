@@ -315,9 +315,11 @@ function insertarImagenEnsayo(processedZip, outXml, foto, tipoPrefix, marker, po
     processedZip.file('word/_rels/document.xml.rels', relsXml);
   }
 
-  // Altura fija 8 cm, ancho proporcional, capa máxima 15 cm
+  // Altura fija 8 cm, ancho proporcional, tope máximo 10 cm en ambas dimensiones
+  // (política de laboratorio para fotos de ensayo).
   const ALTO_EMU      = 8 * 360000;
-  const MAX_ANCHO_EMU = 15 * 360000;
+  const MAX_ANCHO_EMU = 10 * 360000;
+  const MAX_ALTO_EMU  = 10 * 360000;
   const refW = 1000;
   const refH = calcularAlto(foto, refW);
   const aspect = refH > 0 ? (refW / refH) : 1.33;
@@ -326,6 +328,10 @@ function insertarImagenEnsayo(processedZip, outXml, foto, tipoPrefix, marker, po
   if (cx > MAX_ANCHO_EMU) {
     cx = MAX_ANCHO_EMU;
     cy = Math.round(cx / aspect);
+  }
+  if (cy > MAX_ALTO_EMU) {
+    cy = MAX_ALTO_EMU;
+    cx = Math.round(cy * aspect);
   }
 
   const parrafo = paraGraphImagen(rId, imgName, cx, cy);
@@ -407,11 +413,13 @@ function tablaSinBordes(gridCols, filas) {
 
 function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker, position = 'before', rIdBase = 200, opciones = {}) {
   // opciones.layout: 'horizontal' | 'vertical' | undefined (legacy: alto fijo 8 cm, apiladas).
-  // opciones.maxAnchoCm, opciones.maxAltoCm: topes para los nuevos layouts (default 15 y 15.7).
+  // opciones.maxAnchoCm, opciones.maxAltoCm: topes por layout (default 10 y 10).
+  // NOTA: además del maxAncho/maxAlto por layout, existe un cap duro de 10x10 cm
+  // por imagen aplicado al final (capImagen) — política de laboratorio.
   const layout = opciones && (opciones.layout === 'horizontal' || opciones.layout === 'vertical')
     ? opciones.layout : null;
-  const maxAnchoCm = (opciones && opciones.maxAnchoCm) || 15;
-  const maxAltoCm  = (opciones && opciones.maxAltoCm)  || 15.7;
+  const maxAnchoCm = (opciones && opciones.maxAnchoCm) || 10;
+  const maxAltoCm  = (opciones && opciones.maxAltoCm)  || 10;
 
   // Contar cuántas imágenes ya existen en el documento (carátula + otros
   // ensayos previos en documentos combinados) para numerar en continuidad.
@@ -435,7 +443,17 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
   garantizarContentTypes(processedZip);
   outXml = garantizarNamespaces(outXml);
 
-  const MAX_ANCHO_EMU_DEFAULT = 15 * 360000;
+  // Tope duro por imagen (10 cm) tanto para ancho como para alto — política de
+  // laboratorio para fotos de ensayo (microestructura, macrografía, etc.).
+  // Se aplica después de la lógica de cada layout, preservando aspect ratio.
+  const CAP_CX_EMU = 10 * 360000;
+  const CAP_CY_EMU = 10 * 360000;
+  const MAX_ANCHO_EMU_DEFAULT = 10 * 360000;
+  function capImagen(cx, cy, aspect) {
+    if (cx > CAP_CX_EMU) { cx = CAP_CX_EMU; cy = Math.round(cx / aspect); }
+    if (cy > CAP_CY_EMU) { cy = CAP_CY_EMU; cx = Math.round(cy * aspect); }
+    return { cx, cy };
+  }
 
   // Blank paragraph con word-joiner invisible (U+2060) para sobrevivir a
   // eliminarParrafosVacios de los generators.
@@ -529,9 +547,10 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
       const celdas = [];
       fila.forEach((it, k) => {
         const anchoCm = (pesos[k] / suma) * maxAnchoCm;
-        const cx = Math.round(anchoCm * 360000);
-        const cy = Math.round(cx / it.aspect);
-        const wDxa = Math.round(anchoCm * 566.929);
+        let cx = Math.round(anchoCm * 360000);
+        let cy = Math.round(cx / it.aspect);
+        ({ cx, cy } = capImagen(cx, cy, it.aspect));
+        const wDxa = Math.round((cx / 360000) * 566.929);
         gridCols.push(wDxa);
         const cap = armarCaption(it.f, it.indice);
         celdas.push(celdaConImagen(it.rId, it.imgName, cx, cy, parrafoCaption(cap), wDxa));
@@ -553,13 +572,14 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
         cx = maxAnchoEmu;
         cy = Math.round(cx / it.aspect);
       }
+      ({ cx, cy } = capImagen(cx, cy, it.aspect));
       bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
       bloque += parrafoCaption(armarCaption(it.f, it.indice));
       bloque += PBLANK;
     });
   } else {
-    // Legacy: alto fijo 8 cm, apiladas, ancho proporcional (cap a 15 cm).
+    // Legacy: alto fijo 8 cm, apiladas, ancho proporcional (cap a 10 cm).
     const ALTO_EMU = 8 * 360000;
     items.forEach(it => {
       let cy = ALTO_EMU;
@@ -568,6 +588,7 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
         cx = MAX_ANCHO_EMU_DEFAULT;
         cy = Math.round(cx / it.aspect);
       }
+      ({ cx, cy } = capImagen(cx, cy, it.aspect));
       bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
       bloque += parrafoCaption(armarCaption(it.f, it.indice));

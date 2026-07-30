@@ -149,7 +149,33 @@ function OTForm(props) {
       return;
     }
     var data = Object.assign({}, form, { nro_ot: form.nro_ot.trim(), nro_solicitud: form.nro_solicitud.trim() });
-    if (editing) { window.LabStore.updateOt(props.nro_ot, data); toast('OT actualizada', 'success'); }
+    if (editing) {
+      // Si el nro_ot cambió (típico: placeholder PEND-{sol}-M{n} → número real),
+      // primero renombrar en el server (propaga en todas las tablas
+      // relacionadas), después actualizar el resto de los campos.
+      var cambioNro = props.nro_ot !== data.nro_ot;
+      if (cambioNro) {
+        fetch('/api/ot/' + encodeURIComponent(props.nro_ot) + '/renombrar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nro_ot: data.nro_ot }),
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.d.error || 'Error al renombrar');
+            // Recargar el store y luego actualizar el resto de los datos.
+            return window.LabStore.init().then(function () {
+              window.LabStore.updateOt(data.nro_ot, data);
+              toast('OT renombrada a ' + data.nro_ot + ' y actualizada', 'success');
+              nav('#/ot/' + data.nro_ot);
+            });
+          })
+          .catch(function (e) { toast('No se pudo renombrar la OT: ' + e.message, 'danger'); });
+        return;
+      }
+      window.LabStore.updateOt(props.nro_ot, data);
+      toast('OT actualizada', 'success');
+    }
     else { window.LabStore.createOt(data); toast('OT ' + data.nro_ot + ' creada', 'success'); }
     nav('#/ot/' + data.nro_ot);
   }

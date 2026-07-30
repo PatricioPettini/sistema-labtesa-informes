@@ -67,7 +67,15 @@ function Dashboard(props) {
       React.createElement('td', null,
         React.createElement('div', { className: 'cell-estado' },
           React.createElement(StatusChip, { tone: est.tone, size: 'sm' }, est.label),
-          o.es_preinforme ? React.createElement(StatusChip, { tone: 'warning', size: 'sm' }, 'Pre') : null
+          o.es_preinforme ? React.createElement(StatusChip, { tone: 'warning', size: 'sm' }, 'Pre') : null,
+          o.trello_oaa_label ? React.createElement('span', {
+            title: 'Marcada como OAA en Trello (recordatorio — la acreditación real se resuelve por detección automática)',
+            style: {
+              fontSize: 9, fontWeight: 700, letterSpacing: '.3px',
+              color: '#5b21b6', background: '#ede9fe', border: '1px solid #c4b5fd',
+              padding: '1px 6px', borderRadius: 999, whiteSpace: 'nowrap',
+            },
+          }, 'OAA Trello') : null
         )
       ),
       React.createElement('td', null,
@@ -217,6 +225,7 @@ function Dashboard(props) {
                   if (agrupar && (o.nro_solicitud || '—') !== lastSol) {
                     lastSol = o.nro_solicitud || '—';
                     var otsGrupo = rows.filter(function (x) { return (x.nro_solicitud || '—') === lastSol; });
+                    var grupoOaaTrello = otsGrupo.some(function (x) { return x.trello_oaa_label; });
                     out.push(React.createElement('tr', {
                       key: 'grp-' + lastSol,
                       style: { background: 'var(--accent-soft)', borderTop: '2px solid var(--accent)' },
@@ -232,7 +241,15 @@ function Dashboard(props) {
                           otsGrupo[0].razon_social,
                           ' · ',
                           otsGrupo.length,
-                          otsGrupo.length === 1 ? ' OT' : ' OTs'))));
+                          otsGrupo.length === 1 ? ' OT' : ' OTs'),
+                        grupoOaaTrello ? React.createElement('span', {
+                          title: 'Al menos una OT de esta solicitud tiene la etiqueta "PARAMETROS ACREDITADOS" en Trello',
+                          style: {
+                            marginLeft: 10, fontSize: 9, fontWeight: 700, letterSpacing: '.3px',
+                            color: '#5b21b6', background: '#ede9fe', border: '1px solid #c4b5fd',
+                            padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle',
+                          },
+                        }, 'OAA Trello') : null)));
                   }
                   out.push(_renderOtRow(o));
                 });

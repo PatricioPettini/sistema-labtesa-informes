@@ -97,6 +97,14 @@ function VariosForm(props) {
             onChange: function () { upd('imagenes_orientacion', 'horizontal'); } }),
           'Horizontal (lado a lado — máx 15 cm de ancho total)')
       ),
+      typeof window.AutoLoadPhotosBtn === 'function'
+        ? _r(window.AutoLoadPhotosBtn, {
+            ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+            datos: datos, set: set,
+            campos: ['imagenes_resultado'],
+            hint: '⚡ Busca fotos en el drive y las carga acá (varios = misc).',
+          })
+        : null,
       typeof window.EnsayoPhotos === 'function'
         ? _r(window.EnsayoPhotos, {
             photos: datos.imagenes_resultado || [],

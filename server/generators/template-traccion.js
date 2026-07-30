@@ -368,7 +368,10 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
   // Los campos `norma` y `codigo_referencia` pasan por normalizarNorma (saca
   // "/XxxM" redundante y sufijos duplicados tipo "(:2020)" o "(-26)").
   const NORMALIZAR_CAMPO = { norma: true, codigo_referencia: true };
-  function agruparPorProbeta(etiqueta, key) {
+  function agruparPorProbeta(etiqueta, key, sep) {
+    // sep: separador entre etiqueta y valor. Default ": " (ej. "Norma de ensayo: X").
+    // Para "Plano de probeta" usamos " según " → "Plano de probeta según X".
+    const separador = sep || ': ';
     const normalizar = NORMALIZAR_CAMPO[key] ? normalizarNorma : (x => x);
     // Solo probetas físicas: las zonas extra (_zona_extra) heredan las
     // condiciones de su probeta padre y NO deben duplicarse en la línea de
@@ -388,13 +391,13 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
       grupos.get(x.valor).push(x.nombre);
     });
     const valores = Array.from(grupos.keys());
-    if (valores.length === 1) return [`${etiqueta}: ${valores[0]}`];
+    if (valores.length === 1) return [`${etiqueta}${separador}${valores[0]}`];
     // Difieren: "valor1 (M1, M3), valor2 (M2)"
     const partes = valores.map(v => {
       const nombres = grupos.get(v);
       return `${v} (${nombres.join(', ')})`;
     });
-    return [`${etiqueta}: ${partes.join('; ')}`];
+    return [`${etiqueta}${separador}${partes.join('; ')}`];
   }
 
   // Procedimientos (código de referencia global desde checkboxes).
@@ -491,7 +494,7 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
     probeta_mecanizada_segun: (() => {
       // Combina líneas globales del bloque probeta (prob_cliente, prob_soldada,
       // probeta_segun) + la línea agrupada de "Plano de probeta" por probeta.
-      const planoLineas = agruparPorProbeta('Plano de probeta', 'plano_probeta');
+      const planoLineas = agruparPorProbeta('Plano de probeta', 'plano_probeta', ' según ');
       return [...probetaLineas, ...planoLineas].join('\n');
     })(),
     probeta_mecanizada_por_cliente:   '',
@@ -604,6 +607,13 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
   outXml = eliminarColumnaOculta(outXml);   // quita col3 si solo hay 1 muestra
   outXml = eliminarFilasOcultas(outXml);    // quita filas con __HIDE__
   outXml = eliminarSeccionesOcultas(outXml);// quita título + párrafo __SECTION_HIDE__
+
+  // Nota OAA en negrita antes del texto de evaluación (solo si es ensayo OAA
+  // y hay texto de evaluación cargado). Formato del laboratorio (FM):
+  //   "Las evaluaciones, opiniones, interpretaciones, etc, que se indican a
+  //   continuación, están fuera del alcance de la acreditación del OAA."
+  // Con comillas tipográficas (U+201C / U+201D) y todo en negrita.
+  outXml = insertarNotaOAAEnEvaluacion(outXml, datos);
 
   outXml = manejarImagenesCaratula(processedZip, outXml, fotos, 'traccion');
 
@@ -1142,6 +1152,52 @@ function agregarFilaZonas(xml, muestras, NCOLS) {
 
 // Elimina el párrafo de título + el párrafo de contenido marcado con __SECTION_HIDE__.
 // Salta párrafos en blanco que el template pueda tener entre título y contenido.
+// Inserta la nota OAA como PRIMER párrafo dentro de la sección de Evaluación
+// (después del heading, antes del texto que escribió el técnico).
+//   Regla: solo si el ensayo es OAA (datos.oaa) y hay texto de evaluación.
+//   Formato: texto exacto entre comillas tipográficas U+201C/U+201D, en negrita,
+//   fuente Calibri, con la misma indentación que el body del template.
+function insertarNotaOAAEnEvaluacion(xml, datos) {
+  const esOaa = !!(datos && (datos.oaa || datos._oaa_original));
+  const tieneEval = !!(datos && datos.tiene_evaluacion &&
+                       String(datos.evaluacion_texto || '').trim());
+  if (!esOaa || !tieneEval) return xml;
+
+  // El heading puede haber sido renombrado por el pase anterior. Buscamos
+  // el que se aplicó (más específico primero).
+  const HEADINGS = [
+    'OBSERVACIÓN Y EVALUACIÓN',
+    'EVALUACIÓN',
+    'EVALUACION DE RESULTADOS',
+  ];
+  let idxHeading = -1;
+  for (const h of HEADINGS) {
+    const re = new RegExp('<w:t[^>]*>\\s*' + h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*</w:t>');
+    const m = re.exec(xml);
+    if (m) { idxHeading = m.index; break; }
+  }
+  if (idxHeading < 0) return xml;
+
+  // Cerrar el párrafo del heading para insertar DESPUÉS.
+  const headingEndIdx = xml.indexOf('</w:p>', idxHeading);
+  if (headingEndIdx < 0) return xml;
+  const insertPos = headingEndIdx + '</w:p>'.length;
+
+  const notaTxt = 'Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA.';
+  // Comillas tipográficas: U+201C “ y U+201D ”.
+  const parrafo =
+    '<w:p><w:pPr><w:pStyle w:val="Textosinformato"/>' +
+    '<w:spacing w:line="276" w:lineRule="auto"/>' +
+    '<w:ind w:left="792"/>' +
+    '<w:rPr><w:rFonts w:ascii="Calibri" w:eastAsia="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b/></w:rPr></w:pPr>' +
+    '<w:r>' +
+    '<w:rPr><w:rFonts w:ascii="Calibri" w:eastAsia="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b/></w:rPr>' +
+    '<w:t xml:space="preserve">“' + notaTxt + '”</w:t>' +
+    '</w:r></w:p>';
+
+  return xml.slice(0, insertPos) + parrafo + xml.slice(insertPos);
+}
+
 function eliminarSeccionesOcultas(xml) {
   const MARKER = '__SECTION_HIDE__';
   let result = xml;

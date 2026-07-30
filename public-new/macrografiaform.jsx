@@ -116,6 +116,44 @@ function MacrografiaForm(props) {
         _r('input', { style: S.inline, placeholder: 'Muestra 1 / Zona afectada', value: datos.muestra_ensayada || '',
           onChange: function (e) { upd('muestra_ensayada', e.target.value); } })),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA DE ENSAYO:'),
+        _r('input', {
+          style: Object.assign({}, S.input, { width: 80 }),
+          placeholder: 'Ej: 23',
+          value: datos.temperatura || '',
+          onChange: function (e) { upd('temperatura', e.target.value); },
+        }),
+        _r('span', null, '°C')),
+      // ── EQUIPAMIENTO FIJO ──────────────────────────────────────────────
+      // El Termohigrómetro TAG N°MM-700 es el equipo standard para macrografía
+      // y viene tildado por default. Si el técnico usa además Microscopio o
+      // Calibre digital, los tilda acá. Antes no se veían en el frontend y
+      // aparecían solos en el Word.
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, padding: '4px 0', borderTop: '1px dashed #ccc', marginTop: 4 } },
+        _r('div', { style: { fontWeight: 600, fontSize: 11 } }, 'EQUIPAMIENTO UTILIZADO:'),
+        _r('label', { style: S.label },
+          _r('input', {
+            type: 'checkbox',
+            checked: datos.eq_termohigro_700 !== false, // default true si undefined
+            onChange: function (e) { updBool('eq_termohigro_700', e.target.checked); },
+          }),
+          'Termohigrómetro TAG N°MM-700'),
+        _r('label', { style: S.label },
+          _r('input', {
+            type: 'checkbox',
+            checked: !!datos.eq_microscopio_378,
+            onChange: function (e) { updBool('eq_microscopio_378', e.target.checked); },
+          }),
+          'Microscopio Leica DM 750 TAG N°MM-378'),
+        _r('label', { style: S.label },
+          _r('input', {
+            type: 'checkbox',
+            checked: !!datos.eq_calibre_703,
+            onChange: function (e) { updBool('eq_calibre_703', e.target.checked); },
+          }),
+          'Calibre digital Mitutoyo TAG N°MM-703')
+      ),
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', null, 'Otro equipo:'),
         _r(window.EquipoInput, { tipo: 'macrografia',
           style: Object.assign({}, S.inline),
@@ -281,6 +319,14 @@ function MacrografiaForm(props) {
   var blockImagenes = _r('div', null,
     _r('div', { style: S.head }, 'IMÁGENES DE LA MACROGRAFÍA (opcional)'),
     _r('div', { style: { padding: 8 } },
+      typeof window.AutoLoadPhotosBtn === 'function'
+        ? _r(window.AutoLoadPhotosBtn, {
+            ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+            datos: datos, set: set,
+            campos: ['imagenes_resultado'],
+            hint: '⚡ Busca fotos de macrografía en el drive y las carga acá.',
+          })
+        : null,
       typeof window.EnsayoPhotos === 'function'
         ? _r(window.EnsayoPhotos, {
             photos: datos.imagenes_resultado || [],

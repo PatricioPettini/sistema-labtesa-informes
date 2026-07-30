@@ -566,6 +566,10 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
       if (ensayo.tipo === 'traccion' && Array.isArray(datos.muestras)) {
         datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
       }
+      // Multi-OT en plegado (mismo mecanismo): filtra probetas por _filtro_ot.
+      if (ensayo.tipo === 'plegado' && (Array.isArray(datos.resultados) || Array.isArray(datos.probetas))) {
+        datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
+      }
       const fotos = i === 0 ? fotosCaratula : null;
       const buf = GENERADORES_TEMPLATE[ensayo.tipo](otConFecha, datos, fotos);
       resultBuf = resultBuf === null ? buf : combinarBuffers(resultBuf, buf, i);
@@ -632,7 +636,14 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
       resultBuf = zipFinal.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
     }
 
+    // Insertar sección "INSPECCIÓN" antes de FIN DE INFORME si la OT trae texto
+    if (resultBuf && ot.inspeccion_texto) {
+      resultBuf = insertarInspeccionAntesDeFin(resultBuf, ot.inspeccion_texto);
+    }
     if (resultBuf) resultBuf = limitarAnchoTablas(resultBuf);
+    // Uniformar interlineado a 1.15 en todo el informe ANTES de spacingCeroEnCeldas,
+    // así las celdas de tabla se recomprimen a 1.0 y sólo el cuerpo queda en 1.15.
+    if (resultBuf) resultBuf = normalizarInterlineado(resultBuf);
     if (resultBuf) resultBuf = spacingCeroEnCeldas(resultBuf);
     if (resultBuf) resultBuf = forzarCompatModerno(resultBuf);
     if (resultBuf) resultBuf = normalizarTamanoLetra(resultBuf);
@@ -897,6 +908,56 @@ function asegurarBlanksAntesDeOAA(buf) {
   return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
+// Inserta la sección "INSPECCIÓN" (título en negrita SIN numeración, seguido del
+// texto libre en párrafos) justo antes de "FIN DE INFORME". No-op si texto vacío.
+function insertarInspeccionAntesDeFin(buf, textoInspeccion) {
+  const texto = String(textoInspeccion || '').trim();
+  if (!texto) return buf;
+  const zip = new PizZip(buf);
+  const docEntry = zip.files['word/document.xml'];
+  if (!docEntry) return buf;
+  let xml = docEntry.asText();
+
+  const finPos = findFinDeInformePos(xml);
+  if (finPos < 0) return buf;
+  const pStart = scanBackForTag(xml, '<w:p', finPos);
+  if (pStart < 0) return buf;
+
+  const esc = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const FONTS = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
+  const SZ    = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
+
+  const heading = '<w:p><w:pPr>' +
+    '<w:spacing w:line="300" w:lineRule="auto" w:before="120" w:after="60"/>' +
+    '<w:ind w:left="142"/>' +
+    `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
+    `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
+    '<w:t xml:space="preserve">INSPECCIÓN</w:t></w:r></w:p>';
+
+  const parrafoTexto = (linea) =>
+    '<w:p><w:pPr>' +
+    '<w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+    '<w:ind w:left="142"/>' +
+    '<w:jc w:val="both"/>' +
+    `<w:rPr>${FONTS}${SZ}</w:rPr></w:pPr>` +
+    (linea ? `<w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
+             `<w:t xml:space="preserve">${esc(linea)}</w:t></w:r>` : '') +
+    '</w:p>';
+
+  const BLANK = '<w:p><w:pPr>' +
+    '<w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+    `</w:pPr><w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
+    '<w:t xml:space="preserve"> </w:t></w:r></w:p>';
+
+  const parrafos = texto.split(/\r?\n/).map(parrafoTexto).join('');
+  const bloque = BLANK + heading + parrafos + BLANK;
+  xml = xml.slice(0, pStart) + bloque + xml.slice(pStart);
+  zip.file('word/document.xml', xml);
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
 // Garantiza un párrafo en blanco DIRECTAMENTE antes de "FIN DE INFORME".
 // Si ya hay uno, no agrega otro. Si no hay, lo inserta.
 function asegurarBlankoAntesFin(buf) {
@@ -982,6 +1043,37 @@ function normalizarTamanoLetra(buf) {
         return rOpen + rPrOpen + rPrInner + SZ_TAG + rPrClose + tRest;
       });
     if (xml !== docEntry.asText()) { zip.file('word/document.xml', xml); mod = true; }
+  }
+
+  return mod ? zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) : buf;
+}
+
+// Normaliza el interlineado a 1.15 (w:line="276" w:lineRule="auto") en TODOS los
+// párrafos del document.xml y en los docDefaults/Normal/Textosinformato de styles.xml.
+// Preserva w:before/w:after existentes. NO toca <w:spacing w:val="X"/> dentro de
+// <w:rPr> (character spacing) — se identifica por ausencia de w:line/w:before/w:after.
+function normalizarInterlineado(buf) {
+  const LINE = '276', RULE = 'auto';
+  const forzarEnSpacing = (attrs) => {
+    if (!/w:line=|w:before=|w:after=|w:lineRule=/.test(attrs)) return null; // no es paragraph spacing
+    let a = attrs
+      .replace(/\s*w:line="\d+"/, '')
+      .replace(/\s*w:lineRule="[^"]*"/, '');
+    return `<w:spacing${a} w:line="${LINE}" w:lineRule="${RULE}"/>`;
+  };
+
+  const zip = new PizZip(buf);
+  let mod = false;
+
+  for (const path of ['word/document.xml', 'word/styles.xml']) {
+    const entry = zip.files[path];
+    if (!entry) continue;
+    const orig = entry.asText();
+    const nuevo = orig.replace(/<w:spacing\b([^/>]*?)\/>/g, (m, attrs) => {
+      const rep = forzarEnSpacing(attrs);
+      return rep === null ? m : rep;
+    });
+    if (nuevo !== orig) { zip.file(path, nuevo); mod = true; }
   }
 
   return mod ? zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) : buf;
@@ -1423,4 +1515,4 @@ function consolidarOAAs(xml) {
   return out.slice(0, pStart) + blankPrevio + parrafos + blankFin + out.slice(pStart);
 }
 
-module.exports = { generarWordCompleto, aplicarVersionEncabezado, insertarFechaAutoEnHeader };
+module.exports = { generarWordCompleto, aplicarVersionEncabezado, insertarFechaAutoEnHeader, GENERADORES_TEMPLATE };

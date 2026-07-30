@@ -46,6 +46,19 @@ function PlegadoForm(props) {
   function upd(k, v) { set(k, v); }
   function updBool(k, checked) { set(k, !!checked); }
 
+  // ── Contexto multi-OT (idéntica lógica que tracción) ────────────────────
+  // otNroActual  = la OT del ensayo (donde estamos parados).
+  // otsDisponibles = todas las OTs hermanas de la misma solicitud (incluida la actual).
+  //                  Se usa para poblar el selector de OT por probeta y para
+  //                  el tab-selector de textos por OT (obs/eval/nota).
+  var otNroActual = props.otNro || '';
+  var otActualObj = otNroActual && window.LabStore && window.LabStore.getOt
+    ? window.LabStore.getOt(otNroActual) : null;
+  var solActual = otActualObj && otActualObj.nro_solicitud;
+  var otsDisponibles = (solActual && window.LabStore.listOtsBySolicitud)
+    ? window.LabStore.listOtsBySolicitud(solActual)
+    : (otActualObj ? [otActualObj] : []);
+
   // Bug 7: al marcar un código de referencia, autocompletar "Probeta mec. según"
   // con el texto del código (editable). Sólo pisa el campo si está vacío o si
   // fue autocompletado antes (`_mecAuto`); si el usuario lo editó a mano, se respeta.
@@ -87,50 +100,16 @@ function PlegadoForm(props) {
   };
 
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
+  // La norma de ensayo y el código de referencia se cargan ahora en la sección
+  // 1.3 (por OT) con desplegables autopoblados del catálogo — misma UX que
+  // tracción. Acá solo queda la metodología (ITM).
   var block11 = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: S.head }, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+    _r('div', { style: S.head }, '1.1  METODOLOGÍA DE ENSAYO'),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
         _r(window.ItmInput, { tipo: 'plegado', style: Object.assign({}, S.input, { flex: 1 }), value: datos.metodologia || '', placeholder: 'ITM N°080',
-          onChange: function (e) { upd('metodologia', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.norma_iso5173, onChange: function (e) { updBool('norma_iso5173', e.target.checked); } }),
-          'SEGÚN ISO 5173'),
-        _r('span', { style: { color: '#555', fontSize: 10 } }, 'Año:'),
-        _r('input', { style: Object.assign({}, S.input, { width: 60 }), placeholder: ':2023',
-          value: datos.norma_iso5173_year || '',
-          onChange: function (e) { upd('norma_iso5173_year', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.norma_astm_e190, onChange: function (e) { updBool('norma_astm_e190', e.target.checked); } }),
-          'SEGÚN ASTM E190'),
-        _r('span', { style: { color: '#555', fontSize: 10 } }, 'Año:'),
-        _r('input', { style: Object.assign({}, S.input, { width: 60 }), placeholder: '-21',
-          value: datos.norma_astm_e190_year || '',
-          onChange: function (e) { upd('norma_astm_e190_year', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_asme, onChange: function (e) { setCod({ cod_asme: e.target.checked }); } }),
-        'ASME BPVC Sección IX Ed.',
-        _r('input', { style: Object.assign({}, S.input, { width: 80 }), value: datos.ed_asme || '', placeholder: '…….',
-          onChange: function (e) { setCod({ ed_asme: e.target.value }); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_api1104, onChange: function (e) { setCod({ cod_api1104: e.target.checked }); } }),
-        'API 1104 Ed.',
-        _r('input', { style: Object.assign({}, S.input, { width: 180 }),
-          value: datos.ed_api1104 || '', placeholder: '22-2021 (E1-2023)',
-          onChange: function (e) { setCod({ ed_api1104: e.target.value }); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_aws_d11, onChange: function (e) { setCod({ cod_aws_d11: e.target.checked }); } }),
-        'AWS D1.1/D1.1M Ed.',
-        _r('input', { style: Object.assign({}, S.input, { width: 120 }),
-          value: datos.ed_aws_d11 || '', placeholder: '2020',
-          onChange: function (e) { setCod({ ed_aws_d11: e.target.value }); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('span', null, 'Otro:'),
-        _r(window.NormaInput, { tipo: 'plegado', categoria: 'ensayo', style: Object.assign({}, S.input, { flex: 1 }), value: datos.norma_referencia || '', placeholder: 'Empezá a escribir (ej: ASTM…)',
-          onChange: function (e) { setCod({ norma_referencia: e.target.value }); } }))
+          onChange: function (e) { upd('metodologia', e.target.value); } }))
     )
   );
 
@@ -161,20 +140,8 @@ function PlegadoForm(props) {
         _r('input', { style: Object.assign({}, S.input, S.num, { width: 80 }), value: datos.ancho_probeta || '',
           onChange: function (e) { upd('ancho_probeta', e.target.value); } }),
         _r('span', null, 'mm')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-        _r('span', { style: { fontWeight: 600 } }, 'ORIENTACIÓN DE PROBETA:'),
-        _r('label', { style: S.label },
-          _r('input', { type: 'radio', name: 'p-orient', checked: datos.orientacion === 'Longitudinal',
-            onChange: function () { upd('orientacion', 'Longitudinal'); } }), 'LONG.'),
-        _r('label', { style: S.label },
-          _r('input', { type: 'radio', name: 'p-orient', checked: datos.orientacion === 'Transversal',
-            onChange: function () { upd('orientacion', 'Transversal'); } }), 'TRANSV.')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'Probeta mec. según:'),
-        _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
-          value: datos.probeta_mecanizada_segun || '',
-          placeholder: 'Se autocompleta con el código de referencia (editable)',
-          onChange: function (e) { set({ probeta_mecanizada_segun: e.target.value, _mecAuto: false }); } })),
+      // Orientación de probeta y "Probeta mec. según" se movieron a la
+      // sección 1.3 (por OT) — ver más abajo.
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'DISTANCIA ENTRE APOYOS:'),
         _r('input', { style: Object.assign({}, S.input, { flex: 1 }), value: datos.distancia_apoyos || '',
@@ -192,7 +159,7 @@ function PlegadoForm(props) {
               : PLEGADO_EQ_EMIC;
   var eqLabel = datos.equipo === 'torne' ? '— Set TORNE' : datos.equipo === 'shimadzu' ? '— Set Shimadzu' : '— Set EMIC';
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO ' + eqLabel),
+    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO ' + eqLabel),
     _r('div', { style: { padding: 8, display: 'flex', gap: 12, alignItems: 'center' } },
       _r('span', { style: { fontWeight: 600, fontSize: 11 } }, 'Máquina:'),
       _r('label', { style: S.label },
@@ -230,12 +197,16 @@ function PlegadoForm(props) {
 
   // ── 1.4 RESULTADOS ────────────────────────────────────────────────────
   var block14 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
+    _r('div', { style: S.head }, '1.5  RESULTADOS OBTENIDOS'),
     _r('div', { style: { padding: 8, overflowX: 'auto' } },
       _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10, minWidth: 900 } },
         _r('thead', null,
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { rowSpan: 2, style: { border: '1px solid #333', padding: 3, width: 60 } }, 'PROBETA'),
+            // Columna OT: solo aparece si hay OTs hermanas (solicitud multi-OT).
+            otsDisponibles.length > 1
+              ? _r('th', { rowSpan: 2, style: { border: '1px solid #333', padding: 3, width: 90 } }, 'OT')
+              : null,
             _r('th', { colSpan: 4, style: { border: '1px solid #333', padding: 3 } }, 'TIPO DE PLEGADO'),
             _r('th', { rowSpan: 2, style: { border: '1px solid #333', padding: 3, width: 70 } }, 'LARGO (mm)'),
             _r('th', { rowSpan: 2, style: { border: '1px solid #333', padding: 3, width: 70 } }, 'ANCHO (mm)'),
@@ -263,10 +234,38 @@ function PlegadoForm(props) {
             var inp = Object.assign({}, S.input, { border: 'none', width: '100%' });
             var isTipo = function (v) { return r.tipo && String(r.tipo).toUpperCase() === v; };
             var isInd = function (v) { return r.resultado && String(r.resultado).toLowerCase().indexOf(v) >= 0; };
+            var otOverride = String(r.nro_ot_override || '').trim();
+            var otEffective = otOverride || otNroActual;
+            var esOtra = otOverride && otOverride !== otNroActual;
             return _r('tr', { key: i },
               _r('td', { style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' } },
                 _r('input', { style: Object.assign({}, inp, { textAlign: 'center', fontWeight: 700 }), value: r.probeta || String(i + 1),
                   onChange: function (e) { setRow(i, 'probeta', e.target.value); } })),
+              // Selector de OT — solo aparece si hay OTs hermanas. Al cambiarlo,
+              // esta probeta se transfiere al ensayo de plegado de la OT destino
+              // al momento de guardar (via saveEnsayoPlegadoMultiOt).
+              otsDisponibles.length > 1
+                ? _r('td', { style: { border: '1px solid #333', textAlign: 'center', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
+                    _r('select', {
+                      value: otEffective,
+                      onChange: function (e) {
+                        var v = String(e.target.value || '').trim();
+                        if (v === otNroActual) v = '';
+                        setRow(i, 'nro_ot_override', v);
+                      },
+                      title: 'OT destino de esta probeta (misma solicitud)',
+                      style: {
+                        border: 'none', outline: 'none', width: '100%',
+                        padding: '3px 4px', fontSize: 10, background: 'transparent',
+                        color: esOtra ? '#8a5a00' : '#24292f',
+                        fontWeight: esOtra ? 700 : 400,
+                      },
+                    },
+                      otsDisponibles.map(function (o) {
+                        var label = o.nro_ot + (o.nro_ot === otNroActual ? ' (esta)' : '');
+                        return _r('option', { key: o.nro_ot, value: o.nro_ot }, label);
+                      })))
+                : null,
               // Tipo (Cara/Raíz/Lat/Long)
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
                 _r('input', { type: 'radio', name: 't' + i, checked: isTipo('CARA'), onChange: function () { setRow(i, 'tipo', 'Cara'); } })),
@@ -329,7 +328,7 @@ function PlegadoForm(props) {
 
   // ── 1.5 INDICACIONES / DEFECTOS ────────────────────────────────────────
   var block15 = _r('div', null,
-    _r('div', { style: S.head }, '1.5  INDICACIONES / DEFECTOS'),
+    _r('div', { style: S.head }, '1.6  INDICACIONES / DEFECTOS'),
     _r('div', { style: { padding: 8 } },
       _r('textarea', { style: { width: '100%', minHeight: 72, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
         value: datos.observaciones_extra || '', placeholder: 'Descripción de indicaciones o defectos observados…',
@@ -339,7 +338,7 @@ function PlegadoForm(props) {
 
   // ── 1.6 OBSERVACIONES ─────────────────────────────────────────────────
   var block16 = _r('div', null,
-    _r('div', { style: S.head }, '1.6  OBSERVACIONES / EVALUACIÓN'),
+    _r('div', { style: S.head }, '1.7  OBSERVACIONES / EVALUACIÓN'),
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11, lineHeight: 1.4 } },
       _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
         _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_evaluaciones, onChange: function (e) { updBool('nota_evaluaciones', e.target.checked); } }),
@@ -361,7 +360,7 @@ function PlegadoForm(props) {
 
   // ── 1.7 INSPECCIÓN ─────────────────────────────────────────────────────
   var block17 = _r('div', null,
-    _r('div', { style: S.head }, '1.7  INSPECCIÓN'),
+    _r('div', { style: S.head }, '1.8  INSPECCIÓN'),
     _r('div', { style: { padding: 8, display: 'flex', gap: 6, alignItems: 'flex-start' } },
       _r('span', { style: { fontWeight: 700, fontSize: 11, paddingTop: 6 } }, 'POR:'),
       _r('textarea', { style: { flex: 1, minHeight: 56, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
@@ -370,9 +369,430 @@ function PlegadoForm(props) {
     )
   );
 
+  // ── 1.8/1.9/1.10 — OBSERVACIÓN / EVALUACIÓN / NOTA por OT ──────────────
+  // Igual patrón que tracción: cada OT tiene su propio texto (obs/eval/nota)
+  // guardado en `datos.textos_por_ot[nro]`. Tabs para cambiar de OT + botón
+  // "copiar a otras OTs" (one-shot).
+  //
+  // OTs "en el ensayo": incluye la OT actual + las que aparecen como override
+  // en las probetas + todas las hermanas de la misma solicitud (aunque todavía
+  // no tengan probetas asignadas). Así el técnico puede preconfigurar las
+  // condiciones específicas de cada hermana ANTES de dividir probetas.
+  var otsEnEnsayo = (function () {
+    var set = {};
+    (resultados || []).forEach(function (r) {
+      var over = String((r && r.nro_ot_override) || '').trim();
+      var dest = over || String(otNroActual || '');
+      if (dest) set[dest] = true;
+    });
+    // Incluir todas las hermanas de la solicitud.
+    (otsDisponibles || []).forEach(function (o) {
+      var n = String(o.nro_ot || '');
+      if (n) set[n] = true;
+    });
+    var list = Object.keys(set);
+    if (list.length === 0 && otNroActual) list.push(String(otNroActual));
+    // Ordenar: la actual primero, resto por número ascendente.
+    list.sort(function (a, b) {
+      if (a === otNroActual) return -1;
+      if (b === otNroActual) return 1;
+      return String(a).localeCompare(String(b));
+    });
+    return list;
+  })();
+  var textosPorOt = (datos && datos.textos_por_ot) || {};
+  var _otTx = React.useState(function () { return otNroActual || (otsEnEnsayo[0] || ''); });
+  var otActivaTextos = _otTx[0], setOtActivaTextos = _otTx[1];
+  if (otsEnEnsayo.length > 0 && otsEnEnsayo.indexOf(otActivaTextos) < 0) {
+    otActivaTextos = otNroActual || otsEnEnsayo[0];
+  }
+  var _copyOpen = React.useState(''); var copyOpen = _copyOpen[0], setCopyOpen = _copyOpen[1];
+  var _copyDest = React.useState([]); var copyDest = _copyDest[0], setCopyDest = _copyDest[1];
+
+  function getTextoOt(nroOt, key) {
+    var m = textosPorOt[nroOt];
+    if (m && m[key] !== undefined) return m[key];
+    if (nroOt === otNroActual) return datos[key];
+    return key.indexOf('tiene_') === 0 ? false : '';
+  }
+  function setTextoOt(nroOt, key, val) {
+    var mapa = Object.assign({}, textosPorOt);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    mapa[nroOt][key] = val;
+    if (nroOt === otNroActual) {
+      var patch = { textos_por_ot: mapa };
+      patch[key] = val;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+  function copiarTextoAOts(fromNro, toNros, flagKey, textoKey) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, textosPorOt);
+    var flagVal = getTextoOt(fromNro, flagKey);
+    var textoVal = getTextoOt(fromNro, textoKey);
+    var pisaActual = false;
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      mapa[nroOt][flagKey] = flagVal;
+      mapa[nroOt][textoKey] = textoVal;
+      if (nroOt === otNroActual) pisaActual = true;
+    });
+    if (pisaActual) {
+      var patch = { textos_por_ot: mapa };
+      patch[flagKey] = flagVal;
+      patch[textoKey] = textoVal;
+      set(patch);
+    } else {
+      set('textos_por_ot', mapa);
+    }
+  }
+
+  var selectorOtTextos = otsEnEnsayo.length > 1
+    ? _r('div', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '8px 12px', background: '#fff8e5',
+          border: '1px solid #e0c060', borderTop: '1px solid #333', fontSize: 11,
+        },
+      },
+        _r('span', { style: { fontWeight: 700, color: '#8a5a00', textTransform: 'uppercase', fontSize: 10, letterSpacing: '.05em' } },
+          'Editando OT:'),
+        _r('div', { style: { display: 'inline-flex', border: '1px solid #d0d7de', borderRadius: 4, overflow: 'hidden', background: '#fff' } },
+          otsEnEnsayo.map(function (nro, i) {
+            var activa = nro === otActivaTextos;
+            var esLaActual = nro === otNroActual;
+            return _r('button', {
+              key: nro, type: 'button',
+              onClick: function () { setOtActivaTextos(nro); },
+              style: {
+                border: 'none',
+                borderLeft: i === 0 ? 'none' : '1px solid #d0d7de',
+                background: activa ? '#0969da' : '#fff',
+                color: activa ? '#fff' : '#24292f',
+                padding: '5px 12px', fontSize: 12,
+                fontWeight: activa ? 700 : 500,
+                cursor: activa ? 'default' : 'pointer',
+                fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              },
+            }, nro,
+              esLaActual
+                ? _r('span', { style: { fontSize: 9, opacity: 0.8, fontFamily: 'system-ui' } }, '· actual')
+                : null);
+          })),
+        _r('span', { style: { fontSize: 10, color: '#8a5a00' } },
+          'Cada OT tiene sus propios textos.'))
+    : null;
+
+  function popoverCopiar(clave, flagKey, textoKey) {
+    if (copyOpen !== clave) return null;
+    var otrasOts = otsEnEnsayo.filter(function (n) { return n !== otActivaTextos; });
+    if (otrasOts.length === 0) return null;
+    return _r('div', {
+      style: {
+        position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+        background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10,
+        minWidth: 220, fontSize: 11,
+      },
+    },
+      _r('div', { style: { fontWeight: 700, marginBottom: 6, fontSize: 11, color: '#24292f' } }, 'Copiar a otras OTs'),
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+        otrasOts.map(function (nro) {
+          var checked = copyDest.indexOf(nro) >= 0;
+          return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '2px 4px', borderRadius: 3 } },
+            _r('input', { type: 'checkbox', checked: checked,
+              onChange: function () {
+                setCopyDest(checked
+                  ? copyDest.filter(function (n) { return n !== nro; })
+                  : copyDest.concat([nro]));
+              } }),
+            _r('span', { style: { fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' } }, nro),
+            nro === otNroActual
+              ? _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, '(actual)')
+              : null);
+        })),
+      _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+        _r('button', { type: 'button',
+          onClick: function () { setCopyOpen(''); setCopyDest([]); },
+          style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', borderRadius: 3, fontSize: 11, cursor: 'pointer' },
+        }, 'Cancelar'),
+        _r('button', { type: 'button',
+          disabled: copyDest.length === 0,
+          onClick: function () {
+            copiarTextoAOts(otActivaTextos, copyDest, flagKey, textoKey);
+            setCopyOpen(''); setCopyDest([]);
+          },
+          style: {
+            border: '1px solid #0969da',
+            background: copyDest.length === 0 ? '#cbd5e1' : '#0969da',
+            color: '#fff', padding: '3px 10px', borderRadius: 3, fontSize: 11,
+            cursor: copyDest.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600,
+          },
+        }, 'Copiar')));
+  }
+
+  function seccionOpcional(numero, titulo, flagKey, textoKey, placeholder) {
+    var activa = !!getTextoOt(otActivaTextos, flagKey);
+    var clave = textoKey;
+    return _r('div', null,
+      _r('div', { style: S.head },
+        _r('label', { style: { display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 800 } },
+          _r('input', { type: 'checkbox', checked: activa,
+            onChange: function (e) { setTextoOt(otActivaTextos, flagKey, e.target.checked); } }),
+          _r('span', null, numero + '  ' + titulo),
+          otsEnEnsayo.length > 1
+            ? _r('span', { style: { fontSize: 10, color: '#8a5a00', fontWeight: 600, marginLeft: 6 } }, '· OT ' + otActivaTextos)
+            : null)),
+      activa ? _r('div', { style: { padding: 8, position: 'relative' } },
+        _r('textarea', { style: { width: '100%', minHeight: 70, border: '1px solid #999', fontSize: 11, padding: 6, resize: 'vertical' },
+          value: getTextoOt(otActivaTextos, textoKey) || '', placeholder: placeholder,
+          onChange: function (e) { setTextoOt(otActivaTextos, textoKey, e.target.value); } }),
+        otsEnEnsayo.length > 1
+          ? _r('div', { style: { position: 'relative', display: 'flex', justifyContent: 'flex-end', marginTop: 4 } },
+              _r('button', { type: 'button',
+                title: 'Copiar este texto a otras OTs de la solicitud',
+                onClick: function () {
+                  if (copyOpen === clave) { setCopyOpen(''); setCopyDest([]); }
+                  else { setCopyOpen(clave); setCopyDest([]); }
+                },
+                style: {
+                  border: '1px solid #d0d7de',
+                  background: copyOpen === clave ? '#f6f8fa' : '#fff',
+                  color: '#0969da', padding: '3px 10px', borderRadius: 3,
+                  fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                },
+              }, '⇪ Copiar a otras OTs…'),
+              popoverCopiar(clave, flagKey, textoKey))
+          : null
+      ) : null
+    );
+  }
+
+  var blockObservacion = seccionOpcional('1.9',  'OBSERVACIÓN', 'tiene_observacion', 'observacion_texto', 'Observación del ensayo…');
+  var blockEvaluacion  = seccionOpcional('1.10', 'EVALUACIÓN',  'tiene_evaluacion',  'evaluacion_texto',  'Evaluación del ensayo…');
+  var blockNota        = seccionOpcional('1.11', 'NOTA',        'tiene_nota',        'nota_texto',        'Nota adicional…');
+
+  // ── 1.11 CONDICIONES ESPECÍFICAS POR OT ──────────────────────────────
+  // Cuando el ensayo tiene múltiples OTs, cada OT puede tener sus propios
+  // valores para norma / código / orientación / probeta mecanizada. Si no
+  // se completa acá, se usa el valor global de las secciones 1.1 y 1.2.
+  var condPorOt = (datos && datos.condiciones_por_ot) || {};
+  function getCondOt(nroOt, key) {
+    var m = condPorOt[nroOt];
+    if (m && m[key] !== undefined && m[key] !== '') return m[key];
+    return '';
+  }
+  function setCondOt(nroOt, key, val) {
+    var mapa = Object.assign({}, condPorOt);
+    mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+    if (val === '' || val == null) delete mapa[nroOt][key];
+    else mapa[nroOt][key] = val;
+    if (Object.keys(mapa[nroOt]).length === 0) delete mapa[nroOt];
+    set('condiciones_por_ot', mapa);
+  }
+  function copiarCondAOts(fromNro, toNros, keys) {
+    if (!toNros || toNros.length === 0) return;
+    var mapa = Object.assign({}, condPorOt);
+    var src = mapa[fromNro] || {};
+    toNros.forEach(function (nroOt) {
+      mapa[nroOt] = Object.assign({}, mapa[nroOt] || {});
+      keys.forEach(function (k) {
+        if (src[k] !== undefined && src[k] !== '') mapa[nroOt][k] = src[k];
+        else delete mapa[nroOt][k];
+      });
+    });
+    set('condiciones_por_ot', mapa);
+  }
+
+  var _copyCondOpen = React.useState(false);
+  var copyCondOpen = _copyCondOpen[0], setCopyCondOpen = _copyCondOpen[1];
+  var _copyCondDest = React.useState([]);
+  var copyCondDest = _copyCondDest[0], setCopyCondDest = _copyCondDest[1];
+
+  var COND_KEYS = ['norma_ensayo_ot', 'codigo_referencia_ot', 'orientacion_ot', 'probeta_mec_ot'];
+
+  var multiOt = otsEnEnsayo.length > 1;
+  var blockCondPorOt = _r('div', null,
+    _r('div', { style: S.head },
+      _r('span', null, '1.3  CONDICIONES DE ENSAYO'),
+      multiOt
+        ? _r('span', { style: { fontSize: 10, color: '#8a5a00', fontWeight: 600, marginLeft: 6 } }, '· OT ' + otActivaTextos)
+        : null
+    ),
+    _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 } },
+      // Norma de ensayo — desplegable autopoblado desde el catálogo (excluye
+      // códigos de referencia ASME/API/AWS). Misma UX que tracción.
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Norma de ensayo:'),
+        typeof window.NormaInput === 'function'
+          ? _r(window.NormaInput, {
+              tipo: 'plegado', categoria: 'ensayo',
+              style: Object.assign({}, S.input, { flex: 1 }),
+              value: getCondOt(otActivaTextos, 'norma_ensayo_ot') || '',
+              placeholder: 'Ej: ISO 5173:2023 · ASTM E190-21',
+              onChange: function (e) { setCondOt(otActivaTextos, 'norma_ensayo_ot', e.target.value); },
+            })
+          : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
+              value: getCondOt(otActivaTextos, 'norma_ensayo_ot') || '',
+              onChange: function (e) { setCondOt(otActivaTextos, 'norma_ensayo_ot', e.target.value); } })),
+      // Código de referencia — desplegable autopoblado (solo ASME/API/AWS).
+      // Al escribir/elegir un código, auto-completa "Probeta mec. según" con
+      // el mismo texto (respeta ediciones manuales via flag _probeta_mec_auto).
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Código de referencia:'),
+        (function () {
+          function onCodigoChange(nuevoVal) {
+            var mapa = Object.assign({}, condPorOt);
+            var ot = otActivaTextos;
+            var cur = Object.assign({}, mapa[ot] || {});
+            var probActual = String(cur.probeta_mec_ot || '').trim();
+            var mecAuto = !!cur._probeta_mec_auto;
+            cur.codigo_referencia_ot = nuevoVal;
+            // Auto-fill "Probeta mec. según" si está vacío o si el valor
+            // actual fue auto-completado en un ciclo previo (no lo tocó el
+            // técnico).
+            if (!probActual || mecAuto) {
+              cur.probeta_mec_ot = nuevoVal;
+              cur._probeta_mec_auto = true;
+            }
+            if (!nuevoVal) delete cur.codigo_referencia_ot;
+            if (Object.keys(cur).length === 0) delete mapa[ot];
+            else mapa[ot] = cur;
+            set('condiciones_por_ot', mapa);
+          }
+          return typeof window.NormaInput === 'function'
+            ? _r(window.NormaInput, {
+                tipo: 'plegado', categoria: 'referencia',
+                style: Object.assign({}, S.input, { flex: 1 }),
+                value: getCondOt(otActivaTextos, 'codigo_referencia_ot') || '',
+                placeholder: 'Ej: ASME BPVC Sección IX Ed. 2025 · API 1104 Ed. 22-2021',
+                onChange: function (e) { onCodigoChange(e.target.value); },
+              })
+            : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
+                value: getCondOt(otActivaTextos, 'codigo_referencia_ot') || '',
+                onChange: function (e) { onCodigoChange(e.target.value); } });
+        })()),
+      // Orientación de probeta — click en la opción ya seleccionada la
+      // deselecciona (queda sin orientación → línea no se emite en el Word).
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Orientación de probeta:'),
+        _r('label', { style: Object.assign({}, S.label, { cursor: 'pointer' }) },
+          _r('input', { type: 'checkbox',
+            checked: getCondOt(otActivaTextos, 'orientacion_ot') === 'Longitudinal',
+            onChange: function () {
+              var actual = getCondOt(otActivaTextos, 'orientacion_ot');
+              setCondOt(otActivaTextos, 'orientacion_ot', actual === 'Longitudinal' ? '' : 'Longitudinal');
+            } }),
+          'Longitudinal'),
+        _r('label', { style: Object.assign({}, S.label, { cursor: 'pointer' }) },
+          _r('input', { type: 'checkbox',
+            checked: getCondOt(otActivaTextos, 'orientacion_ot') === 'Transversal',
+            onChange: function () {
+              var actual = getCondOt(otActivaTextos, 'orientacion_ot');
+              setCondOt(otActivaTextos, 'orientacion_ot', actual === 'Transversal' ? '' : 'Transversal');
+            } }),
+          'Transversal'),
+        getCondOt(otActivaTextos, 'orientacion_ot')
+          ? _r('button', { type: 'button', title: 'Limpiar orientación',
+              onClick: function () { setCondOt(otActivaTextos, 'orientacion_ot', ''); },
+              style: {
+                border: '1px solid #d0d7de', background: '#fff', padding: '2px 8px',
+                borderRadius: 3, fontSize: 10, cursor: 'pointer', color: '#666', marginLeft: 4,
+              },
+            }, 'Limpiar')
+          : null),
+      // Probeta mecanizada según — desplegable ídem código. Editar acá marca
+      // el campo como "manual" (no auto-completa después de ediciones).
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Probeta mec. según:'),
+        (function () {
+          function onProbetaChange(nuevoVal) {
+            var mapa = Object.assign({}, condPorOt);
+            var ot = otActivaTextos;
+            var cur = Object.assign({}, mapa[ot] || {});
+            cur.probeta_mec_ot = nuevoVal;
+            // Edición manual → marcar como no-auto para que futuros cambios
+            // de "Código de referencia" no lo pisen.
+            cur._probeta_mec_auto = false;
+            if (!nuevoVal) { delete cur.probeta_mec_ot; delete cur._probeta_mec_auto; }
+            if (Object.keys(cur).length === 0) delete mapa[ot];
+            else mapa[ot] = cur;
+            set('condiciones_por_ot', mapa);
+          }
+          return typeof window.NormaInput === 'function'
+            ? _r(window.NormaInput, {
+                tipo: 'plegado', categoria: 'referencia',
+                style: Object.assign({}, S.input, { flex: 1 }),
+                value: getCondOt(otActivaTextos, 'probeta_mec_ot') || '',
+                placeholder: 'Se auto-completa con el código de referencia (editable)',
+                onChange: function (e) { onProbetaChange(e.target.value); },
+              })
+            : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
+                value: getCondOt(otActivaTextos, 'probeta_mec_ot') || '',
+                onChange: function (e) { onProbetaChange(e.target.value); } });
+        })()),
+      // Botón "Copiar a otras OTs" — solo si hay hermanas.
+      multiOt ? _r('div', { style: { position: 'relative', display: 'flex', justifyContent: 'flex-end', marginTop: 4 } },
+        _r('button', { type: 'button',
+          onClick: function () { setCopyCondOpen(!copyCondOpen); setCopyCondDest([]); },
+          style: {
+            border: '1px solid #d0d7de', background: copyCondOpen ? '#f6f8fa' : '#fff',
+            color: '#0969da', padding: '3px 10px', borderRadius: 3, fontSize: 11,
+            cursor: 'pointer', fontWeight: 600,
+          },
+        }, '⇪ Copiar condiciones a otras OTs…'),
+        copyCondOpen ? _r('div', {
+          style: {
+            position: 'absolute', zIndex: 20, top: '100%', right: 0, marginTop: 4,
+            background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 220, fontSize: 11,
+          },
+        },
+          _r('div', { style: { fontWeight: 700, marginBottom: 6 } }, 'Copiar las 4 condiciones a:'),
+          _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+            otsEnEnsayo.filter(function (n) { return n !== otActivaTextos; }).map(function (nro) {
+              var checked = copyCondDest.indexOf(nro) >= 0;
+              return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+                _r('input', { type: 'checkbox', checked: checked,
+                  onChange: function () {
+                    setCopyCondDest(checked
+                      ? copyCondDest.filter(function (n) { return n !== nro; })
+                      : copyCondDest.concat([nro]));
+                  } }),
+                _r('span', { style: { fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' } }, nro));
+            })),
+          _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+            _r('button', { type: 'button',
+              onClick: function () { setCopyCondOpen(false); setCopyCondDest([]); },
+              style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', borderRadius: 3, fontSize: 11, cursor: 'pointer' } }, 'Cancelar'),
+            _r('button', { type: 'button', disabled: copyCondDest.length === 0,
+              onClick: function () {
+                copiarCondAOts(otActivaTextos, copyCondDest, COND_KEYS);
+                setCopyCondOpen(false); setCopyCondDest([]);
+              },
+              style: {
+                border: '1px solid #0969da',
+                background: copyCondDest.length === 0 ? '#cbd5e1' : '#0969da',
+                color: '#fff', padding: '3px 10px', borderRadius: 3, fontSize: 11,
+                cursor: copyCondDest.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600,
+              } }, 'Copiar'))
+        ) : null) : null
+    )
+  );
+
   return _r('div', { style: S.sheet },
     _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1.4fr' } }, block11, block12),
-    block13, block14, block15, block16, block17
+    // Selector de OT (tab bar) + 1.3 Condiciones específicas por OT: van
+    // arriba de Equipamiento (1.4) para que el técnico primero vea/edite las
+    // condiciones específicas de cada OT y después el equipamiento común.
+    selectorOtTextos,
+    blockCondPorOt,
+    block13, block14, block15, block16, block17,
+    blockObservacion, blockEvaluacion, blockNota
   );
 }
 

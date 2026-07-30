@@ -8,45 +8,60 @@ const CACHE_MS = 5 * 60 * 1000;
 let cache = { at: 0, data: null };
 
 async function fetchTablero() {
-  const boardId = process.env.TRELLO_BOARD_ID;
-  const key     = process.env.TRELLO_KEY;
-  const token   = process.env.TRELLO_TOKEN;
-  if (!boardId || !key || !token) {
-    throw new Error('Falta configurar TRELLO_BOARD_ID / TRELLO_KEY / TRELLO_TOKEN en .env');
+  const key   = process.env.TRELLO_KEY;
+  const token = process.env.TRELLO_TOKEN;
+  // Soporta múltiples boards: env var CSV. Compat con TRELLO_BOARD_ID (legacy).
+  //   - TRELLO_BOT_BOARD_IDS  (CSV, nuevo)
+  //   - TRELLO_BOARD_ID       (single, legacy)
+  //   - Default: 'PgtfyZWt' (metalmecánica CABA) + 'BkCmrveB' (SEDE NQN).
+  const csv = process.env.TRELLO_BOT_BOARD_IDS;
+  const single = process.env.TRELLO_BOARD_ID;
+  const boardIds = csv ? csv.split(',').map(s => s.trim()).filter(Boolean)
+                : single ? [single]
+                : ['PgtfyZWt', 'BkCmrveB'];
+  if (boardIds.length === 0 || !key || !token) {
+    throw new Error('Falta configurar TRELLO_BOARD_ID(s) / TRELLO_KEY / TRELLO_TOKEN en .env');
   }
 
   if (cache.data && (Date.now() - cache.at) < CACHE_MS) return cache.data;
 
   const auth = `key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
-  const [rC, rL] = await Promise.all([
-    fetch(`https://api.trello.com/1/boards/${boardId}/cards?fields=name,due,dueComplete,idList,shortUrl,closed&filter=open&${auth}`),
-    fetch(`https://api.trello.com/1/boards/${boardId}/lists?fields=name,pos&${auth}`),
-  ]);
-  if (!rC.ok) throw new Error('Trello cards: HTTP ' + rC.status);
-  if (!rL.ok) throw new Error('Trello lists: HTTP ' + rL.status);
-
-  const cards = await rC.json();
-  const lists = await rL.json();
+  const cardsCombined = [];
   const listaPorId = {};
-  for (const l of lists) listaPorId[l.id] = l.name;
+  for (const boardId of boardIds) {
+    try {
+      const [rC, rL] = await Promise.all([
+        fetch(`https://api.trello.com/1/boards/${boardId}/cards?fields=name,due,dueComplete,idList,idBoard,shortUrl,closed,labels&filter=open&${auth}`),
+        fetch(`https://api.trello.com/1/boards/${boardId}/lists?fields=name,pos&${auth}`),
+      ]);
+      if (!rC.ok || !rL.ok) { console.warn('[trello-fetcher] board ' + boardId + ' falló'); continue; }
+      const cs = await rC.json();
+      const ls = await rL.json();
+      for (const l of ls) listaPorId[l.id] = l.name;
+      for (const c of cs) cardsCombined.push(c);
+    } catch (e) { console.warn('[trello-fetcher] board ' + boardId + ': ' + e.message); }
+  }
 
-  cache = { at: Date.now(), data: { cards, listaPorId } };
+  cache = { at: Date.now(), data: { cards: cardsCombined, listaPorId } };
   return cache.data;
 }
 
-// Extrae razón social + nro de solicitud del título estilo "CLIENTE - 38079".
+// Extrae razón social + nro de solicitud del título. Soporta:
+//   "CLIENTE - 38079"
+//   "CLIENTE - 38079 (VER COMENTARIOS)"
+//   "CLIENTE - 38079 - PRELIMINAR"   ← el número NO está en la última posición
+//   "CLIENTE - SOL 38079"
+// Ojo: mantener alineado con `parsearTitulo` en trello-parser.js (misma regex).
 function parseTitulo(titulo) {
-  const t = String(titulo || '');
+  const t = String(titulo || '').trim();
   let cliente = t, nroSolicitud = '';
   if (t.includes(' - ')) {
-    const partes = t.split(' - ').map(p => p.trim()).filter(Boolean);
-    cliente = partes[0] || '';
-    const ultima = partes[partes.length - 1] || '';
-    if (/^\d+$/.test(ultima)) nroSolicitud = ultima;
-    else {
-      const m = t.match(/(\d{3,})\s*$/);
-      nroSolicitud = m ? m[1] : '';
-    }
+    cliente = t.split(' - ')[0].trim();
+    // Todos los "\s-\s+<digits>" del título; nos quedamos con el ÚLTIMO match.
+    // Cubre "CLIENTE - 38079 - PRELIMINAR" (match único) y "CLIENTE - X - 38079"
+    // (dos matches → último). Tolera texto/paréntesis después del número.
+    const matches = [...t.matchAll(/\s-\s+(\d{3,})(?=\s|$|\()/g)];
+    if (matches.length > 0) nroSolicitud = matches[matches.length - 1][1];
   } else {
     const m = t.match(/(\d{3,})\s*$/);
     if (m) {
@@ -55,6 +70,22 @@ function parseTitulo(titulo) {
     }
   }
   return { cliente, nro_solicitud: nroSolicitud };
+}
+
+// Normalización de nombres de etiqueta (misma que bot-trello.js). Duplicada
+// acá para no crear una dependencia cruzada — cambio menor y estable.
+function _normLabel(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+const _OAA_LABELS = new Set(['parametro acreditado', 'parametros acreditados']);
+function _cardTieneEtiquetaOAA(card) {
+  const labels = Array.isArray(card.labels) ? card.labels : [];
+  return labels.some(l => _OAA_LABELS.has(_normLabel(l && l.name)));
+}
+const _PRELIMINAR_LABELS = new Set(['preliminar']);
+function _cardTieneEtiquetaPreliminar(card) {
+  const labels = Array.isArray(card.labels) ? card.labels : [];
+  return labels.some(l => _PRELIMINAR_LABELS.has(_normLabel(l && l.name)));
 }
 
 function clasificar(cards, listaPorId) {
@@ -99,6 +130,8 @@ function clasificar(cards, listaPorId) {
       lista: listaPorId[c.idList] || '',
       url: c.shortUrl || `https://trello.com/c/${c.id}`,
       es_cintolo: esCintolo,
+      trello_oaa_label: _cardTieneEtiquetaOAA(c) ? 1 : 0,
+      es_preliminar: _cardTieneEtiquetaPreliminar(c) ? 1 : 0,
     };
     if (dias < 0) clas.vencidas.push(item);
     else if (dias === 0) clas.hoy.push(item);

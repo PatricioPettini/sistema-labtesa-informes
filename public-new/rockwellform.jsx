@@ -216,6 +216,14 @@ function RockwellForm(props) {
           'ESQUEMA DE MEDICIONES'),
         _r('div', { style: { padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 6 } },
           _r('div', { style: { fontSize: 10 } }, 'Las zonas de mediciones se indican en el siguiente esquema:'),
+          typeof window.AutoLoadPhotosBtn === 'function'
+            ? _r(window.AutoLoadPhotosBtn, {
+                ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+                datos: datos, set: set,
+                campos: ['imagenes_esquema'],
+                hint: '⚡ Busca el esquema de mediciones en el drive.',
+              })
+            : null,
           typeof window.EnsayoPhotos === 'function'
             ? _r(window.EnsayoPhotos, {
                 photos: datos.imagenes_esquema || [],

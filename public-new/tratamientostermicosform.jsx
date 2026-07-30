@@ -229,6 +229,14 @@ function TratamientosTermicosForm(props) {
       _r('div', null,
         _r('div', { style: { fontSize: 10, fontWeight: 700, marginBottom: 4 } },
           'GRÁFICO DEL TRATAMIENTO (opcional)'),
+        typeof window.AutoLoadPhotosBtn === 'function'
+          ? _r(window.AutoLoadPhotosBtn, {
+              ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+              datos: datos, set: set,
+              campos: ['imagenes_resultado'],
+              hint: '⚡ Busca fotos en el drive (gráficos de tratamiento) y las carga aquí.',
+            })
+          : null,
         typeof window.EnsayoPhotos === 'function'
           ? _r(window.EnsayoPhotos, {
               photos: datos.imagenes_resultado || [],

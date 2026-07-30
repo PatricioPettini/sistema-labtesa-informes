@@ -230,8 +230,50 @@ function AnexoMetalograficoForm(props) {
     )
   );
 
+  // ── 1.5 IMÁGENES — separadas por tipo de análisis ─────────────────────
+  // Dos grillas independientes para que el técnico deje claro qué imagen
+  // pertenece a grano y cuál a tenor inclusionario. El generator las inserta
+  // en las secciones correspondientes del Word.
+  var block15 = _r('div', null,
+    _r('div', { style: S.head }, '1.5  IMÁGENES DEL ENSAYO'),
+    _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 12 } },
+      // Botón de carga automática — busca fotos en el drive y las categoriza
+      // entre grano e inclusiones por subcarpeta/filename (regex + IA fallback).
+      typeof window.AutoLoadPhotosBtn === 'function'
+        ? _r(window.AutoLoadPhotosBtn, {
+            ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+            datos: datos, set: set,
+            campos: ['imagenes_grano', 'imagenes_inclusiones'],
+            hint: '⚡ Busca fotos en el drive y las asigna a grano/inclusiones automáticamente.',
+          })
+        : null,
+      _r('div', null,
+        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+          'TAMAÑO DE GRANO — imágenes'),
+        typeof window.EnsayoPhotos === 'function'
+          ? _r(window.EnsayoPhotos, {
+              photos: datos.imagenes_grano || [],
+              hint: 'Micrografías con la estructura del grano (ASTM E112 / ITM 064). Se insertan bajo el resultado de Tamaño de Grano en el Word.',
+              onChange: function (next) { upd('imagenes_grano', next); },
+            })
+          : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
+      ),
+      _r('div', null,
+        _r('div', { style: { fontSize: 10.5, fontWeight: 700, marginBottom: 4, color: '#374151' } },
+          'TENOR INCLUSIONARIO — imágenes'),
+        typeof window.EnsayoPhotos === 'function'
+          ? _r(window.EnsayoPhotos, {
+              photos: datos.imagenes_inclusiones || [],
+              hint: 'Micrografías con las inclusiones (ASTM E45 / ITM 063). Se insertan bajo la tabla de Tenor Inclusionario en el Word.',
+              onChange: function (next) { upd('imagenes_inclusiones', next); },
+            })
+          : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
+      )
+    )
+  );
+
   return _r('div', { style: S.sheet },
-    block11, block12, block13, block14
+    block11, block12, block13, block14, block15
   );
 }
 

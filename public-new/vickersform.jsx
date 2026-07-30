@@ -292,6 +292,14 @@ function VickersForm(props) {
   var block16 = _r('div', null,
     _r('div', { style: S.head }, '1.6  IMÁGENES DEL ENSAYO (mapa de durezas, improntas, etc.)'),
     _r('div', { style: { padding: 8 } },
+      typeof window.AutoLoadPhotosBtn === 'function'
+        ? _r(window.AutoLoadPhotosBtn, {
+            ensayoId: props.ensayoId, nroOt: props.nroOt, tipo: props.tipo,
+            datos: datos, set: set,
+            campos: ['imagenes_resultado'],
+            hint: '⚡ Busca fotos de improntas / mapas de durezas en el drive y las carga acá.',
+          })
+        : null,
       typeof window.EnsayoPhotos === 'function'
         ? _r(window.EnsayoPhotos, {
             photos: datos.imagenes_resultado || [],

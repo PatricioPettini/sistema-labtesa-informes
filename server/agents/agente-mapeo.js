@@ -155,6 +155,9 @@ function traducirV2aV1(tipo, datos) {
             resultado:          r.resultado,
             cant_indicaciones:  r.cant_indicaciones,
             longitud_mm:        r.longitud_mm,
+            // Preservar override multi-OT — el template filtra por _filtro_ot
+            // usando este campo para emitir solo las probetas de la OT actual.
+            nro_ot_override:    r.nro_ot_override,
           };
         });
       }

@@ -68,6 +68,37 @@ function EnsayoForm(props) {
   });
   var datos = _datos[0], setDatos = _datos[1];
 
+  // Lazy fetch de imágenes completas al abrir un ensayo existente. El init
+  // de LabStore trae los ensayos SIN los base64 de imagenes* (payload grande
+  // se cortaría). Al abrir el form, si detectamos imágenes marcadas con
+  // `_dataUrlStripped: true`, pedimos el ensayo completo al servidor y
+  // reemplazamos SOLO los campos imagenes_* en el state. Los demás campos
+  // (que el técnico puede haber empezado a editar) no se tocan.
+  React.useEffect(function () {
+    if (!existing || !existing.id) return;
+    var necesitaFetch = Object.keys(datos || {}).some(function (k) {
+      if (!/^imagenes/i.test(k)) return false;
+      if (!Array.isArray(datos[k])) return false;
+      return datos[k].some(function (img) { return img && img._dataUrlStripped; });
+    });
+    if (!necesitaFetch) return;
+    fetch('/api/ensayo/' + existing.id)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (row) {
+        if (!row || !row.datos) return;
+        setDatos(function (prev) {
+          var next = Object.assign({}, prev);
+          Object.keys(row.datos).forEach(function (k) {
+            if (/^imagenes/i.test(k) && Array.isArray(row.datos[k])) {
+              next[k] = row.datos[k];
+            }
+          });
+          return next;
+        });
+      })
+      .catch(function () { /* silencioso — el técnico verá el widget vacío */ });
+  }, [existing && existing.id]);
+
   function set(k, v) {
     // Forma callback: set(function(prev) { return next; })
     if (typeof k === 'function') { setDatos(k); return; }
@@ -150,6 +181,26 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en plegado (mismo patrón que tracción).
+    if (tipo === 'plegado' && Array.isArray(clean.resultados)) {
+      var hayOverridePlg = clean.resultados.some(function (r) {
+        var over = String((r && r.nro_ot_override) || '').trim();
+        return over && over !== String(ot.nro_ot);
+      });
+      if (hayOverridePlg && typeof window.LabStore.saveEnsayoPlegadoMultiOt === 'function') {
+        window.LabStore.saveEnsayoPlegadoMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Plegado guardado · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+        return;
+      }
+    }
     window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null);
     toast((window.LabStore.labels[tipo] || 'Ensayo') + ' guardado', 'success');
     nav('#/ot/' + ot.nro_ot);
@@ -213,6 +264,11 @@ function EnsayoForm(props) {
 
     React.createElement(OTBanner, { ot: ot }),
 
+    // Agente sugerencia de norma + edición acreditada — banner inline.
+    typeof window.OAAHintBanner === 'function'
+      ? React.createElement(window.OAAHintBanner, { tipo: tipo, datos: datos })
+      : null,
+
     typeof window.PlantillasBar === 'function'
       ? React.createElement(window.PlantillasBar, {
           tipo: tipo,
@@ -268,7 +324,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.TraccionForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'plegado' && typeof window.PlegadoForm === 'function'
-        ? React.createElement(window.PlegadoForm, { datos: datos, set: set })
+        ? React.createElement(window.PlegadoForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'quimicos' && typeof window.QuimicosForm === 'function'
         ? React.createElement(window.QuimicosForm, { datos: datos, set: set })
@@ -277,13 +333,13 @@ function EnsayoForm(props) {
         ? React.createElement(window.BrinellForm, { datos: datos, set: set })
         : null,
       tipo === 'varios' && typeof window.VariosForm === 'function'
-        ? React.createElement(window.VariosForm, { datos: datos, set: set })
+        ? React.createElement(window.VariosForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'dureza-vickers' && typeof window.VickersForm === 'function'
-        ? React.createElement(window.VickersForm, { datos: datos, set: set })
+        ? React.createElement(window.VickersForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'dureza-rockwell' && typeof window.RockwellForm === 'function'
-        ? React.createElement(window.RockwellForm, { datos: datos, set: set })
+        ? React.createElement(window.RockwellForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'nick-break' && typeof window.NickBreakForm === 'function'
         ? React.createElement(window.NickBreakForm, { datos: datos, set: set })
@@ -292,7 +348,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.FerritaForm, { datos: datos, set: set })
         : null,
       tipo === 'macrografia' && typeof window.MacrografiaForm === 'function'
-        ? React.createElement(window.MacrografiaForm, { datos: datos, set: set })
+        ? React.createElement(window.MacrografiaForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'rugosidad' && typeof window.RugosidadForm === 'function'
         ? React.createElement(window.RugosidadForm, { datos: datos, set: set })
@@ -301,13 +357,13 @@ function EnsayoForm(props) {
         ? React.createElement(window.LiquidosPenetrantesForm, { datos: datos, set: set })
         : null,
       tipo === 'metalografia-general' && typeof window.MetalografiaGeneralForm === 'function'
-        ? React.createElement(window.MetalografiaGeneralForm, { datos: datos, set: set })
+        ? React.createElement(window.MetalografiaGeneralForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null })
         : null,
       tipo === 'anexo-metalografico' && typeof window.AnexoMetalograficoForm === 'function'
-        ? React.createElement(window.AnexoMetalograficoForm, { datos: datos, set: set })
+        ? React.createElement(window.AnexoMetalograficoForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'tratamientos-termicos' && typeof window.TratamientosTermicosForm === 'function'
-        ? React.createElement(window.TratamientosTermicosForm, { datos: datos, set: set })
+        ? React.createElement(window.TratamientosTermicosForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       (tipo === 'impacto' || tipo === 'traccion' || tipo === 'plegado' || tipo === 'quimicos' || tipo === 'dureza-brinell' || tipo === 'varios' || tipo === 'dureza-vickers' || tipo === 'dureza-rockwell' || tipo === 'nick-break' || tipo === 'macrografia' || tipo === 'rugosidad' || tipo === 'liquidos-penetrantes' || tipo === 'metalografia-general' || tipo === 'anexo-metalografico' || tipo === 'tratamientos-termicos' || (tipo === 'ferrita-delta' && (datos.variante || 'fischer') !== 'microscopio')) ? null : sections.map(function (sec, si) {
         var sectionContent;
@@ -322,11 +378,22 @@ function EnsayoForm(props) {
             onChangeExtra: function (next) { set('equipamiento_extra', next); },
           });
         } else if (sec.type === 'photos') {
-          sectionContent = React.createElement(EnsayoPhotos, {
-            photos: datos[sec.key] || [],
-            hint: sec.hint,
-            onChange: function (next) { set(sec.key, next); },
-          });
+          sectionContent = React.createElement('div', null,
+            typeof window.AutoLoadPhotosBtn === 'function'
+              ? React.createElement(window.AutoLoadPhotosBtn, {
+                  ensayoId: existing ? existing.id : null,
+                  nroOt: props.nro_ot, tipo: tipo,
+                  datos: datos, set: set,
+                  campos: [sec.key],
+                  hint: '⚡ Busca fotos en el drive y las asigna a esta sección automáticamente.',
+                })
+              : null,
+            React.createElement(EnsayoPhotos, {
+              photos: datos[sec.key] || [],
+              hint: sec.hint,
+              onChange: function (next) { set(sec.key, next); },
+            })
+          );
         } else if (sec.type === 'dynamicTable') {
           try {
             sectionContent = React.createElement(DynamicTable, {
@@ -589,6 +656,33 @@ function CalibBadge(props) {
   );
 }
 
+/* Deriva un caption inicial desde el nombre del archivo. Port cliente-side de
+   server/utils/fotos-auto.js:parseCaptionDeFilename. Mismas reglas:
+   - saca extensión
+   - underscores → espacio
+   - quita prefijos "M<n> " / "IMAGEN Nº<n> - "
+   - sentence case (primera mayúscula)
+   - "100x" → "(100X)"
+   Ej: "IMAGEN Nº1 - MICROESTRUCTURA EN SUPERFICIE 100x.jpg" → "Microestructura en superficie (100X)"
+*/
+function captionDesdeNombre(filename) {
+  if (!filename) return '';
+  var s = String(filename).replace(/\.[a-z0-9]{2,5}$/i, '');
+  s = s.replace(/_+/g, ' ');
+  s = s.replace(/^\s*M\s*\d+\s+/i, '');
+  s = s.replace(/^\s*(?:IMAGEN|IMAGENES|IMÁGEN|IMG|FOTO|FOTOGRAFIA)\s*(?:N\s*[°ºo]?)?\s*\d+\s*[-–—:]?\s*/i, '');
+  s = s.replace(/([\wñáéíóúü])\(/gi, '$1 (');
+  s = s.replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  s = s.toLowerCase();
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  s = s.replace(/\((\d+)\s*x\)/g, '($1X)');
+  s = s.replace(/(\d+)\s*x\b/gi, '($1X)');
+  s = s.replace(/\(\((\d+X)\)\)/g, '($1)');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
 /* Componente: imágenes con caption para incluir DENTRO de la sección del ensayo
    (ej. fotos de microscopía en Ferrita Delta). Cada item: { dataUrl, name, caption } */
 function EnsayoPhotos(props) {
@@ -604,7 +698,11 @@ function EnsayoPhotos(props) {
     files.forEach(function (file, i) {
       var reader = new FileReader();
       reader.onload = function (e) {
-        loaded[i] = { dataUrl: e.target.result, name: file.name, caption: '' };
+        loaded[i] = {
+          dataUrl: e.target.result,
+          name: file.name,
+          caption: captionDesdeNombre(file.name),
+        };
         pending--;
         if (pending === 0) props.onChange(photos.concat(loaded.filter(Boolean)));
       };
@@ -782,4 +880,125 @@ function DynamicTable(props) {
   );
 }
 
-Object.assign(window, { EnsayoForm: EnsayoForm, EnsayoPhotos: EnsayoPhotos, DynamicTable: DynamicTable });
+/* Componente: botón "Cargar fotos automáticamente" reusable en todos los forms
+   de ensayo. Llama a /api/ensayo/:id/fotos-auto (o /ensayo/new/fotos-auto con
+   nro_ot+tipo si el ensayo no está guardado todavía) y aplica la respuesta.
+   Props:
+     - ensayoId: opcional. id del ensayo si ya se guardó.
+     - nroOt:    obligatorio si no hay ensayoId. Nro de OT.
+     - tipo:     obligatorio si no hay ensayoId. Tipo de ensayo.
+     - datos:    datos actuales del ensayo (para concatenar sin duplicar)
+     - set:      función para actualizar múltiples campos ({campo: [...]})
+     - campos:   array de nombres de campos donde puede aplicar fotos
+     - hint:     texto opcional que aparece al lado del botón
+*/
+function AutoLoadPhotosBtn(props) {
+  var _l = React.useState(false); var loading = _l[0], setLoading = _l[1];
+  var _msg = React.useState(''); var msg = _msg[0], setMsg = _msg[1];
+  var ensayoId = props.ensayoId;
+  var nroOt = props.nroOt;
+  var tipo = props.tipo;
+  var datos = props.datos || {};
+  var campos = props.campos || [];
+
+  function cargar() {
+    // URL: si tenemos ensayoId, usar el path clásico; sino, usar 'new' + query.
+    var url = ensayoId
+      ? '/api/ensayo/' + ensayoId + '/fotos-auto'
+      : '/api/ensayo/new/fotos-auto?nro_ot=' + encodeURIComponent(nroOt || '') +
+        '&tipo=' + encodeURIComponent(tipo || '');
+    if (!ensayoId && (!nroOt || !tipo)) {
+      setMsg('Falta contexto (nro_ot o tipo).');
+      return;
+    }
+    setLoading(true); setMsg('');
+    fetch(url)
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.d.error || 'Error');
+        var resumen = [];
+        var patch = {};
+        campos.forEach(function (campo) {
+          var arr = (r.d.resultado && r.d.resultado[campo]) || [];
+          if (arr.length === 0) return;
+          var existente = datos[campo] || [];
+          var setNames = new Set(existente.map(function (p) { return String(p.name || '').toLowerCase(); }));
+          var nuevas = arr.filter(function (p) { return !setNames.has(String(p.name || '').toLowerCase()); });
+          if (nuevas.length > 0) {
+            patch[campo] = existente.concat(nuevas);
+            resumen.push(nuevas.length + ' en ' + campo.replace(/^imagenes_?/, ''));
+          }
+        });
+        if (Object.keys(patch).length > 0 && typeof props.set === 'function') {
+          // El set de ensayoform.jsx acepta objeto patch directamente (línea 76:
+          // "if (typeof k === 'object') Object.assign(n, k)"), así que llamamos
+          // una sola vez con el objeto. Funciona para todos los forms hijos.
+          props.set(patch);
+        }
+        var sinClas = (r.d.resultado && r.d.resultado._sin_clasificar) || [];
+        var clas = r.d.clasificador;
+        var msgTxt;
+        if (resumen.length > 0) {
+          msgTxt = 'Cargadas: ' + resumen.join(', ');
+          if (clas && clas.usado) msgTxt += ' · IA usada (' + clas.asignados + '/' + clas.total_input + ')';
+          if (sinClas.length > 0) msgTxt += ' · ' + sinClas.length + ' sin clasificar';
+        } else if (sinClas.length > 0) {
+          msgTxt = 'No se clasificó ninguna foto (' + sinClas.length + ' sin sección detectada)';
+        } else {
+          msgTxt = 'No se encontraron fotos.';
+        }
+        setMsg(msgTxt);
+        // Propagar a hermanas de la solicitud (crea/actualiza sus ensayos con
+        // sus fotos correspondientes). Skip si nroOt no está en props.
+        if (nroOt && tipo) {
+          fetch('/api/fotos-auto-solicitud', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nro_ot_referencia: nroOt, tipo: tipo, incluir_ot_actual: false }),
+          })
+            .then(function (r2) { return r2.json().then(function (d2) { return { ok: r2.ok, d: d2 }; }); })
+            .then(function (r2) {
+              if (!r2.ok) return;
+              var items = (r2.d && r2.d.items) || [];
+              var conFotos = items.filter(function (it) { return it.accion === 'creado' || it.accion === 'actualizado'; });
+              if (conFotos.length === 0) return;
+              var extra = conFotos.map(function (it) {
+                return it.cantidad + ' → OT ' + it.nro_ot + ' (' + it.accion + ')';
+              }).join('; ');
+              setMsg(function (prev) { return prev + ' · Propagado: ' + extra; });
+            })
+            .catch(function () { /* silencioso */ });
+        }
+      })
+      .catch(function (e) { setMsg('Error: ' + e.message); })
+      .finally(function () { setLoading(false); });
+  }
+
+  return React.createElement('div', {
+    style: {
+      padding: '6px 10px', background: '#eef2ff', border: '1px solid #c7d2fe',
+      borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 6,
+      marginBottom: 10,
+    },
+  },
+    React.createElement('div', {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    },
+      React.createElement('div', { style: { fontSize: 11, color: '#3730a3' } },
+        props.hint || '⚡ Busca fotos en el drive y las asigna a esta sección automáticamente.'),
+      React.createElement('button', {
+        type: 'button', onClick: cargar, disabled: loading,
+        style: {
+          border: '1px solid #4361ee', background: loading ? '#c7d2fe' : '#4361ee',
+          color: '#fff', padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          cursor: loading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+        },
+      }, loading ? 'Cargando…' : 'Cargar fotos automáticamente')
+    ),
+    msg ? React.createElement('div', {
+      style: { fontSize: 10.5, color: '#374151' },
+    }, msg) : null
+  );
+}
+
+Object.assign(window, { EnsayoForm: EnsayoForm, EnsayoPhotos: EnsayoPhotos, DynamicTable: DynamicTable, AutoLoadPhotosBtn: AutoLoadPhotosBtn });

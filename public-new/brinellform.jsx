@@ -156,6 +156,9 @@ function BrinellForm(props) {
   );
 
   // ── MEMORIA ANALÍTICA (interno) ────────────────────────────────────────
+  // Registro trazabilidad del patrón usado para verificar el durómetro.
+  // Campos según FM-134 Rev 00: TAG, valor, diámetro impronta patrón, dureza
+  // HB patrón. El archivo_ref (path) se mantiene por retrocompat.
   var blockMem = _r('div', null,
     _r('div', { style: S.subhead }, 'MEMORIA ANALÍTICA (interno)'),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 10.5 } },
@@ -167,10 +170,18 @@ function BrinellForm(props) {
         _r('span', { style: { fontWeight: 600 } }, 'VALOR:'),
         _r('input', { style: S.inline, placeholder: '………………', value: datos.patron_valor || '',
           onChange: function (e) { upd('patron_valor', e.target.value); } })),
-      _r('div', { style: { gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'ARCHIVO GUARDADO EN:'),
-        _r('input', { style: S.inline, placeholder: 'G:\\METALMECANICA\\FOTOS\\CLIENTES…', value: datos.archivo_ref || '',
-          onChange: function (e) { upd('archivo_ref', e.target.value); } }))
+      // Nuevas 2 filas: verificación del patrón (medición de diám. impronta
+      // y dureza HB del patrón usado para chequear el durómetro).
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600 } }, 'DIÁM. IMP. (mm):'),
+        _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
+          placeholder: '…', value: datos.patron_diam_imp || '',
+          onChange: function (e) { upd('patron_diam_imp', e.target.value); } })),
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600 } }, 'DUREZA HB:'),
+        _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
+          placeholder: '…', value: datos.patron_dureza_hb || '',
+          onChange: function (e) { upd('patron_dureza_hb', e.target.value); } }))
     )
   );
 

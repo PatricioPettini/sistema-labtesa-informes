@@ -471,18 +471,24 @@ function reemplazarCondicionesYEquipamiento(xml, datos, temperaturaVal) {
   if (normaOtra) condLineas.push(pLinea(`Norma de ensayo: ${normaOtra}`));
 
   // Métodos de ensayo del preinforme físico FM-071 (checkboxes + texto libre).
+  // Etiqueta unificada "Metodología de ensayo:" para todas las variantes
+  // (antes se usaba "Método de ensayo:" para checkboxes y "Metodología..." para
+  // fallback — inconsistencia que ocultaba el contenido con etiqueta rara).
   const metodos = [];
-  if (datos.metodo_soldadura_chk) {
+  // Aceptar tanto booleanos como strings "true"/"false" que pueden entrar
+  // vía JSON serializado sin normalizar. Convertimos explícitamente.
+  const isTrue = (v) => v === true || v === 'true' || v === 1 || v === '1';
+  if (isTrue(datos.metodo_soldadura_chk)) {
     const s = (datos.metodo_soldadura_text || '').trim();
     metodos.push(s ? `Soldadura: ${s}` : 'Soldadura');
   }
-  if (datos.metodo_macro_general_chk)   metodos.push('Macrografías general: Según ITM-061');
-  if (datos.metodo_lineas_forja_chk)    metodos.push('Líneas de forja: Según ITM-061');
-  if (datos.metodo_soldadura_asme_chk)  metodos.push('Soldadura: Según ASME IX QW 183/184');
+  if (isTrue(datos.metodo_macro_general_chk))   metodos.push('Macrografía general según ITM N°061');
+  if (isTrue(datos.metodo_lineas_forja_chk))    metodos.push('Líneas de forja según ITM N°061');
+  if (isTrue(datos.metodo_soldadura_asme_chk))  metodos.push('Soldadura según ASME IX QW 183/184');
   if (metodos.length) {
-    metodos.forEach(m => condLineas.push(pLinea(`Método de ensayo: ${m}`)));
+    metodos.forEach(m => condLineas.push(pLinea(`Metodología de ensayo: ${m}`)));
   } else {
-    // Fallback legacy: metodología (default ITM N°061 solo si no hay ningún método marcado).
+    // Fallback legacy: campo libre de metodología (ITM).
     const metod = (datos.metodologia || '').trim();
     if (metod) condLineas.push(pLinea(`Metodología de ensayo: ${metod}`));
   }
@@ -504,7 +510,13 @@ function reemplazarCondicionesYEquipamiento(xml, datos, temperaturaVal) {
   // EQUIPAMIENTO
   condLineas.push(pHeading('EQUIPAMIENTO UTILIZADO'));
   const equipos = [];
-  if (datos.eq_termohigro_700 || (datos.equipamiento && datos.equipamiento.termohigro_700)) {
+  // Termohigrómetro: default TRUE. El usuario debe destildar explícitamente
+  // en el form (checkbox marcado por default) para que NO aparezca.
+  // Se sigue soportando el flag legacy datos.equipamiento.termohigro_700.
+  const termoFlag = datos.eq_termohigro_700 !== undefined
+    ? datos.eq_termohigro_700
+    : (datos.equipamiento && datos.equipamiento.termohigro_700);
+  if (termoFlag !== false) {
     equipos.push('Termohigrómetro TAG N°MM-700');
   }
   if (datos.eq_microscopio_378) equipos.push('Microscopio Leica DM 750 TAG N°MM-378');
@@ -520,7 +532,6 @@ function reemplazarCondicionesYEquipamiento(xml, datos, temperaturaVal) {
   }
   // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
   formatearOtrosEquipos(datos).forEach(l => equipos.push(l));
-  if (!equipos.length) equipos.push('Termohigrómetro TAG N°MM-700'); // fallback
   equipos.forEach(e => condLineas.push(pLinea(e)));
 
   // Blank

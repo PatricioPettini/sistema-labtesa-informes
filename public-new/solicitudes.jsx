@@ -50,11 +50,14 @@ function agruparPorSolicitud(ots) {
     var totales = g.ots.length;
     var finalizadas = g.ots.filter(function (o) { return o.fecha_finalizacion; }).length;
     var enEnsayo = g.ots.filter(function (o) { return o.fecha_aprobacion && !o.fecha_finalizacion; }).length;
+    // Solicitud es preliminar si alguna de sus OTs está tildada (viene de la
+    // etiqueta PRELIMINAR de Trello o de un check manual del técnico).
+    var esPreliminar = g.ots.some(function (o) { return !!o.es_preinforme; });
     var estado, tone;
     if (totales > 0 && finalizadas === totales) { estado = 'Finalizada'; tone = 'success'; }
     else if (enEnsayo > 0) { estado = 'En ensayo'; tone = 'info'; }
     else { estado = 'En recepción'; tone = 'neutral'; }
-    return Object.assign({}, g, { total: totales, finalizadas: finalizadas, estado: estado, tone: tone });
+    return Object.assign({}, g, { total: totales, finalizadas: finalizadas, estado: estado, tone: tone, es_preinforme: esPreliminar });
   });
   // Orden descendente por nro_solicitud (más nuevo arriba).
   arr.sort(function (a, b) {
@@ -269,14 +272,17 @@ function SolicitudesScreen(props) {
                   : null
               ),
               _rS('td', null,
-                trelloCol
-                  ? _rS('span', {
-                      style: {
-                        display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-                        fontSize: 11, fontWeight: 600, background: trelloCol.bg, color: trelloCol.fg,
-                      }
-                    }, trelloCol.label)
-                  : _rS(StatusChip, { tone: s.tone, size: 'sm' }, s.estado)
+                _rS('div', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' } },
+                  trelloCol
+                    ? _rS('span', {
+                        style: {
+                          display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+                          fontSize: 11, fontWeight: 600, background: trelloCol.bg, color: trelloCol.fg,
+                        }
+                      }, trelloCol.label)
+                    : _rS(StatusChip, { tone: s.tone, size: 'sm' }, s.estado),
+                  s.es_preinforme ? _rS(StatusChip, { tone: 'warning', size: 'sm' }, 'Preliminar') : null
+                )
               ),
               _rS('td', null, _rS('span', { className: 'sm' }, fmtDate(s.recepcion))),
               _rS('td', null,

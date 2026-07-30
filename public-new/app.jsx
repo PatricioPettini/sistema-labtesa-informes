@@ -27,14 +27,16 @@ function parseRoute(hash) {
   if (parts[0] === 'clientes') return { name: 'clientes' };
   if (parts[0] === 'equipos') return { name: 'equipos' };
   if (parts[0] === 'normas') return { name: 'normas' };
-  if (parts[0] === 'auditoria') return { name: 'auditoria' };
+  if (parts[0] === 'vencimientos') return { name: 'vencimientos' };
+  if (parts[0] === 'auditoria') return { name: 'auditoria', mes: query.mes || null };
   if (parts[0] === 'stats') return { name: 'stats' };
+  if (parts[0] === 'tecnicos') return { name: 'tecnicos' };
   if (parts[0] === 'admin') return { name: 'admin' };
   if (parts[0] === 'ot') {
     if (parts[1] === 'nuevo') return { name: 'ot-new' };
     if (parts.length === 2) return { name: 'ot-detail', nro: dec(parts[1]) };
     if (parts[2] === 'editar') return { name: 'ot-edit', nro: dec(parts[1]) };
-    if (parts[2] === 'ensayo') return { name: 'ensayo', nro: dec(parts[1]), tipo: parts[3], id: parts[4] ? parseInt(parts[4], 10) : null };
+    if (parts[2] === 'ensayo') return { name: 'ensayo', nro: dec(parts[1]), tipo: parts[3], id: parts[4] ? parseInt(parts[4], 10) : null, print: query.print === '1' };
   }
   return { name: 'dashboard' };
 }
@@ -75,14 +77,25 @@ function App() {
       .catch(function (e) { setReady(e.message || 'Error desconocido'); });
   }, []);
 
+  // Modo PRINT: agregar/quitar clase al body. Este useEffect DEBE ir antes
+  // de los early returns para respetar el orden de hooks entre renders.
+  var esPrint = route && route.name === 'ensayo' && route.print;
+  React.useEffect(function () {
+    if (esPrint) document.body.classList.add('print-mode');
+    else document.body.classList.remove('print-mode');
+    return function () { document.body.classList.remove('print-mode'); };
+  }, [esPrint]);
+
   if (ready === null) return React.createElement(AppLoader, null);
   if (ready !== true)  return React.createElement(AppError, { msg: ready });
 
   var active = route.name === 'clientes' ? 'clientes'
              : route.name === 'equipos' ? 'equipos'
              : route.name === 'normas' ? 'normas'
+             : route.name === 'vencimientos' ? 'vencimientos'
              : route.name === 'auditoria' ? 'auditoria'
              : route.name === 'stats' ? 'stats'
+             : route.name === 'tecnicos' ? 'tecnicos'
              : route.name === 'admin' ? 'admin'
              : route.name === 'dashboard' ? 'ots'
              : 'solicitudes';
@@ -103,8 +116,10 @@ function App() {
     case 'clientes': screen = React.createElement(ClientesScreen, {}); break;
     case 'equipos': screen = React.createElement(EquiposScreen, {}); break;
     case 'normas': screen = React.createElement(NormasScreen, {}); break;
-    case 'auditoria': screen = React.createElement(AuditLogScreen, {}); break;
+    case 'vencimientos': screen = typeof window.VencimientosScreen === 'function' ? React.createElement(window.VencimientosScreen, {}) : React.createElement(Dashboard, {}); break;
+    case 'auditoria': screen = React.createElement(AuditLogScreen, { mesInicial: route.mes }); break;
     case 'stats': screen = React.createElement(StatsScreen, {}); break;
+    case 'tecnicos': screen = typeof window.TecnicosScreen === 'function' ? React.createElement(window.TecnicosScreen, {}) : React.createElement('div', { style: { padding: 40 } }, 'Cargando…'); break;
     case 'admin': screen = typeof window.AdminScreen === 'function' ? React.createElement(window.AdminScreen, {}) : React.createElement(Dashboard, {}); break;
     case 'ot-new': screen = React.createElement(OTForm, { key: 'new' }); break;
     case 'ot-edit': screen = React.createElement(OTForm, { nro_ot: route.nro, key: 'edit-' + route.nro }); break;
@@ -114,6 +129,17 @@ function App() {
       screen = typeof window.SolicitudesScreen === 'function'
         ? React.createElement(window.SolicitudesScreen, { clienteFilter: route.cliente, key: 'sol-def' })
         : React.createElement(Dashboard, { clienteFilter: route.cliente, key: 'dash-def' });
+  }
+
+  // Modo PRINT: cuando la URL trae `?print=1` en el hash de un ensayo, sacamos
+  // el sidebar y el layout wrapper para que puppeteer capture solo el form
+  // limpio. El useEffect que agrega/quita la clase al body ya se ejecutó arriba.
+  if (esPrint) {
+    return React.createElement('div', { className: 'app app-print' },
+      React.createElement('main', { className: 'main main-print' },
+        React.createElement('div', { className: 'main-inner main-inner-print' }, screen)
+      )
+    );
   }
 
   return React.createElement('div', { className: 'app' },

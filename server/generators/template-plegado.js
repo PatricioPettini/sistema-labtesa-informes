@@ -95,6 +95,57 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
 
+  // ── Filtro multi-OT: si datos._filtro_ot está seteado, solo emitir las
+  // probetas cuyo `nro_ot_override` matchea (o vacío/default para la OT del
+  // ensayo). El word-generator llama a este template una vez por cada OT del
+  // registro con `_filtro_ot` seteado.
+  if (datos._filtro_ot != null) {
+    const otFiltro = String(datos._filtro_ot);
+    const esOtDelEnsayo = otFiltro === String(ot.nro_ot || '');
+    const filtrarArr = (arr) => (Array.isArray(arr) ? arr : []).filter(p => {
+      const ov = String((p && p.nro_ot_override) || '').trim();
+      const perteneceA = ov || String(ot.nro_ot || '');
+      return perteneceA === otFiltro || (esOtDelEnsayo && !ov);
+    });
+    datos = Object.assign({}, datos);
+    if (Array.isArray(datos.resultados)) datos.resultados = filtrarArr(datos.resultados);
+    if (Array.isArray(datos.probetas))   datos.probetas   = filtrarArr(datos.probetas);
+  }
+
+  // ── Aplicar textos_por_ot para la OT actual (obs/eval/nota). Cada OT tiene
+  // sus propios textos; si el mapa está presente, sobrescribimos los campos
+  // raíz con los de la OT actual antes de emitir. El campo `textos_por_ot`
+  // solo existe cuando el ensayo se editó desde el form nuevo con multi-OT.
+  if (datos.textos_por_ot && typeof datos.textos_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const textosOt = datos.textos_por_ot[nroOtActual];
+    if (textosOt) {
+      datos = Object.assign({}, datos);
+      ['tiene_observacion', 'observacion_texto',
+       'tiene_evaluacion',  'evaluacion_texto',
+       'tiene_nota',        'nota_texto'].forEach(k => {
+        if (textosOt[k] !== undefined) datos[k] = textosOt[k];
+      });
+    }
+  }
+
+  // ── Aplicar condiciones_por_ot: overrides de norma / código / orientación
+  // / probeta_mec_segun para la OT que se está emitiendo. Si un override está
+  // vacío o no existe, se cae al valor global (secciones 1.1 y 1.2 del form).
+  // Marcamos con flags "internos" para que las líneas se armen usando el
+  // texto libre en vez de derivarse de los checkboxes globales.
+  if (datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+    const nroOtActualCond = String(ot.nro_ot || '');
+    const condOt = datos.condiciones_por_ot[nroOtActualCond];
+    if (condOt) {
+      datos = Object.assign({}, datos);
+      if (condOt.norma_ensayo_ot)       datos._norma_ensayo_override = condOt.norma_ensayo_ot;
+      if (condOt.codigo_referencia_ot)  datos._codigo_referencia_override = condOt.codigo_referencia_ot;
+      if (condOt.orientacion_ot)        datos.orientacion = condOt.orientacion_ot;
+      if (condOt.probeta_mec_ot)        datos.probeta_mecanizada_segun = condOt.probeta_mec_ot;
+    }
+  }
+
   const equipo    = datos.equipamiento || {};
   // Auto-detección del tipo de tabla según los `tipo` cargados en cada fila
   // (Cara/Raíz/Lateral). Solo se aplica si el usuario NO eligió tipo_tabla
@@ -128,9 +179,11 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
   const normaEnsayoLegacy = datos.norma_ensayo === 'otra'
     ? (datos.norma_ensayo_otra || '')
     : (datos.norma_ensayo || '');
-  const normaEnsayo = normasCheckList.length
+  const normaEnsayoGlobal = normasCheckList.length
     ? normasCheckList.join(' / ')
     : normaEnsayoLegacy;
+  // Override por OT (condiciones_por_ot) — el texto libre reemplaza el derivado.
+  const normaEnsayo = datos._norma_ensayo_override || normaEnsayoGlobal;
   const metodologia = datos.metodologia || '';
   const normas = [];
   if (normaEnsayo) normas.push(`Norma de ensayo: ${normaEnsayo}`);
@@ -141,7 +194,7 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
   // Códigos / Norma de referencia (texto libre opcional + códigos predefinidos)
   // El "texto del código" (sin el prefijo "Código de referencia:") también se
   // reutiliza abajo como prefijo de "Probeta mecanizada según ...".
-  const codigoRefTexto = (() => {
+  const codigoRefTexto = datos._codigo_referencia_override || (() => {
     if (datos.cod_asme)    return `ASME BPVC Sección IX Ed. ${datos.ed_asme || '…….'}`;
     if (datos.cod_aws_d11) return `AWS D1.1/D1.1M-${datos.ed_aws_d11 || '2020'}`;
     if (datos.cod_api1104) return `API 1104 Ed. ${datos.ed_api1104 || '22-2021 (E1-2023)'}`;
@@ -149,7 +202,7 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
     return null;
   })();
   const codigos = [];
-  if (datos.norma_referencia) codigos.push(`Norma de referencia: ${datos.norma_referencia}`);
+  if (datos.norma_referencia && !datos._codigo_referencia_override) codigos.push(`Norma de referencia: ${datos.norma_referencia}`);
   if (codigoRefTexto)         codigos.push(`Código de referencia: ${codigoRefTexto}`);
   const codigo_referencia_linea = codigos.length ? codigos.join('\n') : '__SECTION_HIDE__';
 
@@ -313,15 +366,31 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
   const inspeccionSlots = { inspeccion_1: '__SECTION_HIDE__', inspeccion_2: '__SECTION_HIDE__', inspeccion_3: '__SECTION_HIDE__', inspeccion_4: '__SECTION_HIDE__' };
 
   // ── Observaciones ─────────────────────────────────────────────────────────
+  // Emite (en orden) las secciones OBSERVACIÓN → EVALUACIÓN → NOTA de la OT
+  // actual. Cada bloque se activa con su flag `tiene_X` + texto. Además, el
+  // campo `observaciones_extra` (indicaciones/defectos globales, sección 1.5)
+  // se emite antes que las secciones por OT.
   const lineasObs = [];
   if (datos.muestra_fuera_alcance) lineasObs.push('"Muestra fuera del alcance de acreditación"');
-  if (datos.tiene_evaluacion && datos.evaluacion_texto) {
-    lineasObs.push('');
-    lineasObs.push('EVALUACION DE RESULTADOS');
-    lineasObs.push('"Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA"');
-    lineasObs.push(datos.evaluacion_texto);
+  if (datos.observaciones_extra) {
+    lineasObs.push(datos.observaciones_extra);
   }
-  if (datos.observaciones_extra) lineasObs.push(datos.observaciones_extra);
+  if (datos.tiene_observacion && String(datos.observacion_texto || '').trim()) {
+    if (lineasObs.length) lineasObs.push('');
+    lineasObs.push('OBSERVACIÓN');
+    lineasObs.push(String(datos.observacion_texto).trim());
+  }
+  if (datos.tiene_evaluacion && String(datos.evaluacion_texto || '').trim()) {
+    if (lineasObs.length) lineasObs.push('');
+    lineasObs.push('EVALUACIÓN DE RESULTADOS');
+    lineasObs.push('"Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA"');
+    lineasObs.push(String(datos.evaluacion_texto).trim());
+  }
+  if (datos.tiene_nota && String(datos.nota_texto || '').trim()) {
+    if (lineasObs.length) lineasObs.push('');
+    lineasObs.push('NOTA');
+    lineasObs.push(String(datos.nota_texto).trim());
+  }
   const observaciones_linea = lineasObs.length ? lineasObs.join('\n') : '__SECTION_HIDE__';
 
   // W5: texto OAA separado, en negrita centrado antes de FIN DE INFORME

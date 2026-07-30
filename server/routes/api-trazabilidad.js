@@ -654,13 +654,14 @@ router.get('/ot/:nro_ot/auditoria.csv', (req, res) => {
 // ─── Estadísticas / dashboard analítico ──────────────────────────────────────
 router.get('/stats', (req, res) => {
   try {
-    // Informes emitidos por mes (últimos 12).
+    // Informes emitidos por mes. Traemos 24 meses para poder hacer comparación
+    // YoY en el gráfico (mismo mes del año pasado en línea dashed).
     const porMes = db.prepare(`
       SELECT substr(fecha, 1, 7) AS ym, COUNT(*) AS n,
              SUM(CASE WHEN acreditado = 1 THEN 1 ELSE 0 END) AS n_oaa,
              SUM(CASE WHEN es_preinforme = 1 THEN 1 ELSE 0 END) AS n_prel
       FROM informes_emitidos
-      WHERE fecha >= date('now', '-12 months')
+      WHERE fecha >= date('now', '-24 months')
       GROUP BY substr(fecha, 1, 7)
       ORDER BY ym ASC
     `).all();
@@ -718,6 +719,88 @@ router.get('/stats', (req, res) => {
     res.json({
       generales, porMes, porTipoEnsayo, topClientes, tiempos, totalesFirma,
     });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Dashboard por técnico ────────────────────────────────────────────────────
+// Métricas agregadas por técnico: ensayos revisados, OTs firmadas, informes
+// emitidos, retracciones y tiempos promedio. Se cruza por nombre normalizado.
+router.get('/tecnicos-dashboard', (req, res) => {
+  try {
+    // 1) Ensayos revisados (últimos 12 meses). Ojo: revisado_por y revisado_en
+    // existen tanto en `ensayos` como en `ots` — hay que calificar con `e.`.
+    const ensayosRev = db.prepare(`
+      SELECT e.revisado_por AS tecnico, COUNT(*) AS n,
+             MAX(e.revisado_en) AS ultimo,
+             AVG(julianday(e.revisado_en) - julianday(o.fecha_recepcion)) AS dias_prom
+      FROM ensayos e
+      LEFT JOIN ots o ON o.nro_ot = e.nro_ot
+      WHERE e.revisado_por IS NOT NULL AND e.revisado_por <> ''
+        AND e.revisado_en >= datetime('now','-12 months')
+      GROUP BY e.revisado_por
+    `).all();
+
+    // 2) OTs firmadas (estado_firma actual = 'firmado' con firmante nombrado).
+    const otsFirmadas = db.prepare(`
+      SELECT firmado_por AS tecnico, COUNT(*) AS n
+      FROM ots
+      WHERE firmado_por IS NOT NULL AND firmado_por <> ''
+        AND firmado_en >= datetime('now','-12 months')
+      GROUP BY firmado_por
+    `).all();
+
+    // 3) Informes emitidos (OTs con informe_path atribuido al firmante).
+    const informes = db.prepare(`
+      SELECT firmado_por AS tecnico, COUNT(*) AS n
+      FROM ots
+      WHERE informe_path IS NOT NULL AND informe_path <> ''
+        AND informe_generado_en >= datetime('now','-12 months')
+        AND firmado_por IS NOT NULL AND firmado_por <> ''
+      GROUP BY firmado_por
+    `).all();
+
+    // 4) Desfirmas realizadas por cada técnico (útiles para detectar retrabajo).
+    const desfirmas = db.prepare(`
+      SELECT token_nombre AS tecnico, COUNT(*) AS n
+      FROM firmas
+      WHERE accion = 'desfirmar'
+        AND token_nombre IS NOT NULL AND token_nombre <> ''
+        AND fecha >= datetime('now','-12 months')
+      GROUP BY token_nombre
+    `).all();
+
+    // 5) Merge por nombre de técnico (normalizado a lower para deduplicar
+    //    diferencias de mayúsculas/espacios).
+    const norm = s => String(s || '').trim().toLowerCase();
+    const map = new Map(); // key -> { tecnico, ensayos, ots_firmadas, ... }
+    function upsert(row, campo, valor) {
+      const key = norm(row.tecnico);
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, { tecnico: row.tecnico.trim(), ensayos_revisados: 0, ots_firmadas: 0, informes_emitidos: 0, desfirmas: 0, dias_prom: null, ultimo: null });
+      }
+      const cur = map.get(key);
+      cur[campo] = (cur[campo] || 0) + (valor || 0);
+      // Nombre canónico: preferir el que tenga más ensayos revisados (más "peso")
+      if (campo === 'ensayos_revisados') cur.tecnico = row.tecnico.trim();
+    }
+    ensayosRev.forEach(r => {
+      upsert(r, 'ensayos_revisados', r.n);
+      const k = norm(r.tecnico);
+      if (k && map.has(k)) {
+        const cur = map.get(k);
+        cur.dias_prom = r.dias_prom;
+        cur.ultimo = r.ultimo;
+      }
+    });
+    otsFirmadas.forEach(r => upsert(r, 'ots_firmadas', r.n));
+    informes.forEach(r => upsert(r, 'informes_emitidos', r.n));
+    desfirmas.forEach(r => upsert(r, 'desfirmas', r.n));
+
+    const out = Array.from(map.values())
+      .sort((a, b) => (b.ensayos_revisados + b.ots_firmadas) - (a.ensayos_revisados + a.ots_firmadas));
+
+    res.json({ tecnicos: out, periodo: '12 meses' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

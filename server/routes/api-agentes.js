@@ -327,6 +327,29 @@ router.get('/qa-status/:nro_ot', (req, res) => {
   res.json(cached);
 });
 
+// ── GET /api/pre-emision/:nro_ot ──────────────────────────────────────────────
+// Análisis de coherencia con Claude antes de emitir el Word. Devuelve hallazgos
+// (críticos / warnings / info) para que el técnico revise antes de generar.
+// No bloquea la emisión — es informativo.
+router.get('/pre-emision/:nro_ot', async (req, res) => {
+  const { nro_ot } = req.params;
+  try {
+    const ot = db.prepare('SELECT * FROM ots WHERE nro_ot = ?').get(nro_ot);
+    if (!ot) return res.status(404).json({ error: 'OT no encontrada' });
+    const ensayos = db.prepare('SELECT id, tipo, datos_json FROM ensayos WHERE nro_ot = ? ORDER BY orden').all(nro_ot);
+    if (!ensayos.length) return res.json({ hallazgos: [], nota: 'OT sin ensayos cargados.' });
+
+    const { analizar } = require('../agents/agente-pre-emision');
+    const t0 = Date.now();
+    const resultado = await analizar(ot, ensayos);
+    console.log('[pre-emision] OT ' + nro_ot + ' — ' + resultado.hallazgos.length + ' hallazgos en ' + (Date.now() - t0) + 'ms (modelo ' + resultado.modelo + ')');
+    res.json(resultado);
+  } catch (err) {
+    console.error('[pre-emision] error OT ' + nro_ot + ':', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/actualizar-forms ────────────────────────────────────────────────
 // Pobla las tablas equipos y normas del DB leyendo los informes de referencia.
 router.post('/actualizar-forms', async (req, res) => {

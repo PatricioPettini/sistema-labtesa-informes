@@ -208,7 +208,7 @@
       // Para updates parciales (es_preinforme, fechas, trello_url) usamos PATCH.
       // El POST /api/ot exige nro_solicitud + razon_social que no necesitan
       // recargarse en una actualización de un solo campo.
-      var PATCH_FIELDS = ['es_preinforme', 'fecha_recepcion', 'fecha_aprobacion', 'fecha_finalizacion', 'trello_url'];
+      var PATCH_FIELDS = ['es_preinforme', 'fecha_recepcion', 'fecha_aprobacion', 'fecha_finalizacion', 'trello_url', 'inspeccion_texto'];
       var soloParcial = Object.keys(data).every(function (k) { return PATCH_FIELDS.indexOf(k) >= 0; });
       if (soloParcial) {
         apiFetch('PATCH', '/api/ot/' + encodeURIComponent(nro_ot), data)
@@ -432,6 +432,123 @@
         }
         return self.saveEnsayoAsync(nroY, 'traccion', datosY, existingIdY).then(function (row) {
           return { nro_ot: nroY, accion: accion, cantidad: sub.muestras.length, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: idxActual.length },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
+    // Guarda un ensayo de plegado con split por OT — mismo patrón que
+    // saveEnsayoTraccionMultiOt: las probetas con `nro_ot_override` apuntando a
+    // otra OT se transfieren al ensayo de plegado de esa OT hermana (creando el
+    // ensayo allí si no existe). En la OT actual queda un ensayo con SOLO sus
+    // probetas propias. Devuelve Promise con resumen del split.
+    saveEnsayoPlegadoMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var resultados = Array.isArray(datos.resultados) ? datos.resultados : [];
+      var otActualStr = String(nro_ot_actual);
+      // Agrupar índices por OT destino (override o actual).
+      var grupos = {}; // nro_ot → [idxOriginal, ...]
+      resultados.forEach(function (r, i) {
+        var over = String((r && r.nro_ot_override) || '').trim();
+        var dest = over || otActualStr;
+        (grupos[dest] = grupos[dest] || []).push(i);
+      });
+      function extraerGrupo(idxs) {
+        return idxs.map(function (oldIdx) {
+          var r = Object.assign({}, resultados[oldIdx] || {});
+          delete r.nro_ot_override; // ya está en su OT destino
+          return r;
+        });
+      }
+      // Textos opcionales por OT (obs / eval / nota).
+      var mapaTextos = (datos && datos.textos_por_ot) || {};
+      var TEXTO_KEYS = ['tiene_observacion', 'observacion_texto',
+                        'tiene_evaluacion',  'evaluacion_texto',
+                        'tiene_nota',        'nota_texto'];
+      function aplanarTextosPara(nroOt) {
+        var m = mapaTextos[nroOt] || {};
+        var out = {};
+        TEXTO_KEYS.forEach(function (k) {
+          if (m[k] !== undefined) out[k] = m[k];
+          else if (nroOt === otActualStr) {
+            if (datos[k] !== undefined) out[k] = datos[k];
+          } else {
+            out[k] = (k.indexOf('tiene_') === 0) ? false : '';
+          }
+        });
+        return out;
+      }
+      // condiciones_por_ot: mapa análogo a textos_por_ot pero para las
+      // condiciones específicas (norma, código, orientación, probeta_mec).
+      // Cada hijo se lleva SOLO la entrada de su propia OT.
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      function condsPara(nroOt) {
+        var m = mapaCond[nroOt];
+        return m ? { condiciones_por_ot: { [nroOt]: Object.assign({}, m) } } : {};
+      }
+      // OT actual
+      var otsDest = Object.keys(grupos);
+      var idxActual = grupos[otActualStr] || [];
+      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsPara(otActualStr));
+      delete datosActual.textos_por_ot;
+      if (!datosActual.condiciones_por_ot) delete datosActual.condiciones_por_ot;
+      datosActual.resultados = extraerGrupo(idxActual);
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'plegado', datosActual, existingId || null);
+      // OTs hermanas: buscar / crear ensayo de plegado y agregar las probetas.
+      var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var subResultados = extraerGrupo(grupos[nroY]);
+        var existente = _db.ensayos.find(function (e) {
+          return e.nro_ot === nroY && e.tipo === 'plegado';
+        });
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          var resultadosPrev = Array.isArray(datosPrev.resultados) ? datosPrev.resultados : [];
+          var textosY = aplanarTextosPara(nroY);
+          datosY = Object.assign({}, datosPrev, textosY, condsPara(nroY), {
+            resultados: resultadosPrev.concat(subResultados),
+          });
+          delete datosY.textos_por_ot;
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          // Copiar condiciones globales del ensayo actual (norma, equipamiento,
+          // ITM, temperatura, orientación, checkboxes de notas, etc.).
+          var CONDICIONES_GLOBALES = [
+            'equipo', 'variante_equipo', 'metodologia',
+            'temperatura', 'estado_superficial', 'diametro_mandril',
+            'espesor_probeta', 'ancho_probeta', 'orientacion',
+            'probeta_mecanizada_segun', '_mecAuto',
+            'distancia_apoyos', 'zona_plegado',
+            'equipamiento', 'equipamiento_tags', 'otros_equipos',
+            'norma_iso5173', 'norma_iso5173_year',
+            'norma_astm_e190', 'norma_astm_e190_year',
+            'cod_asme', 'ed_asme', 'cod_api1104', 'ed_api1104',
+            'cod_aws_d11', 'ed_aws_d11', 'norma_referencia',
+            'observaciones_extra', 'inspeccion_por',
+            'nota_evaluaciones', 'nota_no_conforme', 'nota_mecanizada',
+            'nota_incertidumbre', 'nota_externo',
+          ];
+          datosY = Object.assign({}, aplanarTextosPara(nroY), condsPara(nroY), {
+            resultados: subResultados,
+          });
+          CONDICIONES_GLOBALES.forEach(function (k) {
+            if (datos[k] !== undefined) datosY[k] = datos[k];
+          });
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'plegado', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, cantidad: subResultados.length, id: row && row.id };
         });
       });
       return Promise.all([promActual].concat(promsHermanas)).then(function (results) {

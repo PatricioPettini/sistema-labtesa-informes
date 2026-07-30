@@ -734,53 +734,449 @@ router.get('/ot/:nro_ot/fotos', (req, res) => {
 // Auto-carga de fotos de recepción desde el drive del laboratorio.
 // Devuelve las imágenes como base64 + nombre + info de dónde se encontraron.
 // El técnico usa un botón en la UI para dispararlo manualmente.
-router.get('/ot/:nro_ot/fotos-auto', (req, res) => {
+// REGLAS de clasificación fotos-auto por tipo de ensayo. Cada rule mapea a
+// un `campo` (nombre del campo en datos_json). Se usa en /ensayo/:id/fotos-auto
+// y en /fotos-auto-solicitud (batch).
+const _REGLAS_FOTOS_AUTO = {
+  'metalografia-general': [
+    { campo: 'imagenes_micro',    re: /microestructura\b|microestrutura\b|^micro$/i },
+    { campo: 'imagenes_espesor',  re: /espesor|recubrimiento|capa\b/i },
+    { campo: 'imagenes_grafito',  re: /grafito/i },
+    { campo: 'imagenes_decarb',   re: /decarburaci|decarbur|descarburaci/i },
+  ],
+  'anexo-metalografico': [
+    { campo: 'imagenes_grano',       re: /grano|tama[nñ]o[_\s]*de[_\s]*grano/i },
+    { campo: 'imagenes_inclusiones', re: /inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|oxido|óxido/i },
+  ],
+  'macrografia':          [{ campo: 'imagenes_resultado', re: /macrograf/i }],
+  'dureza-vickers':       [{ campo: 'imagenes_resultado', re: /vickers|microdureza|impronta|mapa[_\s]*de[_\s]*durez|dureza/i }],
+  'dureza-rockwell':      [{ campo: 'imagenes_esquema',   re: /rockwell|esquema|dureza/i }],
+  'tratamientos-termicos':[{ campo: 'imagenes_resultado', re: /tratamient|revenido|temple|recocido|solubiliz|t[eé]rmico/i }],
+  'liquidos-penetrantes': [{ campo: 'imagenes_resultado', re: /liquid|penetrant|revelador|indicaci[oó]n|lp\b|pt\b/i }],
+  'ferrita-delta':        [{ campo: 'imagenes',           re: /ferrita|delta|leica|microscop/i }],
+  'varios':               [{ campo: 'imagenes_resultado', re: /./ }],
+  'microestructura':         [{ campo: 'imagenes_resultado', re: /microestructura|microestrutura|^micro$/i }],
+  'tamano-grano':            [{ campo: 'imagenes_resultado', re: /grano|tama[nñ]o[_\s]*de[_\s]*grano/i }],
+  'inclusiones':             [{ campo: 'imagenes_resultado', re: /inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|oxido|óxido/i }],
+  'estructura-grafito':      [{ campo: 'imagenes_resultado', re: /grafito/i }],
+  'espesor-capa':            [{ campo: 'imagenes_resultado', re: /espesor|recubrimiento|capa\b/i }],
+  'decarburacion':           [{ campo: 'imagenes_resultado', re: /decarburaci|decarbur|descarburaci/i }],
+  'defectos-superficiales':  [{ campo: 'imagenes_resultado', re: /defecto|fisura|grieta|poro/i }],
+  'porosidad':               [{ campo: 'imagenes_resultado', re: /porosidad|poro/i }],
+};
+
+// Regex de detección "esto es foto de ensayo, no de recepción". Aplica al
+// filtro del endpoint /ot/:nro_ot/fotos-auto para excluir fotos que están en
+// subcarpetas de sección de ensayo (MICROESTRUCTURA/, INCLUSIONES/, etc.) o
+// cuyo nombre contiene keywords de sección (inclusiones.png, macrografia.jpg).
+const _SECCION_ENSAYO_RE = /\b(microestructura|micrograf|macrograf|espesor|recubrimiento|grafito|decarbur|descarburaci|grano|inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|vickers|microdureza|rockwell|brinell|penetrant|revelador|indicacion|tratamient|revenido[_\s]|temple[_\s]|recocido|solubiliz|ferrita|nick[_\s-]*break|impacto|tracci[oó]n)/i;
+function _esFotoDeEnsayo(it) {
+  const folders = it.folders || [];
+  if (folders.some(f => _SECCION_ENSAYO_RE.test(f))) return true;
+  const base = pathMod.basename(it.abs).replace(/\.[a-z0-9]{2,5}$/i, '');
+  if (_SECCION_ENSAYO_RE.test(base)) return true;
+  return false;
+}
+
+router.get('/ot/:nro_ot/fotos-auto', async (req, res) => {
   try {
     const nro_ot = req.params.nro_ot;
     const ot = db.prepare('SELECT nro_ot, nro_solicitud, razon_social, id_muestra FROM ots WHERE nro_ot = ?').get(nro_ot);
     if (!ot) return res.status(404).json({ error: 'OT no encontrada' });
-    const { buscarFotosOt } = require('../utils/fotos-auto');
-    const r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+    const { buscarFotosOt, FOTOS_ROOT } = require('../utils/fotos-auto');
+    let r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
     if (!r.root_ok) return res.status(503).json({
       error: 'Drive de fotos no accesible desde el servidor.',
       root: r.root,
       hint: 'El servicio Windows no ve drives mapeados de sesión. Usar ruta UNC o configurar FOTOS_RECEPCION_ROOT.',
     });
-    // Cargar cada archivo como base64 (con límite para evitar respuestas gigantes).
-    const MAX_TOTAL_BYTES = 100 * 1024 * 1024; // 100 MB
+
+    // Cliente no encontrado por fuzzy → probar agente IA cliente-carpeta.
+    let clienteAgenteInfo = null;
+    if (r.debug === 'cliente_no_matcheado') {
+      try {
+        const fsMod2 = require('fs');
+        const carpetas = fsMod2.readdirSync(FOTOS_ROOT, { withFileTypes: true })
+          .filter(d => d.isDirectory()).map(d => d.name);
+        const { resolverCarpeta } = require('../agents/agente-cliente-carpeta');
+        const t0 = Date.now();
+        const decision = await resolverCarpeta(ot.razon_social, carpetas);
+        clienteAgenteInfo = {
+          usado: true, modelo: decision.modelo, ms: Date.now() - t0,
+          carpeta: decision.carpeta, confianza: decision.confianza, motivo: decision.motivo,
+        };
+        console.log('[fotos-auto/cliente-agente] "' + ot.razon_social + '" → ' + (decision.carpeta || '(nada)') + ' [' + decision.confianza + '] ' + clienteAgenteInfo.ms + 'ms');
+        if (decision.carpeta && (decision.confianza === 'alta' || decision.confianza === 'media')) {
+          try {
+            db.prepare("INSERT OR IGNORE INTO cliente_alias (razon_social, carpeta_drive, fuente, verificado) VALUES (?, ?, 'ia', 0)")
+              .run(ot.razon_social, decision.carpeta);
+          } catch (_) {}
+          r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+        }
+      } catch (e) {
+        console.warn('[fotos-auto/cliente-agente] fallo — ' + e.message);
+        clienteAgenteInfo = { usado: false, error: e.message };
+      }
+    }
+
+    // Filtro RECEPCIÓN: excluir fotos con signal de "es de ensayo" (por carpeta
+    // ancestro o por nombre de archivo). Sin este filtro, la recepción trae
+    // TODO recursivo y aparecen fotos de sección como carátula.
+    if (Array.isArray(r.items) && r.items.length > 0) {
+      const antes = r.items.length;
+      r.items = r.items.filter(it => !_esFotoDeEnsayo(it));
+      r.archivos = r.items.map(it => it.abs);
+      if (r.items.length !== antes) {
+        console.log('[fotos-auto/recepcion] OT ' + nro_ot + ' — filtradas ' +
+          (antes - r.items.length) + '/' + antes + ' fotos con signal de ensayo');
+      }
+    }
+
+    // Convención nueva: si existe carpeta OT<nro> propia, la RAÍZ contiene las
+    // fotos de recepción y las subcarpetas son por ensayo. Solo levantar
+    // items directos (folders.length === 0).
+    let archivosFinales = r.archivos;
+    let agenteInfo = null;
+    if (r.carpeta_ot && Array.isArray(r.items) && r.items.length > 0) {
+      const soloRaiz = r.items.filter(it => (it.folders || []).length === 0);
+      archivosFinales = soloRaiz.length > 0 ? soloRaiz.map(it => it.abs) : [];
+      agenteInfo = {
+        usado: false, motivo: 'convencion_carpeta_ot',
+        asignadas_por_carpeta: archivosFinales.length,
+        total_archivos: r.items.length,
+      };
+    } else if (!r.carpeta_ot && ot.nro_solicitud && (r.items || []).length > 0) {
+      const hermanas = db.prepare(
+        'SELECT nro_ot, id_muestra, creado_en FROM ots WHERE nro_solicitud = ? ORDER BY creado_en ASC, nro_ot ASC'
+      ).all(ot.nro_solicitud);
+      if (hermanas.length > 1) {
+        const nroOtDeOrden = {};
+        hermanas.forEach((h, i) => { nroOtDeOrden[i + 1] = String(h.nro_ot); });
+        const items = r.items || [];
+        const paraEstaOtPath = [];
+        for (const it of items) {
+          if (it.muestra == null) continue;
+          const nroOtDest = nroOtDeOrden[it.muestra];
+          if (String(nroOtDest || '') === String(nro_ot)) paraEstaOtPath.push(it.abs);
+        }
+        const sueltos = items.filter(it => it.muestra == null);
+        if (sueltos.length > 0) {
+          try {
+            const { distribuirFotos } = require('../agents/agente-fotos');
+            const filenames = sueltos.map(it => pathMod.basename(it.abs));
+            const t0 = Date.now();
+            const dist = await distribuirFotos(filenames, hermanas);
+            const asignaciones = dist.asignaciones || [];
+            const especificas = new Set(), genericas = new Set();
+            for (const a of asignaciones) {
+              const nroAsig = a.nro_ot == null ? null : String(a.nro_ot);
+              if (nroAsig === String(nro_ot)) especificas.add(a.filename);
+              else if (nroAsig === null) genericas.add(a.filename);
+            }
+            const totalEspecificasParaMi = paraEstaOtPath.length + especificas.size;
+            const usarGenericas = totalEspecificasParaMi === 0;
+            const paraEstaSueltos = new Set(especificas);
+            if (usarGenericas) genericas.forEach(g => paraEstaSueltos.add(g));
+            for (const it of sueltos) {
+              const bn = pathMod.basename(it.abs);
+              if (paraEstaSueltos.has(bn)) paraEstaOtPath.push(it.abs);
+            }
+            agenteInfo = {
+              usado: true, modelo: dist.modelo, ms: Date.now() - t0,
+              asignadas_por_carpeta: items.filter(it => it.muestra != null && String(nroOtDeOrden[it.muestra] || '') === String(nro_ot)).length,
+              asignadas_por_ia: especificas.size,
+              genericas_fallback: usarGenericas ? genericas.size : 0,
+              total_archivos: items.length,
+              hermanas: hermanas.length,
+            };
+          } catch (e) {
+            console.warn('[fotos-auto/agente] fallo — ' + e.message);
+            agenteInfo = { usado: false, error: e.message };
+          }
+        } else {
+          agenteInfo = {
+            usado: false,
+            asignadas_por_carpeta: paraEstaOtPath.length,
+            total_archivos: items.length,
+            hermanas: hermanas.length,
+            motivo: 'todos resueltos por carpeta',
+          };
+        }
+        archivosFinales = paraEstaOtPath;
+      }
+    }
+
+    // Cargar como base64 con límite.
+    const { parseCaptionDeFilename } = require('../utils/fotos-auto');
+    const itemsPorAbs = new Map((r.items || []).map(it => [it.abs, it]));
+    const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
     let total = 0;
     const items = [];
-    for (const abs of r.archivos) {
+    for (const abs of archivosFinales) {
       try {
         const stat = fsMod.statSync(abs);
         if (total + stat.size > MAX_TOTAL_BYTES) break;
         const buf = fsMod.readFileSync(abs);
         const ext = pathMod.extname(abs).slice(1).toLowerCase();
         const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const name = pathMod.basename(abs);
+        const it = itemsPorAbs.get(abs);
         items.push({
-          name: pathMod.basename(abs),
+          name,
           dataUrl: 'data:' + mime + ';base64,' + buf.toString('base64'),
           size: stat.size,
           ruta: abs,
+          caption: parseCaptionDeFilename(name, it ? { muestra: it.muestra, folders: it.folders } : null),
         });
         total += stat.size;
       } catch (e) { console.warn('[fotos-auto] no se pudo leer', abs, e.message); }
     }
     res.json({
-      encontrada: r.encontrada,
+      encontrada: items.length > 0,
       carpeta_cliente: r.carpeta_cliente,
       carpeta_sol: r.carpeta_sol,
       carpeta_ot: r.carpeta_ot,
       count: items.length,
-      total_disponibles: r.archivos.length,
+      total_disponibles: (r.items || []).length,
       items,
       debug: r.debug,
       razon_social_buscada: r.razon_social_buscada,
       cliente_score: r.cliente_score,
       cliente_candidatos: r.cliente_candidatos,
       sols_disponibles: r.sols_disponibles,
+      agente: agenteInfo,
+      cliente_agente: clienteAgenteInfo,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Función reusable para el endpoint clásico y el batch.
+async function armarFotosParaOtYTipo(ot, tipo, ensayoId) {
+  const { buscarFotosOt } = require('../utils/fotos-auto');
+  const r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+  if (!r.root_ok) return { error: 'Drive de fotos no accesible', root: r.root, http: 503 };
+
+  let archivos = r.archivos || [];
+  if (r.carpeta_ot && Array.isArray(r.items) && r.items.length > 0) {
+    archivos = r.items.map(it => it.abs);
+  } else if (Array.isArray(r.items) && r.items.length > 0 && ot.nro_solicitud) {
+    const hermanas = db.prepare(
+      'SELECT nro_ot, id_muestra, creado_en FROM ots WHERE nro_solicitud = ? ORDER BY creado_en ASC, nro_ot ASC'
+    ).all(ot.nro_solicitud);
+    const nroOtDeOrden = {};
+    hermanas.forEach((h, i) => { nroOtDeOrden[i + 1] = String(h.nro_ot); });
+    const { extraerNumerosMuestra } = require('../utils/fotos-auto');
+    const numsMideEnsayo = extraerNumerosMuestra(ot.id_muestra);
+    const setMPropio = new Set(numsMideEnsayo);
+    const propios = r.items.filter(it => {
+      if (it.muestra == null) return false;
+      const nroOtDest = nroOtDeOrden[it.muestra];
+      if (nroOtDest && String(nroOtDest) === String(ot.nro_ot)) return true;
+      if (setMPropio.size > 0 && setMPropio.has(it.muestra)) return true;
+      return false;
+    });
+    if (propios.length > 0) archivos = propios.map(it => it.abs);
+  }
+
+  const reglas = _REGLAS_FOTOS_AUTO[tipo];
+  if (!reglas) return { error: 'Tipo de ensayo no soportado: ' + tipo, http: 400 };
+
+  const itemsPorAbs = new Map((r.items || []).map(it => [it.abs, it]));
+  const itemsDeEstaOt = archivos.map(abs => itemsPorAbs.get(abs) || { abs, folders: [] });
+
+  const porCampo = {};
+  reglas.forEach(rr => { porCampo[rr.campo] = []; });
+  const noClasificados = [];
+  for (const it of itemsDeEstaOt) {
+    const base = pathMod.basename(it.abs);
+    const folders = it.folders || [];
+    let match = null;
+    for (const rr of reglas) {
+      if (folders.some(f => rr.re.test(f))) { match = rr; break; }
+    }
+    if (!match) match = reglas.find(rr => rr.re.test(base));
+    if (match) porCampo[match.campo].push(it.abs);
+    else noClasificados.push(it.abs);
+  }
+
+  // Fallback IA (agente-clasificador-fotos): sólo para items que la regex no
+  // clasificó. Con contexto acotado al OT/SOL — pocos tokens por decisión.
+  let clasificadorInfo = null;
+  if (noClasificados.length > 0) {
+    try {
+      const { clasificarFotos } = require('../agents/agente-clasificador-fotos');
+      const categorias = reglas.map(rr => ({ campo: rr.campo }));
+      const carpetaBase = r.carpeta_ot || r.carpeta_sol || '';
+      const items = noClasificados.map(abs => {
+        const it = itemsPorAbs.get(abs) || { abs, folders: [] };
+        const rel = carpetaBase ? pathMod.relative(carpetaBase, abs) : pathMod.basename(abs);
+        return { path: rel, folders: it.folders || [], filename: pathMod.basename(abs) };
+      });
+      const t0 = Date.now();
+      const decision = await clasificarFotos(tipo, categorias, items);
+      const asignaciones = decision.asignaciones || [];
+      const camposValidos = new Set(reglas.map(rr => rr.campo));
+      const nuevosNoClas = [];
+      const asignadosPorAgente = [];
+      for (const abs of noClasificados) {
+        const rel = pathMod.relative(carpetaBase, abs);
+        const base = pathMod.basename(abs);
+        const asig = asignaciones.find(a => a.path === rel || a.path === base || a.path === abs);
+        if (asig && asig.categoria && camposValidos.has(asig.categoria)) {
+          porCampo[asig.categoria].push(abs);
+          asignadosPorAgente.push({ path: rel, categoria: asig.categoria, confianza: asig.confianza });
+        } else {
+          nuevosNoClas.push(abs);
+        }
+      }
+      noClasificados.length = 0;
+      Array.prototype.push.apply(noClasificados, nuevosNoClas);
+      clasificadorInfo = {
+        usado: true, modelo: decision.modelo, ms: Date.now() - t0,
+        total_input: items.length, asignados: asignadosPorAgente.length,
+        descartados: items.length - asignadosPorAgente.length,
+      };
+      console.log('[ensayo/fotos-auto/agente] ' + tipo + ' OT ' + ot.nro_ot + ' — ' +
+        asignadosPorAgente.length + '/' + items.length + ' clasificados en ' + clasificadorInfo.ms + 'ms');
+    } catch (e) {
+      console.warn('[ensayo/fotos-auto/agente] fallo — ' + e.message);
+      clasificadorInfo = { usado: false, error: e.message };
+    }
+  }
+
+  const { parseCaptionDeFilename } = require('../utils/fotos-auto');
+  const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+  let total = 0;
+  function loadFiles(paths) {
+    const out = [];
+    for (const abs of paths) {
+      try {
+        const stat = fsMod.statSync(abs);
+        if (total + stat.size > MAX_TOTAL_BYTES) break;
+        const buf = fsMod.readFileSync(abs);
+        const ext = pathMod.extname(abs).slice(1).toLowerCase();
+        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const name = pathMod.basename(abs);
+        const it = itemsPorAbs.get(abs);
+        const caption = parseCaptionDeFilename(name, it ? { muestra: it.muestra, folders: it.folders } : null);
+        out.push({ name, dataUrl: 'data:' + mime + ';base64,' + buf.toString('base64'), size: stat.size, ruta: abs, caption });
+        total += stat.size;
+      } catch (e) { console.warn('[ensayo/fotos-auto] no se pudo leer', abs, e.message); }
+    }
+    return out;
+  }
+
+  const respuesta = {};
+  for (const rr of reglas) respuesta[rr.campo] = loadFiles(porCampo[rr.campo]);
+  respuesta._sin_clasificar = loadFiles(noClasificados);
+
+  return {
+    ensayo_id: ensayoId, tipo, nro_ot: ot.nro_ot,
+    total_disponibles: archivos.length,
+    carpeta_sol: r.carpeta_sol, carpeta_ot: r.carpeta_ot,
+    resultado: respuesta, clasificador: clasificadorInfo,
+  };
+}
+
+// Endpoint clásico: /ensayo/:id/fotos-auto — una sola OT. Soporta id='new'
+// con query params ?nro_ot=X&tipo=Y para ensayos aún no guardados.
+router.get('/ensayo/:id/fotos-auto', async (req, res) => {
+  try {
+    const idParam = req.params.id;
+    let ensayo, ensayoId;
+    if (idParam === 'new' || idParam === '0') {
+      const nroOtQ = req.query.nro_ot;
+      const tipoQ  = req.query.tipo;
+      if (!nroOtQ || !tipoQ) return res.status(400).json({ error: 'Faltan nro_ot y tipo en query' });
+      ensayo = { id: null, nro_ot: nroOtQ, tipo: tipoQ };
+      ensayoId = null;
+    } else {
+      ensayoId = parseInt(idParam, 10);
+      ensayo = db.prepare('SELECT id, nro_ot, tipo FROM ensayos WHERE id = ?').get(ensayoId);
+      if (!ensayo) return res.status(404).json({ error: 'Ensayo no encontrado' });
+    }
+    const ot = db.prepare('SELECT nro_ot, nro_solicitud, razon_social, id_muestra FROM ots WHERE nro_ot = ?').get(ensayo.nro_ot);
+    if (!ot) return res.status(404).json({ error: 'OT no encontrada' });
+
+    const resultado = await armarFotosParaOtYTipo(ot, ensayo.tipo, ensayoId);
+    if (resultado.error) return res.status(resultado.http || 500).json(resultado);
+    return res.json(resultado);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint batch: POST /api/fotos-auto-solicitud — propaga carga automática a
+// TODAS las OTs de la solicitud. Recibe { nro_ot_referencia, tipo }. Itera
+// hermanas, crea/actualiza cada ensayo con las fotos correspondientes.
+// La OT actual se skipea (incluir_ot_actual: true para incluirla también).
+router.post('/fotos-auto-solicitud', async (req, res) => {
+  try {
+    const { nro_ot_referencia, tipo, incluir_ot_actual } = req.body || {};
+    if (!nro_ot_referencia || !tipo) {
+      return res.status(400).json({ error: 'Faltan nro_ot_referencia y tipo en body' });
+    }
+    if (!_REGLAS_FOTOS_AUTO[tipo]) {
+      return res.status(400).json({ error: 'Tipo de ensayo no soportado: ' + tipo });
+    }
+    const otRef = db.prepare('SELECT nro_ot, nro_solicitud, razon_social, id_muestra FROM ots WHERE nro_ot = ?')
+      .get(nro_ot_referencia);
+    if (!otRef) return res.status(404).json({ error: 'OT de referencia no encontrada' });
+    if (!otRef.nro_solicitud) {
+      return res.json({ items: [], nota: 'La OT no tiene nro_solicitud — no hay hermanas' });
+    }
+    const hermanas = db.prepare(
+      'SELECT nro_ot, nro_solicitud, razon_social, id_muestra FROM ots WHERE nro_solicitud = ? ORDER BY creado_en ASC, nro_ot ASC'
+    ).all(otRef.nro_solicitud);
+    const items = [];
+    for (const ot of hermanas) {
+      if (!incluir_ot_actual && String(ot.nro_ot) === String(nro_ot_referencia)) {
+        items.push({ nro_ot: ot.nro_ot, accion: 'saltada', motivo: 'OT actual (ya resuelta por front)' });
+        continue;
+      }
+      const resFotos = await armarFotosParaOtYTipo(ot, tipo, null);
+      if (resFotos.error) {
+        items.push({ nro_ot: ot.nro_ot, accion: 'error', error: resFotos.error });
+        continue;
+      }
+      const camposConFotos = Object.keys(resFotos.resultado || {}).filter(k => k !== '_sin_clasificar');
+      let cantidad = 0;
+      camposConFotos.forEach(k => { cantidad += (resFotos.resultado[k] || []).length; });
+      if (cantidad === 0) {
+        items.push({
+          nro_ot: ot.nro_ot, accion: 'sin_fotos',
+          sin_clasificar: (resFotos.resultado._sin_clasificar || []).length,
+        });
+        continue;
+      }
+      let ensayo = db.prepare('SELECT id, datos_json FROM ensayos WHERE nro_ot = ? AND tipo = ?').get(ot.nro_ot, tipo);
+      let datosPrev = {};
+      let accion = 'actualizado';
+      if (ensayo) {
+        try { datosPrev = JSON.parse(ensayo.datos_json || '{}'); } catch {}
+      } else {
+        const maxOrden = db.prepare('SELECT MAX(orden) as m FROM ensayos WHERE nro_ot = ?').get(ot.nro_ot);
+        const nuevoOrden = (maxOrden?.m || 0) + 1;
+        accion = 'creado';
+        const info = db.prepare('INSERT INTO ensayos (nro_ot, tipo, orden, datos_json) VALUES (?, ?, ?, ?)')
+          .run(ot.nro_ot, tipo, nuevoOrden, JSON.stringify({}));
+        ensayo = { id: info.lastInsertRowid, datos_json: '{}' };
+      }
+      camposConFotos.forEach(campo => {
+        const existentes = Array.isArray(datosPrev[campo]) ? datosPrev[campo] : [];
+        const setNames = new Set(existentes.map(p => String(p.name || '').toLowerCase()));
+        const nuevas = (resFotos.resultado[campo] || []).filter(p => !setNames.has(String(p.name || '').toLowerCase()));
+        datosPrev[campo] = existentes.concat(nuevas);
+      });
+      db.prepare('UPDATE ensayos SET datos_json = ? WHERE id = ?').run(JSON.stringify(datosPrev), ensayo.id);
+      items.push({
+        nro_ot: ot.nro_ot, ensayo_id: ensayo.id, accion, cantidad,
+        sin_clasificar: (resFotos.resultado._sin_clasificar || []).length,
+      });
+      try {
+        registrarEvento(ot.nro_ot, 'Fotos auto-cargadas ' + accion + ' vía propagación de solicitud (' + cantidad + ' fotos) — ' + tipo, 'edit');
+      } catch (_) {}
+    }
+    return res.json({ nro_solicitud: otRef.nro_solicitud, tipo, items });
+  } catch (err) { console.error('[POST /fotos-auto-solicitud]', err); res.status(500).json({ error: err.message }); }
 });
 
 router.post('/generate/:nro_ot', upload.array('fotos'), async (req, res) => {

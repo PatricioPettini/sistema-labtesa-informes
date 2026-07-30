@@ -82,7 +82,8 @@ function OTDetail(props) {
   var _addOpen = React.useState(false); var addOpen = _addOpen[0], setAddOpen = _addOpen[1];
   var _confirm = React.useState(null); var confirm = _confirm[0], setConfirm = _confirm[1];
   var _qa = React.useState(null); var qa = _qa[0], setQa = _qa[1];
-  var _gen = React.useState(''); var gen = _gen[0], setGen = _gen[1]; // '', 'word', 'qa'
+  var _preEm = React.useState(null); var preEmision = _preEm[0], setPreEmision = _preEm[1];
+  var _gen = React.useState(''); var gen = _gen[0], setGen = _gen[1]; // '', 'word', 'qa', 'preemision'
   var _dup = React.useState(false); var dup = _dup[0], setDup = _dup[1];
   // Modal de confirmación de carpeta para generar Word.
   var _saveDlg = React.useState(null); var saveDlg = _saveDlg[0], setSaveDlg = _saveDlg[1]; // null | 'word' | 'qa'
@@ -97,8 +98,88 @@ function OTDetail(props) {
   var _arch = React.useState(null); var archExiste = _arch[0], setArchExiste = _arch[1];
   // Modal "editar solicitud" (aplica a todas las OTs hermanas).
   var _editSol = React.useState(false); var editSol = _editSol[0], setEditSol = _editSol[1];
+  // Flag para el auto-refresh cuando la OT no está en cache local.
+  // Draft local del texto de inspección — se persiste on blur para no spamear PATCH.
+  var _insp = React.useState(''); var inspDraft = _insp[0], setInspDraft = _insp[1];
+  var _inspInit = React.useState(false); var inspInit = _inspInit[0], setInspInit = _inspInit[1];
+  var _autoRefreshed = React.useState(false); var autoRefreshed = _autoRefreshed[0], setAutoRefreshed = _autoRefreshed[1];
+  var _autoLoading  = React.useState(false); var autoLoading  = _autoLoading[0],  setAutoLoading  = _autoLoading[1];
+  // Badge OAA: se calcula desde /api/oaa-preview (misma fuente que OAAPanel) para
+  // reflejar la detección real por norma+sede+temp. El flag `datos.oaa` en crudo
+  // no sirve — su semántica cambia según el generator (macrografía/varios/etc.
+  // arrancan con oaa=true por default, aunque no son OAA-acreditadas).
+  var _oaaDet = React.useState(null); var oaaDet = _oaaDet[0], setOaaDet = _oaaDet[1];
 
-  if (!ot) return React.createElement('div', { className: 'page' }, React.createElement(EmptyState, { icon: 'search', title: 'OT no encontrada', action: React.createElement(Button, { onClick: function () { nav('#/'); } }, 'Volver') }));
+  // Sincronizar draft de inspección con el valor de la OT (sólo la primera vez
+  // que la OT está disponible; después el textarea es la fuente de verdad).
+  React.useEffect(function () {
+    if (!ot || inspInit) return;
+    setInspDraft(ot.inspeccion_texto || '');
+    setInspInit(true);
+  }, [ot && ot.nro_ot]);
+
+  // Auto-refresh: si la OT no está en el cache local pero el nro_ot parece
+  // válido (numérico), disparar init() UNA vez para traer del backend. Cubre
+  // el caso "el bot Trello acaba de crear la OT y el cache está viejo".
+  React.useEffect(function () {
+    if (ot || autoRefreshed || autoLoading) return;
+    if (!/^\d{3,8}$/.test(String(props.nro_ot || ''))) return;
+    setAutoLoading(true);
+    if (window.LabStore && window.LabStore.init) {
+      window.LabStore.init()
+        .then(function () { setAutoRefreshed(true); setAutoLoading(false); setV(function (x) { return x + 1; }); })
+        .catch(function () { setAutoRefreshed(true); setAutoLoading(false); });
+    } else {
+      setAutoRefreshed(true); setAutoLoading(false);
+    }
+  }, [props.nro_ot, ot]);
+
+  // Fetch OAA preview cuando cambia la cantidad de ensayos (mismo trigger que
+  // el OAAPanel). Determina el badge "OAA" del header en base a la detección
+  // real (norma + sede + rango de temperatura + reglas por tipo).
+  var _ensLen = ot && ot.ensayos ? ot.ensayos.length : 0;
+  React.useEffect(function () {
+    if (!ot || _ensLen === 0) { setOaaDet(null); return; }
+    fetch('/api/oaa-preview/' + ot.nro_ot)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { setOaaDet(j && Array.isArray(j.detecciones) ? j.detecciones : null); })
+      .catch(function () { setOaaDet(null); });
+  }, [ot && ot.nro_ot, _ensLen]);
+
+  if (!ot) {
+    if (autoLoading) {
+      // Loading discreto mientras se refresca del backend por primera vez.
+      return React.createElement('div', { className: 'page' },
+        React.createElement(EmptyState, {
+          icon: 'clock',
+          title: 'Cargando OT ' + props.nro_ot + '…',
+          message: 'Buscando en el backend (puede haber sido creada recién).',
+        }));
+    }
+    // La OT puede haber sido creada por el bot Trello después del último init
+    // del cache. Ofrecer "Recargar datos" además de "Volver" — dispara un
+    // init() completo desde el backend sin necesidad de F5.
+    return React.createElement('div', { className: 'page' },
+      React.createElement(EmptyState, {
+        icon: 'search',
+        title: 'OT ' + props.nro_ot + ' no encontrada',
+        message: 'Puede haber sido creada recientemente (por el bot de Trello, por ejemplo). Probá recargar los datos.',
+        action: React.createElement('div', { style: { display: 'flex', gap: 8, justifyContent: 'center' } },
+          React.createElement(Button, {
+            variant: 'primary', icon: 'download',
+            onClick: function () {
+              if (window.LabStore && window.LabStore.init) {
+                window.LabStore.init().then(function () {
+                  // Forzar re-render de la app (el hash sigue igual → se reprocesa).
+                  var h = location.hash; location.hash = '#/_reload'; setTimeout(function () { location.hash = h; }, 30);
+                }).catch(function (e) { toast('Error al recargar: ' + e.message, 'danger'); });
+              }
+            },
+          }, 'Recargar datos'),
+          React.createElement(Button, { onClick: function () { nav('#/'); } }, 'Volver'))
+      })
+    );
+  }
 
   function refresh() { setV(function (x) { return x + 1; }); }
   function updateFotos(next) { setFotos(next); window.LabStore.setFotos(ot.nro_ot, next); }
@@ -135,10 +216,17 @@ function OTDetail(props) {
         var aAgregar = nuevas.filter(function (n) { return !existentesNames.has(String(n.name || '').toLowerCase()); });
         var combinadas = (fotos || []).concat(aAgregar.map(function (n) { return { dataUrl: n.dataUrl, name: n.name }; }));
         updateFotos(combinadas);
-        toast('Cargadas ' + aAgregar.length + ' de ' + nuevas.length + ' fotos.'
-          + (nuevas.length !== aAgregar.length ? ' Se saltearon las ya existentes por nombre.' : '')
-          + (r.d.total_disponibles > nuevas.length ? ' (Truncado a 100 MB — hay más disponibles en el drive)' : ''),
-          'success');
+        var _extra = '';
+        if (nuevas.length !== aAgregar.length) _extra += ' Se saltearon las ya existentes por nombre.';
+        if (r.d.total_disponibles > nuevas.length) _extra += ' (Truncado a 100 MB — hay más disponibles en el drive)';
+        if (r.d.agente && r.d.agente.usado) {
+          _extra += ' IA: ' + r.d.agente.asignadas_a_esta_ot + ' específica(s) de ' + r.d.agente.total_archivos +
+                    ' (' + r.d.agente.hermanas + ' OTs hermanas).';
+          if (r.d.agente.genericas_fallback > 0) {
+            _extra += ' Sin fotos específicas — se usaron ' + r.d.agente.genericas_fallback + ' genérica(s) como fallback.';
+          }
+        }
+        toast('Cargadas ' + aAgregar.length + ' de ' + nuevas.length + ' fotos.' + _extra, 'success');
       })
       .catch(function (e) { toast('Error al cargar fotos: ' + e.message, 'danger'); })
       .finally(function () { setFotosAutoLoading(false); });
@@ -262,6 +350,25 @@ function OTDetail(props) {
       .catch(function (e) { setGen(''); toast('Error al generar: ' + e.message, 'danger'); });
   }
 
+  // Agente pre-emisión: análisis de coherencia con Claude.
+  function genPreEmision() {
+    setGen('preemision');
+    setPreEmision(null);
+    fetch('/api/pre-emision/' + ot.nro_ot)
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.d.error || 'Error en análisis de coherencia');
+        setPreEmision(r.d);
+        setGen('');
+        var criticos = (r.d.hallazgos || []).filter(function (h) { return h.severidad === 'critico'; }).length;
+        var warns    = (r.d.hallazgos || []).filter(function (h) { return h.severidad === 'warning'; }).length;
+        if (criticos > 0) toast('Análisis IA: ' + criticos + ' crítico(s), ' + warns + ' advertencia(s)', 'danger');
+        else if (warns > 0) toast('Análisis IA: ' + warns + ' advertencia(s) — revisá antes de emitir', 'warning');
+        else toast('Análisis IA: sin hallazgos preocupantes', 'success');
+      })
+      .catch(function (e) { setGen(''); toast('Error en análisis IA: ' + e.message, 'danger'); });
+  }
+
   function genQA() {
     setGen('qa');
     fetch('/api/qa-check/' + ot.nro_ot, { method: 'POST' })
@@ -356,6 +463,14 @@ function OTDetail(props) {
             React.createElement(Icon, { name: 'trash', size: 12 }),
             'Eliminar solicitud')))
     : null;
+  // Flag "faltan datos" — mostrar chip en header y banner de alerta.
+  var _faltDf = [];
+  try { _faltDf = ot.datos_faltantes ? JSON.parse(ot.datos_faltantes) : []; } catch (_) { _faltDf = []; }
+  if (!Array.isArray(_faltDf)) _faltDf = [];
+  var _faltLbl = _faltDf.map(function (f) { return f === 'nro_ot' ? 'Nº de OT' : f === 'id_muestra' ? 'ID de muestra' : f; });
+  // OAA: al menos un ensayo pasa la detección real de acreditación (agente-oaa
+  // vía /api/oaa-preview). Usamos la misma fuente que el OAAPanel.
+  var _esOAA = !!(oaaDet && oaaDet.some(function (d) { return d && d.acreditado; }));
   return React.createElement('div', { className: 'page' },
     React.createElement(Breadcrumb, { items: [
       { label: 'OTs', onClick: function () { nav('#/'); } },
@@ -366,7 +481,26 @@ function OTDetail(props) {
       React.createElement('div', { className: 'detail-title' },
         React.createElement('h1', { className: 'page-title' }, React.createElement('span', { className: 'mono' }, ot.nro_ot)),
         React.createElement(StatusChip, { tone: est.tone }, est.label),
-        ot.es_preinforme ? React.createElement(StatusChip, { tone: 'warning', icon: 'alertTri' }, 'Preinforme') : null
+        ot.es_preinforme ? React.createElement(StatusChip, { tone: 'warning', icon: 'alertTri' }, 'Preinforme') : null,
+        _esOAA ? React.createElement('span', {
+          title: 'Al menos un ensayo acreditado (OAA) — el informe va en la carpeta OAA',
+          style: {
+            fontSize: 10, fontWeight: 800, letterSpacing: '.3px',
+            color: '#fff', background: '#7c3aed',
+            padding: '3px 8px', borderRadius: 999,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          },
+        }, React.createElement(Icon, { name: 'checkCircle', size: 11 }), 'OAA') : null,
+        ot.trello_oaa_label ? React.createElement('span', {
+          title: 'La tarjeta de Trello tiene la etiqueta "PARAMETROS ACREDITADOS". Es solo un recordatorio — la acreditación real la valida agente-oaa (norma+sede+temp).',
+          style: {
+            fontSize: 10, fontWeight: 700, letterSpacing: '.3px',
+            color: '#5b21b6', background: '#ede9fe', border: '1px solid #c4b5fd',
+            padding: '2px 8px', borderRadius: 999,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          },
+        }, React.createElement(Icon, { name: 'tag', size: 11 }), 'Marcada OAA en Trello') : null,
+        _faltDf.length > 0 ? React.createElement(StatusChip, { tone: 'danger', icon: 'alertTri' }, 'Faltan datos: ' + _faltLbl.join(', ')) : null
       ),
       React.createElement('div', { className: 'page-head-actions' },
         React.createElement(Button, { variant: 'soft', size: 'sm', icon: 'pencil', onClick: function () { nav('#/ot/' + ot.nro_ot + '/editar'); } }, 'Editar'),
@@ -406,6 +540,30 @@ function OTDetail(props) {
             }, 'Cargar fotos automáticamente')
           ),
           React.createElement(PhotoGrid, { photos: fotos, onChange: updateFotos })
+        ),
+        // ── Inspección — texto libre para la sección "INSPECCION" al final del
+        // informe (sin numeración). Se guarda en ots.inspeccion_texto y se
+        // emite después del último ensayo en el Word.
+        React.createElement(Card, null,
+          React.createElement(CardHead, { icon: 'clipboard', title: 'Inspección', sub: 'Texto libre — se emite como sección "INSPECCIÓN" al final del informe' }),
+          React.createElement('div', { style: { padding: '0 12px 12px' } },
+            React.createElement('textarea', {
+              value: inspDraft,
+              placeholder: 'Ej: Se verificó la trazabilidad de la muestra y la calibración de los equipos utilizados…',
+              onChange: function (e) { setInspDraft(e.target.value); },
+              onBlur: function () {
+                var actual = (ot.inspeccion_texto || '');
+                if (actual === inspDraft) return;
+                window.LabStore.updateOt(ot.nro_ot, { inspeccion_texto: inspDraft });
+                refresh();
+              },
+              style: {
+                width: '100%', minHeight: 80, border: '1px solid var(--border)',
+                borderRadius: 6, padding: 8, fontSize: 13, fontFamily: 'inherit',
+                resize: 'vertical', background: 'var(--surface)',
+              },
+            })
+          )
         ),
         React.createElement(Card, null,
           React.createElement(CardHead, { icon: 'clock', title: 'Historial de la orden' }),
@@ -455,21 +613,43 @@ function OTDetail(props) {
           // Política simplificada: solo se requiere firma del realizador
           // (estado 'revisado' o 'autorizado'). No hace falta aprobación.
           var firmados = ensayos.filter(function (e) { return e.estado_firma === 'revisado' || e.estado_firma === 'autorizado' || e.estado_firma === 'firmado'; }).length;
-          var listos = totalEns > 0 && firmados === totalEns;
+          // Flag "faltan datos": si el bot importó la OT con FALTA O.T o FALTA ID,
+          // o si el técnico no completó esos campos, no se puede generar.
+          var faltantes = [];
+          try { faltantes = ot.datos_faltantes ? JSON.parse(ot.datos_faltantes) : []; }
+          catch (_) { faltantes = []; }
+          if (!Array.isArray(faltantes)) faltantes = [];
+          var faltantesLabels = faltantes.map(function (f) { return f === 'nro_ot' ? 'Nº de OT' : f === 'id_muestra' ? 'ID de muestra' : f; });
+          var listos = totalEns > 0 && firmados === totalEns && faltantes.length === 0;
+          var tooltipGen = faltantes.length > 0
+            ? 'Faltan datos: ' + faltantesLabels.join(', ')
+            : (totalEns > 0 && firmados < totalEns ? 'Firmá todos los ensayos antes de generar el informe' : '');
           return React.createElement(Card, { className: 'report-card' },
             React.createElement(CardHead, { icon: 'fileDoc', title: 'Generar informe Word' }),
-            // Estado de doble firma
-            totalEns > 0 ? React.createElement('div', {
+            // Aviso de datos faltantes (bloqueante)
+            faltantes.length > 0 ? React.createElement('div', {
               style: {
                 margin: '0 0 8px', padding: '8px 12px', borderRadius: 6,
-                background: listos ? '#d1f0dc' : '#fdecea',
-                color: listos ? '#0f7d3a' : '#b02a2a',
+                background: '#fdecea', color: '#b02a2a',
                 fontSize: 12, fontWeight: 600,
                 display: 'flex', alignItems: 'center', gap: 8,
               }
             },
-              React.createElement(Icon, { name: listos ? 'checkCircle' : 'alertCircle', size: 14 }),
-              listos
+              React.createElement(Icon, { name: 'alertTri', size: 14 }),
+              'Faltan datos: ' + faltantesLabels.join(', ') + '. Completá para poder generar.'
+            ) : null,
+            // Estado de doble firma
+            totalEns > 0 ? React.createElement('div', {
+              style: {
+                margin: '0 0 8px', padding: '8px 12px', borderRadius: 6,
+                background: (totalEns === firmados) ? '#d1f0dc' : '#fdecea',
+                color: (totalEns === firmados) ? '#0f7d3a' : '#b02a2a',
+                fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }
+            },
+              React.createElement(Icon, { name: (totalEns === firmados) ? 'checkCircle' : 'alertCircle', size: 14 }),
+              (totalEns === firmados)
                 ? 'Todos los ensayos están firmados (' + firmados + '/' + totalEns + ')'
                 : 'Faltan firmar ' + (totalEns - firmados) + ' de ' + totalEns + ' ensayos'
             ) : null,
@@ -491,12 +671,14 @@ function OTDetail(props) {
                 variant: 'primary', block: true, icon: 'download',
                 loading: gen === 'word',
                 disabled: !listos,
-                title: listos ? '' : 'Firmá todos los ensayos antes de generar el informe',
+                title: tooltipGen,
                 onClick: genWord,
               }, 'Generar informe'),
-              React.createElement(Button, { variant: 'soft', block: true, icon: 'clipboard', loading: gen === 'qa', onClick: genQA }, 'Control de calidad')
+              React.createElement(Button, { variant: 'soft', block: true, icon: 'clipboard', loading: gen === 'qa', onClick: genQA }, 'Control de calidad'),
+              React.createElement(Button, { variant: 'soft', block: true, icon: 'sparkles', loading: gen === 'preemision', onClick: genPreEmision, title: 'Análisis de coherencia con IA (Claude): rangos, unidades, normas, valores imposibles' }, 'Análisis IA')
             ),
-            qa ? React.createElement(QAPanel, { qa: qa }) : null
+            qa ? React.createElement(QAPanel, { qa: qa }) : null,
+            preEmision ? React.createElement(PreEmisionPanel, { data: preEmision }) : null
           );
         })()
       )

@@ -59,10 +59,39 @@ router.get('/ots-v2', (req, res) => {
 });
 
 // ── GET /api/ensayos  (todos los ensayos planos) ──────────────────────────────
+// Optimización: descarta los `dataUrl` base64 de cualquier campo `imagenes*` en
+// datos_json antes de devolver. Un ensayo con 4 fotos puede pesar 5MB y con 20
+// ensayos así el payload de init supera el límite del servidor (50MB) y algunos
+// llegan truncados → al abrir el form las imágenes no aparecen.
+// Se preservan `name` y `caption` para que los listados y previews funcionen.
+// El EnsayoForm hace fetch lazy de /api/ensayo/:id al montar, que devuelve
+// datos_json COMPLETO con dataUrl.
+function stripDataUrls(datosJsonStr) {
+  if (!datosJsonStr || typeof datosJsonStr !== 'string') return datosJsonStr;
+  try {
+    const d = JSON.parse(datosJsonStr);
+    let modificado = false;
+    for (const key of Object.keys(d)) {
+      if (!/^imagenes/i.test(key)) continue;
+      if (!Array.isArray(d[key])) continue;
+      d[key] = d[key].map((img) => {
+        if (img && typeof img === 'object' && img.dataUrl) {
+          modificado = true;
+          const { dataUrl, ...resto } = img;
+          return { ...resto, _dataUrlStripped: true };
+        }
+        return img;
+      });
+    }
+    return modificado ? JSON.stringify(d) : datosJsonStr;
+  } catch { return datosJsonStr; }
+}
+
 router.get('/ensayos', (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM ensayos ORDER BY nro_ot, orden').all();
-    res.json(rows);
+    const light = rows.map(r => Object.assign({}, r, { datos_json: stripDataUrls(r.datos_json) }));
+    res.json(light);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -84,10 +113,42 @@ router.post('/ensayo', (req, res) => {
     const { absorberOtros } = require('../utils/catalogo-auto');
     const { id, nro_ot, tipo, orden, datos_json, force_create } = req.body;
     if (!nro_ot || !tipo || !datos_json) return res.status(400).json({ error: 'Faltan campos obligatorios' });
-    const jsonStr = typeof datos_json === 'string' ? datos_json : JSON.stringify(datos_json);
+    let jsonStr = typeof datos_json === 'string' ? datos_json : JSON.stringify(datos_json);
     // Parseo defensivo para absorber "otros" al catálogo tras guardar exitoso.
     let datosObj = null;
     try { datosObj = typeof datos_json === 'string' ? JSON.parse(datos_json) : datos_json; } catch {}
+
+    // Protección anti-pérdida: si el request trae items con `_dataUrlStripped: true`
+    // (no llegó a hidratarse el fetch lazy), fusionar con el datos_json que ya
+    // tiene la DB. Preservamos dataUrl por nombre de archivo.
+    if (datosObj && id) {
+      const existente = db.prepare('SELECT datos_json FROM ensayos WHERE id = ?').get(id);
+      if (existente) {
+        let datosPrev = {};
+        try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch {}
+        let hidratado = false;
+        for (const key of Object.keys(datosObj)) {
+          if (!/^imagenes/i.test(key)) continue;
+          if (!Array.isArray(datosObj[key])) continue;
+          const prevArr = Array.isArray(datosPrev[key]) ? datosPrev[key] : [];
+          datosObj[key] = datosObj[key].map((img) => {
+            if (img && img._dataUrlStripped && !img.dataUrl) {
+              const match = prevArr.find((p) => p && p.name === img.name);
+              if (match && match.dataUrl) {
+                hidratado = true;
+                const { _dataUrlStripped, ...rest } = img;
+                return Object.assign({}, rest, { dataUrl: match.dataUrl });
+              }
+            }
+            return img;
+          });
+        }
+        if (hidratado) {
+          jsonStr = JSON.stringify(datosObj);
+          console.log('[POST /ensayo] hidratados dataUrl de imágenes stripped al guardar id=' + id);
+        }
+      }
+    }
 
     // Bloqueo: si el ensayo está firmado o aprobado, devolver 423.
     function bloquearSiFirmado(row) {
@@ -206,7 +267,7 @@ router.patch('/ot/:nro_ot', (req, res) => {
   const { nro_ot } = req.params;
   const allowed = ['es_preinforme', 'fecha_aprobacion', 'fecha_finalizacion', 'fecha_recepcion',
                    'trello_url', 'razon_social', 'nro_cliente', 'id_muestra',
-                   'fecha_vencimiento', 'trello_columna'];
+                   'fecha_vencimiento', 'trello_columna', 'inspeccion_texto'];
   const sets = [], vals = [], cambios = [];
   for (const [k, v] of Object.entries(req.body || {})) {
     if (allowed.includes(k)) { sets.push(`${k} = ?`); vals.push(v); cambios.push(k); }

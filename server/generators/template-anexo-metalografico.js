@@ -237,6 +237,10 @@ function construirBloqueEnsayo(datos) {
       resultadoGrano.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => partes.push(pLinea(l)));
       partes.push(pBlanco());
     }
+    // Marker para insertar las imágenes de tamaño de grano después. Se
+    // reemplaza en el post-proceso vía insertarImagenesEnsayo (o se limpia
+    // si no hay imágenes cargadas).
+    partes.push(pLinea('__IMG_GRANO__'));
   }
 
   // ─── SECCIÓN 2: DETERMINACIÓN DE INCLUSIONES ──────────────────────────
@@ -273,6 +277,7 @@ function construirBloqueEnsayo(datos) {
         partes.push(pBlanco());
       }
     }
+    partes.push(pLinea('__IMG_INCL__'));
   }
 
   return partes.join('');
@@ -311,17 +316,39 @@ function generarAnexoMetalograficoDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos.oaa !== false) textosOAA.push('"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."');
   outXml = insertarOAAAntesDeFin(outXml, textosOAA);
 
-  const fotosEnsayo = Array.isArray(datos.imagenes_resultado)
-    ? datos.imagenes_resultado.map(p => {
-        if (!p) return null;
-        const url = typeof p === 'string' ? p : p.dataUrl;
-        if (!url) return null;
-        const b64 = url.replace(/^data:[^;]+;base64,/, '');
-        return { buffer: Buffer.from(b64, 'base64'), caption: p.caption || '', name: p.name || '' };
-      }).filter(x => x && x.buffer)
-    : [];
-  if (fotosEnsayo.length > 0) {
-    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosEnsayo, 'anexo-metalografico', MARKER_FIN_ENSAYO, 'before');
+  // Helper para convertir la lista de fotos del form (dataUrl base64) al shape
+  // que espera insertarImagenesEnsayo (Buffer + caption + name).
+  function toFotosBuffer(arr) {
+    return Array.isArray(arr)
+      ? arr.map(p => {
+          if (!p) return null;
+          const url = typeof p === 'string' ? p : p.dataUrl;
+          if (!url) return null;
+          const b64 = url.replace(/^data:[^;]+;base64,/, '');
+          return { buffer: Buffer.from(b64, 'base64'), caption: p.caption || '', name: p.name || '' };
+        }).filter(x => x && x.buffer)
+      : [];
+  }
+
+  // Fotos separadas por sección — se insertan en los markers correspondientes
+  // (__IMG_GRANO__ y __IMG_INCL__) que construirBloqueEnsayo dejó plantados.
+  const fotosGrano = toFotosBuffer(datos.imagenes_grano);
+  const fotosInclu = toFotosBuffer(datos.imagenes_inclusiones);
+  if (fotosGrano.length > 0) {
+    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosGrano, 'anexo-metalografico', '__IMG_GRANO__', 'after', 250);
+  }
+  if (fotosInclu.length > 0) {
+    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosInclu, 'anexo-metalografico', '__IMG_INCL__', 'after', 260);
+  }
+  // Limpiar los markers (párrafos con "__IMG_GRANO__" o "__IMG_INCL__" que
+  // hayan quedado si no había fotos, o los originales que quedan del insert).
+  outXml = outXml.replace(/<w:p\b[^>]*>(?:(?!<w:p\b)[\s\S])*?__IMG_(?:GRANO|INCL)__(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, '');
+
+  // Compat: si algún ensayo legacy todavía usa `imagenes_resultado`, lo
+  // colocamos al final del bloque (antes de "FIN DE INFORME") como antes.
+  const fotosLegacy = toFotosBuffer(datos.imagenes_resultado);
+  if (fotosLegacy.length > 0) {
+    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosLegacy, 'anexo-metalografico', MARKER_FIN_ENSAYO, 'before');
   }
 
   outXml = manejarImagenesCaratula(processedZip, outXml, fotos, 'anexo-metalografico');

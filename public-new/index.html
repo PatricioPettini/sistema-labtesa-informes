@@ -150,6 +150,35 @@ html[data-theme="dark"] .main [style*="border: 1px solid #bbb"]{
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+
+/* ── Modo PRINT (puppeteer captura registros digitales) ─────────────── */
+/* Layout limpio: sin sidebar, breadcrumb ni botones — solo el form del ensayo,
+   centrado y sin overflow. Puppeteer captura A4 con scale=0.65 así que el
+   sheet natural (1123px) entra cómodo. */
+body.print-mode{background:#fff;overflow-x:hidden;}
+body.print-mode .sidebar,
+body.print-mode .breadcrumb,
+body.print-mode .page-head-actions,
+body.print-mode .otbanner,
+body.print-mode .plantillas-bar,
+body.print-mode .variant-block,
+body.print-mode .page-head .page-title,
+body.print-mode .form-actions,
+body.print-mode .firma-panel,
+body.print-mode .ensayo-firma-chip,
+body.print-mode .add-ensayo-grid,
+body.print-mode .breadcrumb-sep{display:none !important;}
+body.print-mode .app-print{background:#fff;min-height:0;}
+body.print-mode .main-print{margin:0 !important;padding:0 !important;background:#fff;}
+body.print-mode .main-inner-print{max-width:1200px;margin:0 auto;padding:8px;}
+body.print-mode .page,body.print-mode .page-wide{padding:0 !important;max-width:100% !important;}
+body.print-mode .page-head{margin:0 0 8px !important;}
+body.print-mode input,body.print-mode textarea,body.print-mode select{
+  background:transparent !important;pointer-events:none;
+}
+/* Forzar que las tablas del form respeten el ancho del sheet y no se salgan. */
+body.print-mode table{max-width:100% !important;}
+body.print-mode .stats-card,body.print-mode .card{page-break-inside:avoid;}
 button{font-family:inherit;cursor:pointer;}
 a{color:inherit;text-decoration:none;}
 .mono{font-family:var(--mono);font-feature-settings:"tnum";letter-spacing:-.01em;}
@@ -932,6 +961,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface);border:1p
 <script type="text/babel" src="ui.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="oaa-panel.jsx"></script>
+<script type="text/babel" src="oaa-hint.jsx"></script>
 <script type="text/babel" src="photogrid.jsx"></script>
 <script type="text/babel" src="dashboard.jsx"></script>
 <script type="text/babel" src="solicitudes.jsx"></script>
@@ -968,9 +998,11 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface);border:1p
 <script type="text/babel" src="firmapanel.jsx"></script>
 <script type="text/babel" src="as400modal.jsx"></script>
 <script type="text/babel" src="vencimientosbanner.jsx"></script>
+<script type="text/babel" src="vencimientosscreen.jsx"></script>
 <script type="text/babel" src="auditlog.jsx"></script>
 <script type="text/babel" src="globalsearch.jsx"></script>
 <script type="text/babel" src="statsscreen.jsx"></script>
+<script type="text/babel" src="tecnicosscreen.jsx"></script>
 <script type="text/babel" src="adminscreen.jsx"></script>
 <script type="text/babel" src="app.jsx"></script>
 </body>

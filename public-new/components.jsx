@@ -333,6 +333,76 @@ function QAPanel(props) {
   );
 }
 
+/* ============ PANEL AGENTE PRE-EMISIÓN ============ */
+// Muestra los hallazgos del agente-pre-emision (análisis Claude sobre coherencia
+// de datos). Cada hallazgo trae severidad (critico/warning/info) + mensaje +
+// opcionalmente sugerencia. Panel similar al QA pero orientado a hallazgos
+// semánticos que las reglas fijas no pescan.
+function PreEmisionPanel(props) {
+  var data = props.data;
+  if (!data) return null;
+  var hallazgos = data.hallazgos || [];
+  if (!hallazgos.length) {
+    return React.createElement('div', { className: 'qa-panel' },
+      React.createElement('div', { className: 'qa-head' },
+        React.createElement(Icon, { name: 'sparkles', size: 16 }),
+        React.createElement('span', null, 'Análisis IA'),
+        React.createElement('span', { className: 'qa-summary' },
+          React.createElement(StatusChip, { tone: 'success', size: 'sm', icon: 'check' }, 'Sin hallazgos'))
+      ),
+      React.createElement('div', { className: 'qa-group qa-success' },
+        React.createElement('div', { className: 'qa-line' },
+          React.createElement(Icon, { name: 'checkCircle', size: 15, strokeWidth: 2 }),
+          React.createElement('span', null, 'No detecté problemas de coherencia en los datos.'))
+      )
+    );
+  }
+  // Agrupar por severidad
+  var grupos = { critico: [], warning: [], info: [] };
+  hallazgos.forEach(function (h) {
+    var s = h.severidad || 'info';
+    if (!grupos[s]) grupos[s] = [];
+    grupos[s].push(h);
+  });
+  var order = [
+    { key: 'critico', tone: 'danger',  icon: 'alertCircle', label: 'Críticos' },
+    { key: 'warning', tone: 'warning', icon: 'alertTri',   label: 'Advertencias' },
+    { key: 'info',    tone: 'info',    icon: 'checkCircle', label: 'Notas' },
+  ];
+  var totCrit = grupos.critico.length;
+  var totWarn = grupos.warning.length;
+  return React.createElement('div', { className: 'qa-panel' },
+    React.createElement('div', { className: 'qa-head' },
+      React.createElement(Icon, { name: 'sparkles', size: 16 }),
+      React.createElement('span', null, 'Análisis IA'),
+      React.createElement('span', { className: 'qa-summary' },
+        totCrit > 0
+          ? React.createElement(StatusChip, { tone: 'danger', size: 'sm', icon: 'alertCircle' }, totCrit + ' crítico(s)')
+          : (totWarn > 0
+              ? React.createElement(StatusChip, { tone: 'warning', size: 'sm', icon: 'alertTri' }, totWarn + ' advertencia(s)')
+              : React.createElement(StatusChip, { tone: 'info', size: 'sm', icon: 'checkCircle' }, hallazgos.length + ' nota(s)'))
+      )
+    ),
+    order.map(function (g) {
+      var items = grupos[g.key] || [];
+      if (!items.length) return null;
+      return React.createElement('div', { key: g.key, className: 'qa-group qa-' + g.tone },
+        items.map(function (h, i) {
+          var etiqueta = h.ensayo ? '[' + h.ensayo + (h.campo ? ' · ' + h.campo : '') + '] ' : '';
+          var texto = etiqueta + (h.mensaje || '');
+          if (h.sugerencia) texto += '  →  ' + h.sugerencia;
+          return React.createElement('div', { key: i, className: 'qa-line' },
+            React.createElement(Icon, { name: g.icon, size: 15, strokeWidth: 2 }),
+            React.createElement('span', null, texto));
+        })
+      );
+    }),
+    data.modelo ? React.createElement('div', {
+      style: { padding: '6px 12px', fontSize: 10, color: 'var(--text-3)', textAlign: 'right', fontStyle: 'italic' }
+    }, 'Análisis por ' + data.modelo + (data.ms ? ' · ' + data.ms + 'ms' : '')) : null
+  );
+}
+
 /* ============ EMPTY STATE ============ */
 function EmptyState(props) {
   return React.createElement('div', { className: 'empty' },
@@ -381,10 +451,12 @@ function ThemeToggle() {
 function Sidebar(props) {
   var items = [
     { id: 'solicitudes', label: 'Solicitudes', icon: 'inbox', route: '#/' },
+    { id: 'vencimientos', label: 'Vencimientos', icon: 'clock', route: '#/vencimientos' },
     { id: 'clientes', label: 'Clientes', icon: 'building', route: '#/clientes' },
     { id: 'equipos', label: 'Equipos', icon: 'gauge', route: '#/equipos' },
     { id: 'normas', label: 'Normas e ITM', icon: 'fileText', route: '#/normas' },
     { id: 'stats', label: 'Estadísticas', icon: 'dashboard', route: '#/stats' },
+    { id: 'tecnicos', label: 'Técnicos', icon: 'user', route: '#/tecnicos' },
     { id: 'auditoria', label: 'Auditoría', icon: 'shield', route: '#/auditoria' },
     { id: 'admin', label: 'Administración', icon: 'lock', route: '#/admin' },
   ];

@@ -181,6 +181,10 @@ function construirBloqueEnsayo(datos) {
         resultadoSec.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => partes.push(pLinea(l)));
         partes.push(pBlanco());
       }
+      // Marker para insertar las imágenes de ESTA sección después. El
+      // post-proceso reemplaza esta línea por las fotos correspondientes
+      // (imagenes_micro, imagenes_espesor, etc.) y limpia el marker si no hay.
+      partes.push(pLinea('__IMG_MG_' + k.toUpperCase() + '__'));
     });
   } else {
     // Fallback legacy: si no se marcó ningún análisis, emitir un único bloque
@@ -258,18 +262,41 @@ function generarMetalografiaGeneralDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos.oaa !== false) textosOAA.push('"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."');
   outXml = insertarOAAAntesDeFin(outXml, textosOAA);
 
-  // Micrografías del ensayo (opcionales).
-  const fotosEnsayo = Array.isArray(datos.imagenes_resultado)
-    ? datos.imagenes_resultado.map(p => {
-        if (!p) return null;
-        const url = typeof p === 'string' ? p : p.dataUrl;
-        if (!url) return null;
-        const b64 = url.replace(/^data:[^;]+;base64,/, '');
-        return { buffer: Buffer.from(b64, 'base64'), caption: p.caption || '', name: p.name || '' };
-      }).filter(x => x && x.buffer)
-    : [];
-  if (fotosEnsayo.length > 0) {
-    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosEnsayo, 'metalografia-general', MARKER_FIN_ENSAYO, 'before');
+  // Micrografías del ensayo — separadas POR ANÁLISIS. Cada sección tiene un
+  // marker __IMG_MG_<KEY>__ que reemplazamos por las fotos correspondientes.
+  function toFotosBuffer(arr) {
+    return Array.isArray(arr)
+      ? arr.map(p => {
+          if (!p) return null;
+          const url = typeof p === 'string' ? p : p.dataUrl;
+          if (!url) return null;
+          const b64 = url.replace(/^data:[^;]+;base64,/, '');
+          return { buffer: Buffer.from(b64, 'base64'), caption: p.caption || '', name: p.name || '' };
+        }).filter(x => x && x.buffer)
+      : [];
+  }
+  const seccionesConImagenes = [
+    { key: 'micro',   rIdBase: 200 },
+    { key: 'espesor', rIdBase: 210 },
+    { key: 'grafito', rIdBase: 220 },
+    { key: 'decarb',  rIdBase: 230 },
+    { key: 'otro',    rIdBase: 240 },
+  ];
+  for (const s of seccionesConImagenes) {
+    const fotosSec = toFotosBuffer(datos['imagenes_' + s.key]);
+    const marker = '__IMG_MG_' + s.key.toUpperCase() + '__';
+    if (fotosSec.length > 0) {
+      outXml = insertarImagenesEnsayo(processedZip, outXml, fotosSec, 'metalografia-general', marker, 'after', s.rIdBase);
+    }
+  }
+  // Limpiar cualquier marker que haya quedado (secciones sin imágenes).
+  outXml = outXml.replace(/<w:p\b[^>]*>(?:(?!<w:p\b)[\s\S])*?__IMG_MG_[A-Z]+__(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, '');
+
+  // Compat legacy: si algún ensayo viejo tiene `imagenes_resultado` (antes de
+  // splitear por sección), lo emitimos al final del bloque como antes.
+  const fotosLegacy = toFotosBuffer(datos.imagenes_resultado);
+  if (fotosLegacy.length > 0) {
+    outXml = insertarImagenesEnsayo(processedZip, outXml, fotosLegacy, 'metalografia-general', MARKER_FIN_ENSAYO, 'before');
   }
 
   outXml = manejarImagenesCaratula(processedZip, outXml, fotos, 'metalografia-general');

@@ -2,22 +2,53 @@
  * Consulta directamente el tablero de Trello (endpoint /api/trello/vencimientos)
  * y muestra las tarjetas abiertas con `due` clasificadas por urgencia.
  * NO requiere que la OT esté importada al sistema — se ven todas las del tablero.
- * Si la solicitud ya fue importada, click en la tarjeta va al detalle interno;
- * si no, abre el link a Trello.
+ * Si la solicitud ya fue importada, click en la tarjeta va al detalle interno de
+ * la primera OT hermana; si no, muestra un toast.
  */
 'use strict';
 
 var _rV = React.createElement;
+
+// Etiquetas cortas + color por familia para chips de ensayos.
+var ENSAYO_INFO_BANNER = {
+  'traccion':              { label: 'Tracción',    bg: '#fef3c7', color: '#92400e' },
+  'dureza-brinell':        { label: 'Brinell',     bg: '#e0e7ff', color: '#3730a3' },
+  'dureza-vickers':        { label: 'Vickers',     bg: '#e0e7ff', color: '#3730a3' },
+  'dureza-rockwell':       { label: 'Rockwell',    bg: '#e0e7ff', color: '#3730a3' },
+  'impacto':               { label: 'Impacto',     bg: '#fce7f3', color: '#9d174d' },
+  'plegado':               { label: 'Plegado',     bg: '#fef3c7', color: '#92400e' },
+  'nick-break':            { label: 'Nick Break',  bg: '#fef3c7', color: '#92400e' },
+  'metalografia-general':  { label: 'Metalografía',bg: '#dcfce7', color: '#166534' },
+  'anexo-metalografico':   { label: 'Anexo Met.',  bg: '#dcfce7', color: '#166534' },
+  'macrografia':           { label: 'Macrografía', bg: '#dcfce7', color: '#166534' },
+  'ferrita-delta':         { label: 'Ferrita δ',   bg: '#dcfce7', color: '#166534' },
+  'rugosidad':             { label: 'Rugosidad',   bg: '#e0f2fe', color: '#075985' },
+  'quimicos':              { label: 'Químicos',    bg: '#f3e8ff', color: '#6b21a8' },
+  'liquidos-penetrantes':  { label: 'LP',          bg: '#fee2e2', color: '#991b1b' },
+  'tratamientos-termicos': { label: 'TT',          bg: '#ffedd5', color: '#9a3412' },
+};
+function _chipEnsayoBanner(tipo) {
+  var i = ENSAYO_INFO_BANNER[tipo] || { label: tipo, bg: '#eef1f4', color: '#3a3a3a' };
+  return _rV('span', {
+    key: tipo,
+    style: {
+      fontSize: 9, fontWeight: 700,
+      color: i.color, background: i.bg,
+      padding: '1px 5px', borderRadius: 3,
+      whiteSpace: 'nowrap',
+    },
+  }, i.label);
+}
 
 function VencimientosBanner() {
   var _d = React.useState(null);   var data = _d[0], setData = _d[1];
   var _err = React.useState(null); var err = _err[0], setErr = _err[1];
   var _busy = React.useState(true); var busy = _busy[0], setBusy = _busy[1];
   var _modal = React.useState(null); var modalSol = _modal[0], setModalSol = _modal[1];
+  var _toast = React.useState(null); var toast = _toast[0], setToast = _toast[1];
 
   function cargar(force) {
     setBusy(true); setErr(null);
-    // Detectar modo mock via ?mock=1 en la URL del navegador (para preview).
     var mock = /(\?|&)mock=1(&|$)/.test(location.search) || /[?&]mock=1(&|$)/.test(location.hash);
     var url = '/api/trello/vencimientos' + (mock ? '?mock=1' : (force ? '?refresh=1' : ''));
     fetch(url)
@@ -32,7 +63,6 @@ function VencimientosBanner() {
 
   React.useEffect(function () {
     cargar(false);
-    // Refresco automático cada 10 min.
     var t = setInterval(function () { cargar(false); }, 10 * 60 * 1000);
     return function () { clearInterval(t); };
   }, []);
@@ -58,11 +88,6 @@ function VencimientosBanner() {
   var hoyRaw    = Array.isArray(data.hoy) ? data.hoy : [];
   var mananaRaw = Array.isArray(data['mañana']) ? data['mañana'] : (Array.isArray(data.manana) ? data.manana : []);
 
-  // Columnas Trello "post-ensayo": la solicitud ya fue procesada y está cargada
-  // en el sistema (revisión / preliminar / firma / enviada). Estas cards no
-  // requieren acción de ensayo, así que se separan visualmente.
-  // categoriaPostEnsayo devuelve la subcategoría (para agrupar dentro de la
-  // sección) o null si no aplica.
   function categoriaPostEnsayo(lista) {
     var c = (lista || '').toString().toLowerCase();
     if (!c) return null;
@@ -81,8 +106,6 @@ function VencimientosBanner() {
 
   var hoy    = hoyRaw.filter(function (o) { return !categoriaPostEnsayo(o.lista); });
   var manana = mananaRaw.filter(function (o) { return !categoriaPostEnsayo(o.lista); });
-  // enSistema queda agrupado por categoría, preservando origen (hoy / manana)
-  // para poder mostrar la fecha de vencimiento en cada card.
   var enSistemaFlat = hoyRaw.filter(function (o) { return categoriaPostEnsayo(o.lista); })
     .map(function (o) { return Object.assign({}, o, { _cat: categoriaPostEnsayo(o.lista), _tono: 'hoy' }); })
     .concat(mananaRaw.filter(function (o) { return categoriaPostEnsayo(o.lista); })
@@ -92,27 +115,13 @@ function VencimientosBanner() {
     if (!enSistemaByCat[o._cat]) enSistemaByCat[o._cat] = [];
     enSistemaByCat[o._cat].push(o);
   });
-  var enSistema = enSistemaFlat; // usado sólo para el condicional de "hay algo".
+  var enSistema = enSistemaFlat;
 
-  function fmtDia(iso, tono) {
-    if (!iso) return '';
-    var p = String(iso).split('-');
-    var dia = p.length >= 3 ? (p[2] + '/' + p[1]) : iso;
-    var etq = tono === 'hoy' ? ' · HOY' : (tono === 'manana' ? ' · mañana' : '');
-    return 'Vence ' + dia + etq;
-  }
-
-  // AS400 a preparar HOY: solicitudes de Cintolo que vencen HOY o MAÑANA.
-  // - Vencen mañana → hay que preparar el Excel hoy (entrega 1 día antes).
-  // - Vencen hoy → ya se atrasó, hay que hacerlo YA.
-  // Cada card lleva el flag `_urgencia` para pintarlas distinto.
   var as400Hoy = hoy.filter(function (o) { return o.es_cintolo; })
     .map(function (o) { return Object.assign({}, o, { _urgencia: 'hoy' }); })
     .concat(manana.filter(function (o) { return o.es_cintolo; })
       .map(function (o) { return Object.assign({}, o, { _urgencia: 'manana' }); }));
 
-  // Si no hay nada que mostrar pero el modal está abierto, seguimos renderizando
-  // el modal solo (para no montar/desmontar hooks entre renders).
   if (hoy.length === 0 && manana.length === 0 && as400Hoy.length === 0 && enSistema.length === 0) {
     return (modalSol !== null && typeof window.AS400Modal === 'function')
       ? _rV(window.AS400Modal, { nroSolicitud: modalSol, onClose: function () { setModalSol(null); } })
@@ -123,88 +132,195 @@ function VencimientosBanner() {
     setModalSol((item && item.nro_solicitud) || '');
   }
 
+  // Siempre ir al detalle interno del sistema. Mismo comportamiento que la
+  // vista dedicada de Vencimientos. Si el cache local no la tiene (por ej,
+  // recién importada por el bot como placeholder PEND-...), refrescamos el
+  // store desde la API y reintentamos. Si igual no aparece, toast.
+  function _buscarHermanas(raw, norm) {
+    var hermanas = window.LabStore.listOtsBySolicitud(raw);
+    if (!hermanas || !hermanas.length) hermanas = window.LabStore.listOtsBySolicitud(norm);
+    return (hermanas && hermanas.length) ? hermanas : null;
+  }
   function irA(item) {
-    // Si la solicitud está en el sistema (flag del backend O sección
-    // "Ya cargadas en el sistema" del banner), intentar ABRIR LA CARPETA del
-    // informe emitido en el explorador (labopen://). Fallback: navegar al
-    // detalle interno /v2/#/solicitud/<nro>.
-    var forzarSistema = !!item.en_sistema || !!item._cat;
-    var nroSol = item.nro_solicitud;
-    if (forzarSistema && nroSol) {
-      var normSol = String(parseInt(nroSol, 10) || nroSol);
-      fetch('/api/solicitud/' + encodeURIComponent(normSol) + '/carpeta')
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (r) {
-          if (r.ok && r.d && r.d.carpeta) {
-            // Normalizar path share → G: (igual que auditlog.jsx).
-            var carpeta = String(r.d.carpeta)
-              .replace(/^[\\\/]{2}192\.168\.1\.200[\\\/]+Labtesa1[\\\/]+/i, 'G:\\')
-              .replace(/\//g, '\\');
-            // labopen:// abre el explorador si el handler está instalado.
-            var url = 'labopen://' + carpeta.replace(/\\/g, '/').replace(/:/g, '%3A');
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = url;
-            document.body.appendChild(iframe);
-            setTimeout(function () { try { document.body.removeChild(iframe); } catch (_) {} }, 500);
-            return;
-          }
-          // Fallback: sin carpeta (informe no emitido todavía) → detalle interno.
-          location.hash = '#/solicitud/' + normSol;
-        })
-        .catch(function () { location.hash = '#/solicitud/' + normSol; });
+    if (!(window.LabStore && window.LabStore.listOtsBySolicitud)) {
+      setToast('Cargando datos del sistema…');
+      setTimeout(function () { setToast(null); }, 2500);
       return;
     }
-    if (item.url) window.open(item.url, '_blank');
+    var raw = String(item.nro_solicitud || '').trim();
+    var norm = String(parseInt(raw, 10) || raw);
+    var hermanas = _buscarHermanas(raw, norm);
+    if (hermanas) { location.hash = '#/ot/' + hermanas[0].nro_ot; return; }
+    // Miss del cache → refrescar y reintentar. Cubre el caso "el bot acaba de
+    // crear la OT (placeholder PEND o real) pero el LabStore local está viejo".
+    if (item.en_sistema && typeof window.LabStore.init === 'function') {
+      setToast('Actualizando datos del sistema…');
+      window.LabStore.init().then(function () {
+        setToast(null);
+        var h2 = _buscarHermanas(raw, norm);
+        if (h2) { location.hash = '#/ot/' + h2[0].nro_ot; return; }
+        setToast('La solicitud ' + (item.nro_solicitud || item.titulo) + ' figura en el sistema pero no encontramos la OT — probá F5.');
+        setTimeout(function () { setToast(null); }, 4500);
+      }).catch(function () {
+        setToast('No se pudo refrescar el cache. Probá F5.');
+        setTimeout(function () { setToast(null); }, 3500);
+      });
+      return;
+    }
+    setToast('La solicitud ' + (item.nro_solicitud || item.titulo) + ' todavía no fue importada al sistema.');
+    setTimeout(function () { setToast(null); }, 3500);
   }
 
-  function estiloTarjeta(color) {
-    return {
-      background: 'var(--surface)',
-      border: '1px solid ' + color + '55',
-      borderLeft: '4px solid ' + color,
-      borderRadius: 6, padding: '10px 12px',
-      cursor: 'pointer', transition: 'transform .1s, box-shadow .1s',
-      minWidth: 220, flex: '0 1 260px',
-      color: 'var(--text)',
-    };
+  // ── Paleta por tono/urgencia (mismo look que VencimientosScreen) ─────────
+  function tonoInfo(tono) {
+    if (tono === 'vencido')  return { color: '#b02a2a', bg: '#ffe4e4', border: '#e0a0a0', accent: '#dc2626' };
+    if (tono === 'hoy')      return { color: '#8a5a00', bg: '#fff8dc', border: '#e0c060', accent: '#f0b429' };
+    if (tono === 'manana')   return { color: '#3b52c4', bg: '#e6ecff', border: '#a8b8e0', accent: '#4d6bff' };
+    /* sistema */             return { color: '#0a7a55', bg: '#e6f9ef', border: '#a8d9c1', accent: '#12b76a' };
+  }
+
+  function fmtFechaDue(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+    } catch (_) { return iso; }
   }
 
   function tarjeta(o, tono) {
-    var color = tono === 'vencido' ? '#b02a2a' : tono === 'hoy' ? '#c04a00' : '#7a5a1a';
-    var labelDias = tono === 'vencido'
-      ? 'Vencida hace ' + Math.abs(o.dias) + ' día' + (Math.abs(o.dias) === 1 ? '' : 's')
-      : tono === 'hoy' ? 'Vence HOY'
-      : 'Vence mañana';
-    return _rV('div', {
-      key: o.id_trello, style: estiloTarjeta(color),
+    var col = tonoInfo(tono);
+    var diasLabel = tono === 'vencido'
+      ? ('vencida ' + Math.abs(o.dias) + 'd')
+      : tono === 'hoy' ? 'HOY'
+      : tono === 'manana' ? 'MAÑANA'
+      : (o.dias === 0 ? 'HOY' : (o.dias === 1 ? 'MAÑANA' : ('en ' + o.dias + ' d')));
+    var dueDate = fmtFechaDue(o.due);
+    var ensayos = Array.isArray(o.ensayos_tipos) ? o.ensayos_tipos : [];
+    return _rV('button', {
+      key: o.id_trello,
       onClick: function () { irA(o); },
-      onMouseEnter: function (e) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.08)'; },
-      onMouseLeave: function (e) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; },
-      title: (o.en_sistema ? 'Solicitud importada — abrir OT' : 'Abrir en Trello')
+      className: 'venc-card',
+      style: {
+        position: 'relative',
+        display: 'block', textAlign: 'left',
+        padding: '10px 12px 10px 16px',
+        borderRadius: 8,
+        background: '#fff',
+        border: '1px solid ' + col.border,
+        borderLeft: '4px solid ' + col.accent,
+        cursor: 'pointer',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        transition: 'transform .08s ease, box-shadow .12s ease',
+        minWidth: 240, flex: '0 1 280px',
+      },
+      onMouseEnter: function (e) {
+        e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.08)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
+      },
+      onMouseLeave: function (e) {
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+        e.currentTarget.style.transform = 'translateY(0)';
+      },
+      title: o.titulo + ' — ' + (o.lista || ''),
     },
-      _rV('div', { style: { display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', marginBottom: 4 } },
-        _rV('span', { style: { fontSize: 11, fontWeight: 700, color: color } }, labelDias),
-        o.en_sistema
-          ? _rV('span', { style: { fontSize: 9, padding: '1px 6px', background: '#0f7d3a22', color: '#0f7d3a', borderRadius: 3, fontWeight: 700 } }, 'EN SISTEMA')
-          : _rV('span', { style: { fontSize: 9, padding: '1px 6px', background: 'var(--surface-3)', color: 'var(--text-3)', borderRadius: 3 } }, 'TRELLO')
+      _rV('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 } },
+        _rV('div', {
+          style: {
+            flex: 1, minWidth: 0,
+            fontWeight: 700, fontSize: 13, color: '#1f2328',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          },
+        }, o.titulo),
+        o.es_oaa ? _rV('span', {
+          title: 'Solicitud con al menos un ensayo acreditado (OAA) — va en la carpeta OAA',
+          style: {
+            flexShrink: 0,
+            fontSize: 10, fontWeight: 800, letterSpacing: '.3px',
+            color: '#fff', background: '#7c3aed',
+            padding: '3px 8px', borderRadius: 999,
+          },
+        }, 'OAA') : null,
+        (o.trello_oaa_label && !o.es_oaa) ? _rV('span', {
+          title: 'La tarjeta de Trello tiene etiqueta "PARAMETROS ACREDITADOS" — recordatorio; la acreditación real la valida agente-oaa',
+          style: {
+            flexShrink: 0,
+            fontSize: 9, fontWeight: 700, letterSpacing: '.3px',
+            color: '#5b21b6', background: '#ede9fe', border: '1px solid #c4b5fd',
+            padding: '2px 6px', borderRadius: 999,
+          },
+        }, 'OAA Trello') : null,
+        o.es_preliminar ? _rV('span', {
+          title: 'La tarjeta de Trello tiene etiqueta PRELIMINAR — el informe se emite como preinforme',
+          style: {
+            flexShrink: 0,
+            fontSize: 9, fontWeight: 700, letterSpacing: '.3px',
+            color: '#8a5a00', background: '#fff4e0', border: '1px solid #e0c060',
+            padding: '2px 6px', borderRadius: 999,
+          },
+        }, 'PRELIMINAR') : null,
+        _rV('span', {
+          style: {
+            flexShrink: 0,
+            fontSize: 10, fontWeight: 800, letterSpacing: '.3px',
+            color: '#fff', background: col.accent,
+            padding: '3px 8px', borderRadius: 999,
+            textTransform: 'uppercase',
+          },
+        }, diasLabel)
       ),
-      _rV('div', { style: { fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: o.titulo },
-        o.cliente || o.titulo),
-      _rV('div', { style: { fontSize: 11, color: 'var(--text-3)' } },
-        o.nro_solicitud ? ('Sol ' + o.nro_solicitud) : '',
-        o.lista ? (o.nro_solicitud ? ' · ' : '') + o.lista : '')
+      ((o.datos_faltantes && o.datos_faltantes.length > 0) || ensayos.length > 0)
+        ? _rV('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 } },
+            (o.datos_faltantes || []).map(function (f) {
+              var lbl = f === 'nro_ot' ? 'FALTA OT' : f === 'id_muestra' ? 'FALTA ID' : ('FALTA ' + String(f).toUpperCase());
+              return _rV('span', {
+                key: 'df-' + f,
+                style: {
+                  fontSize: 9, fontWeight: 800, letterSpacing: '.3px',
+                  color: '#fff', background: '#dc2626',
+                  padding: '1px 5px', borderRadius: 3, whiteSpace: 'nowrap',
+                },
+              }, lbl);
+            }),
+            ensayos.map(_chipEnsayoBanner))
+        : null,
+      _rV('div', {
+        style: {
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+          gap: 6, fontSize: 11, color: '#57606a',
+        },
+      },
+        o.nro_solicitud ? _rV('span', {
+          style: {
+            fontWeight: 700, color: col.color,
+            background: col.bg, padding: '1px 6px', borderRadius: 4,
+          },
+        }, '#' + o.nro_solicitud) : null,
+        o.lista ? _rV('span', { style: { color: '#8a8a8a' } }, o.lista) : null,
+        dueDate ? _rV('span', null, '· ' + dueDate) : null,
+        // Chip "en sistema" removido — todas las tarjetas se importan siempre,
+        // así que la marca era redundante. Sí mostramos "sin importar" para
+        // los casos edge (falta solicitud, no se detectó, etc).
+        !o.en_sistema
+          ? _rV('span', {
+              style: {
+                marginLeft: 'auto', color: '#b76a00', fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+              },
+            },
+              _rV(Icon, { name: 'alertTri', size: 11 }), 'sin importar')
+          : null
+      )
     );
   }
 
   function seccion(titulo, arr, tono, color) {
     if (arr.length === 0) return null;
-    return _rV('div', { style: { marginBottom: 10 } },
+    return _rV('div', { style: { marginBottom: 12 } },
       _rV('div', {
         style: { fontSize: 11, fontWeight: 700, color: color, textTransform: 'uppercase',
-                 letterSpacing: '.03em', marginBottom: 5 }
+                 letterSpacing: '.03em', marginBottom: 6 }
       }, titulo + ' (' + arr.length + ')'),
-      _rV('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+      _rV('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
         arr.slice(0, 14).map(function (o) { return tarjeta(o, tono); }),
         arr.length > 14 ? _rV('div', {
           style: { padding: 10, fontSize: 11, color: 'var(--text-3)', alignSelf: 'center' }
@@ -216,11 +332,11 @@ function VencimientosBanner() {
   return _rV('div', {
     style: {
       background: 'var(--banner-bg)', border: '1px solid var(--banner-border)', borderRadius: 8,
-      padding: 12, marginBottom: 16,
+      padding: 14, marginBottom: 16,
     }
   },
     _rV('div', {
-      style: { fontSize: 13, fontWeight: 700, color: 'var(--banner-title)', marginBottom: 8,
+      style: { fontSize: 13, fontWeight: 700, color: 'var(--banner-title)', marginBottom: 10,
                display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }
     },
       _rV('span', null, '⏰ Vencimientos de solicitudes en Trello'),
@@ -232,14 +348,25 @@ function VencimientosBanner() {
                  color: 'var(--banner-title)', fontWeight: 500 }
       }, busy ? '⟳' : '↻ Actualizar')
     ),
-    // Sección AS400 (Cintolo): tarjetas especiales con botón "Abrir AS400".
-    // Diferencia visual entre "vence HOY" (urgente — ya se atrasó) y "vence
-    // MAÑANA" (a preparar hoy, en plazo).
-    as400Hoy.length > 0 ? _rV('div', { style: { marginBottom: 10 } },
+    toast
+      ? _rV('div', {
+          style: {
+            position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+            background: '#1f2328', color: '#fff',
+            padding: '10px 14px', borderRadius: 8,
+            fontSize: 13, boxShadow: '0 8px 20px rgba(0,0,0,.25)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          },
+        },
+          _rV(Icon, { name: 'alertTri', size: 14 }),
+          toast)
+      : null,
+    // Sección AS400 (Cintolo).
+    as400Hoy.length > 0 ? _rV('div', { style: { marginBottom: 12 } },
       _rV('div', {
         style: {
           fontSize: 11, fontWeight: 700, color: '#3b52c4', textTransform: 'uppercase',
-          letterSpacing: '.03em', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 8,
+          letterSpacing: '.03em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8,
           justifyContent: 'space-between',
         }
       },
@@ -252,48 +379,51 @@ function VencimientosBanner() {
           }
         }, '📊 Generar Excel AS400')
       ),
-      _rV('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+      _rV('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
         as400Hoy.slice(0, 14).map(function (o) {
           var esHoy = o._urgencia === 'hoy';
-          var color = esHoy ? '#c04a00' : '#3b52c4';
+          var col = esHoy ? tonoInfo('hoy') : tonoInfo('manana');
           var chipLabel = esHoy ? 'AS400 URGENTE' : 'AS400 HOY';
           var footTxt = esHoy ? 'vence HOY — atrasado' : 'vence mañana';
           return _rV('div', {
             key: 'as-' + o.id_trello,
             style: {
-              background: 'var(--surface)', border: '1px solid ' + color + '55',
-              borderLeft: '4px solid ' + color,
-              borderRadius: 6, padding: '10px 12px', minWidth: 220, flex: '0 1 260px',
-              cursor: 'pointer', transition: 'transform .1s',
+              background: '#fff', border: '1px solid ' + col.border,
+              borderLeft: '4px solid ' + col.accent,
+              borderRadius: 8, padding: '10px 12px 10px 16px',
+              minWidth: 240, flex: '0 1 280px',
+              cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              transition: 'transform .08s, box-shadow .12s',
             },
             title: esHoy
               ? 'Cintolo — vence HOY, hay que hacer el AS400 YA.'
               : 'Cintolo — el Excel AS400 se entrega HOY (vence mañana). Click para abrir.',
             onClick: function () { abrirAs400(o); },
-            onMouseEnter: function (e) { e.currentTarget.style.transform = 'translateY(-1px)'; },
-            onMouseLeave: function (e) { e.currentTarget.style.transform = 'none'; }
+            onMouseEnter: function (e) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.08)'; },
+            onMouseLeave: function (e) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }
           },
-            _rV('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 } },
-              _rV('span', { style: { fontSize: 11, fontWeight: 700, color: color } }, chipLabel),
-              _rV('span', { style: { fontSize: 9, padding: '1px 6px', background: color + '22', color: color, borderRadius: 3, fontWeight: 700, marginLeft: 'auto' } }, 'CINTOLO')
+            _rV('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 } },
+              _rV('div', { style: { flex: 1, fontWeight: 700, fontSize: 13, color: '#1f2328' } }, 'CINTOLO'),
+              _rV('span', { style: {
+                fontSize: 10, fontWeight: 800, letterSpacing: '.3px',
+                color: '#fff', background: col.accent,
+                padding: '3px 8px', borderRadius: 999,
+                textTransform: 'uppercase',
+              } }, chipLabel)
             ),
-            _rV('div', { style: { fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2 } },
-              'CINTOLO'),
-            _rV('div', { style: { fontSize: 11, color: 'var(--text-3)' } },
-              (o.nro_solicitud ? 'Sol ' + o.nro_solicitud : o.titulo) + ' · ' + footTxt)
+            _rV('div', { style: { fontSize: 11, color: '#57606a' } },
+              (o.nro_solicitud ? '#' + o.nro_solicitud + ' · ' : '') + footTxt)
           );
         })
       )
     ) : null,
-    seccion('Vencen hoy', hoy, 'hoy', '#c04a00'),
-    seccion('Vencen mañana', manana, 'manana', '#7a5a1a'),
-    // Ya cargadas en el sistema: las solicitudes cuyo Trello está en
-    // revisión / preliminar / firma / enviadas ya pasaron la etapa de ensayos.
-    // Se muestran aparte, separadas por subcategoría, y con la fecha en la card.
+    seccion('Vencen hoy', hoy, 'hoy', '#8a5a00'),
+    seccion('Vencen mañana', manana, 'manana', '#3b52c4'),
+    // Ya cargadas en el sistema — mismo estilo, tono verde.
     enSistema.length > 0 ? _rV('div', { style: { marginBottom: 6, marginTop: 4 } },
       _rV('div', {
         style: {
-          fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase',
+          fontSize: 11, fontWeight: 700, color: '#0a7a55', textTransform: 'uppercase',
           letterSpacing: '.03em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6,
         }
       },
@@ -306,38 +436,11 @@ function VencimientosBanner() {
           _rV('div', {
             style: {
               fontSize: 10.5, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase',
-              letterSpacing: '.04em', marginBottom: 4, marginLeft: 2,
+              letterSpacing: '.04em', marginBottom: 5, marginLeft: 2,
             }
           }, cat.label + ' (' + arr.length + ')'),
-          _rV('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-            arr.slice(0, 20).map(function (o) {
-              return _rV('div', {
-                key: 'sys-' + o.id_trello,
-                style: {
-                  background: 'var(--surface)', border: '1px solid #16653433', borderLeft: '4px solid #22c55e',
-                  borderRadius: 6, padding: '9px 12px', minWidth: 220, flex: '0 1 260px',
-                  cursor: 'pointer', transition: 'transform .1s',
-                  opacity: 0.92,
-                },
-                title: 'Abrir solicitud en el sistema — ' + (o.lista || 'Cargada'),
-                onClick: function () { irA(o); },
-                onMouseEnter: function (e) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.opacity = 1; },
-                onMouseLeave: function (e) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.opacity = 0.92; }
-              },
-                _rV('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, justifyContent: 'space-between' } },
-                  _rV('span', {
-                    style: { fontSize: 10, fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '.02em' }
-                  }, fmtDia(o.due, o._tono)),
-                  o.en_sistema
-                    ? _rV('span', { style: { fontSize: 9, padding: '1px 6px', background: '#0f7d3a22', color: '#0f7d3a', borderRadius: 3, fontWeight: 700 } }, 'EN SISTEMA')
-                    : null
-                ),
-                _rV('div', { style: { fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: o.titulo },
-                  o.cliente || o.titulo),
-                _rV('div', { style: { fontSize: 11, color: 'var(--text-3)' } },
-                  o.nro_solicitud ? ('Sol ' + o.nro_solicitud) : '')
-              );
-            }),
+          _rV('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
+            arr.slice(0, 20).map(function (o) { return tarjeta(o, 'sistema'); }),
             arr.length > 20 ? _rV('div', {
               style: { padding: 10, fontSize: 11, color: 'var(--text-3)', alignSelf: 'center' }
             }, '+' + (arr.length - 20) + ' más') : null

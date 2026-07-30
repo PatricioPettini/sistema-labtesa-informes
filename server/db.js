@@ -62,8 +62,49 @@ const _migrations = [
   `ALTER TABLE informes_emitidos ADD COLUMN ruta_original TEXT`,
   `ALTER TABLE informes_emitidos ADD COLUMN template_sha256 TEXT`,
   `ALTER TABLE informes_emitidos ADD COLUMN correlativo TEXT`,
+  // Marca datos faltantes en OTs importadas del bot cuando la tarjeta Trello
+  // tenía etiqueta FALTA O.T o FALTA ID. JSON array, ej ["nro_ot","id_muestra"].
+  // La UI muestra chip rojo y bloquea la generación de informe.
+  `ALTER TABLE ots      ADD COLUMN datos_faltantes TEXT`,
+  // Chip informativo: la tarjeta Trello tenía etiqueta "PARAMETRO ACREDITADO" /
+  // "PARAMETROS ACREDITADOS" en el último scan. El badge OAA real (y la carpeta
+  // de destino del informe) se resuelven por detección automática (agente-oaa),
+  // esta columna es solo señal para el técnico.
+  `ALTER TABLE ots      ADD COLUMN trello_oaa_label INTEGER DEFAULT 0`,
+  // Texto libre de inspección — se emite como sección "INSPECCION" al final
+  // del informe (después del último ensayo), sin numeración.
+  `ALTER TABLE ots      ADD COLUMN inspeccion_texto TEXT`,
+  // Alias cliente → carpeta en el drive de fotos / informes. Sirve para casos
+  // donde el fuzzy match falla: acrónimos (TGN → Transportadora de Gas del Norte),
+  // nombres cortos (AESA → A. Evangelista), typos, etc. El agente IA guarda acá
+  // los que resuelve y así el sistema aprende con el uso.
+  `CREATE TABLE IF NOT EXISTS cliente_alias (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    razon_social   TEXT NOT NULL,
+    carpeta_drive  TEXT NOT NULL,
+    fuente         TEXT DEFAULT 'manual',    -- 'manual' | 'ia' | 'seed'
+    verificado     INTEGER DEFAULT 0,        -- 1 si el técnico lo confirmó explícitamente
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(razon_social)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_cliente_alias_rs ON cliente_alias(razon_social)`,
 ];
 for (const sql of _migrations) { try { db.exec(sql); } catch {} }
+
+// Seed inicial de alias cliente → carpeta drive. Idempotente (INSERT OR IGNORE).
+// Los agrego una sola vez al arrancar; si el técnico los edita después, no se
+// pisan porque UNIQUE(razon_social) protege el registro.
+const _seedAliases = [
+  { rs: 'TGN', carpeta: 'TRANSPORTADORA DE GAS DEL NORTE S.A' },
+  { rs: 'AESA', carpeta: 'A. EVANGELISTA' },
+  { rs: 'ITASA', carpeta: 'ITA S A INDUSTRIA Y TECNOLOGIA EN ACEROS S.A' },
+  { rs: 'ITASA IND TECNOLOGICA ARG S.A.', carpeta: 'ITA S A INDUSTRIA Y TECNOLOGIA EN ACEROS S.A' },
+  { rs: 'TGF BOMBAS SRL', carpeta: 'TGFB BOMBAS S.R.L' },
+];
+try {
+  const stmt = db.prepare("INSERT OR IGNORE INTO cliente_alias (razon_social, carpeta_drive, fuente, verificado) VALUES (?, ?, 'seed', 1)");
+  for (const a of _seedAliases) stmt.run(a.rs, a.carpeta);
+} catch (_) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS clientes (

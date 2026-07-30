@@ -159,11 +159,15 @@ function intentarExecCommand(texto) {
   } catch (_) { return false; }
 }
 
-function AuditLogScreen() {
+function AuditLogScreen(props) {
   var _rows = React.useState([]);       var rows       = _rows[0], setRows       = _rows[1];
   var _loading = React.useState(true);  var loading    = _loading[0], setLoading  = _loading[1];
   var _filtroNroOt = React.useState(''); var filtroNroOt = _filtroNroOt[0], setFiltroNroOt = _filtroNroOt[1];
   var _filtroTipo = React.useState('');  var filtroTipo = _filtroTipo[0], setFiltroTipo = _filtroTipo[1];
+  // Filtro por mes YYYY-MM. Se inicializa desde ?mes= en el hash cuando el usuario
+  // clickea una barra del gráfico "Informes emitidos por mes".
+  var _filtroMes = React.useState(props && props.mesInicial ? props.mesInicial : '');
+  var filtroMes = _filtroMes[0], setFiltroMes = _filtroMes[1];
   var _q = React.useState('');           var q = _q[0], setQ = _q[1];
   var _diff = React.useState(null);      var diffOpen = _diff[0], setDiffOpen = _diff[1];
 
@@ -183,6 +187,7 @@ function AuditLogScreen() {
   React.useEffect(cargar, [filtroNroOt, filtroTipo]);
 
   var filtradas = rows.filter(function (r) {
+    if (filtroMes && String(r.fecha || '').slice(0, 7) !== filtroMes) return false;
     if (!q) return true;
     var s = q.toLowerCase();
     return (r.texto || '').toLowerCase().indexOf(s) >= 0
@@ -254,6 +259,23 @@ function AuditLogScreen() {
         className: 'btn btn-default btn-sm',
         onClick: cargar
       }, 'Actualizar'),
+      filtroMes ? React.createElement('span', {
+        style: {
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 10px', borderRadius: 999,
+          background: '#eef2ff', color: '#4361ee', fontSize: 12, fontWeight: 600,
+        },
+      },
+        'Mes: ' + filtroMes,
+        React.createElement('button', {
+          onClick: function () { setFiltroMes(''); location.hash = '#/auditoria'; },
+          title: 'Quitar filtro por mes',
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#4361ee', fontSize: 14, lineHeight: 1, padding: 0,
+          },
+        }, '×')
+      ) : null,
       React.createElement('span', { style: { fontSize: 12, color: 'var(--text-3)' } },
         filtradas.length + ' de ' + rows.length + ' registros')
     ),

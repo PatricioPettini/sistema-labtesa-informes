@@ -73,23 +73,13 @@ function _prom() {
 }
 function _mround(x, base) { return Math.round(x / base) * base; }
 function _fmtTension(mpa) {
-  // Aplica SOLO a `resistencia_traccion` (Tensión de rotura) y `tension_fluencia`.
-  // Siempre ENTERO (nunca decimal), redondeado según convención del laboratorio:
-  //   - < 500       → entero de 1 en 1.   Ej: 3.41 → 3, 301.7 → 302.
-  //   - 500 – 1000  → múltiplo de 5.      Ej: 552 → 550, 778 → 780.
-  //   - > 1000      → múltiplo de 10.     Ej: 1023 → 1020, 1567 → 1570.
-  //   - Negativo    → 'NOTA' (dato inconsistente, cargar nota explicativa).
+  // Excel: ROUND(..., 0) en los 3 tramos (< 500, 500-1000, > 1000).
   if (isNaN(mpa)) return '';
-  if (mpa < 0) return 'NOTA';
-  if (mpa < 500)  return String(Math.round(mpa));
-  if (mpa <= 1000) return String(_mround(mpa, 5));
-  return String(_mround(mpa, 10));
+  return String(Math.round(mpa));
 }
 function _fmtPct(pct) {
   // < 10% → MROUND(0.5). ≥ 10% → MROUND(1). Excel: G11 y H11.
-  // Negativo (Lf < L0, o Sf > S0) → 'NOTA'.
   if (isNaN(pct)) return '';
-  if (pct < 0) return 'NOTA';
   if (pct < 10) return _mround(pct, 0.5).toFixed(1);
   return String(Math.round(pct));
 }
@@ -684,40 +674,24 @@ function TraccionForm(props) {
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { rowSpan: hayZonaAlguna ? 2 : 1, style: { border: '1px solid #333', padding: 4, width: 180, textAlign: 'left', verticalAlign: 'middle' } }, 'PARÁMETRO'),
             _r('th', { rowSpan: hayZonaAlguna ? 2 : 1, style: { border: '1px solid #333', padding: 4, width: 60, verticalAlign: 'middle' } }, 'UNIDAD'),
-            // Detectar si hay varias OTs distintas entre las probetas físicas.
-            // Si sí → el label de cada columna dice "OT XXXXX" (identifica a
-            // qué OT va cada dato). Si es una sola → sigue "M1/M2" o "O.T. XXX"
-            // cuando es la única columna.
-            (function () {
-              var otsUnicas = {};
-              idxFisicas.forEach(function (probIdx) {
-                var mm = muestras[probIdx] || {};
-                var no = String((mm.nro_ot_override || otNroActual) || '').trim();
-                if (no) otsUnicas[no] = true;
-              });
-              window._traccionMultiOtHeader = Object.keys(otsUnicas).length > 1;
-            })(),
             idxFisicas.map(function (probIdx, iFis) {
               var m = muestras[probIdx] || {};
               var nombreValor = (m.nombre != null) ? m.nombre : ('M' + (iFis + 1));
               var cs = colspanPorProbeta[iFis];
+              // Título de la columna:
+              //   - Si hay UNA sola columna en la tabla (probeta sin zonas) →
+              //     mostrar "O.T. XXX" (con la OT propia o la del ensayo).
+              //   - Si hay MÚLTIPLES columnas → mostrar "M1", "M2", etc.
+              // Mismo criterio que el generator del Word (template-traccion).
               var otColumna = String((m.nro_ot_override || otNroActual) || '');
               var esUnicaColumna = muestras.length === 1;
-              var esMultiOt = window._traccionMultiOtHeader;
-              // Label de la columna:
-              //   - Ensayo multi-OT           → "OT XXXXX" (identifica destino).
-              //   - Única columna (1 muestra) → "O.T. XXX" (como sale en el Word).
-              //   - Varias columnas, misma OT → "M1", "M2", "M3".
-              var labelTitulo = esMultiOt
-                ? ('OT ' + (otColumna || '—'))
-                : (esUnicaColumna
-                    ? ('O.T. ' + (otColumna || '—'))
-                    : ('M' + (iFis + 1)));
+              var labelTitulo = esUnicaColumna
+                ? ('O.T. ' + (otColumna || '—'))
+                : ('M' + (iFis + 1));
               return _r('th', { key: iFis, colSpan: cs, style: { border: '1px solid #333', padding: 3, background: '#e6e6e6', minWidth: 110 * cs } },
                 _r('div', {
                   style: { fontWeight: 800, fontSize: 10, textAlign: 'center',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace',
-                    color: esMultiOt ? '#8a5a00' : undefined },
+                    fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
                   title: 'Probeta ' + (iFis + 1) + ' — OT ' + otColumna,
                 }, labelTitulo),
                 _r('div', { style: { display: 'flex', gap: 2, alignItems: 'center', fontSize: 9, fontWeight: 400, marginTop: 2 } },
@@ -772,25 +746,19 @@ function TraccionForm(props) {
               muestras.map(function (m, i) {
                 var val = (m && m[p.k]) || '';
                 var esZona = !!(m && m._zona_extra);
-                // Valor "NOTA" (rojo): el cálculo dio negativo → el técnico
-                // debe cargar una nota explicativa antes de emitir el informe.
-                var esNota = val === 'NOTA';
-                var vieneDeCalc = esCalc && val !== '' && !esNota;
-                var bg = esNota ? '#ffd7d7'
-                       : vieneDeCalc ? '#e6f9ef'
-                       : (esZona ? '#fffbef' : 'transparent');
+                // Solo se marca con verde (viene del cálculo) si el campo está
+                // en la lista de calculados Y tiene valor. Sino, editable normal.
+                var vieneDeCalc = esCalc && val !== '';
+                var bg = vieneDeCalc ? '#e6f9ef' : (esZona ? '#fffbef' : 'transparent');
                 return _r('td', { key: i, style: { border: '1px solid #333', padding: 0, background: bg } },
                   _r('input', {
                     style: Object.assign({}, S.input, S.num, {
                       border: 'none', width: '100%', background: 'transparent',
-                      color: esNota ? '#b02a2a' : (vieneDeCalc ? '#0a7a55' : undefined),
-                      fontWeight: (esNota || vieneDeCalc) ? 800 : undefined,
+                      color: vieneDeCalc ? '#0a7a55' : undefined,
+                      fontWeight: vieneDeCalc ? 700 : undefined,
                     }),
                     value: val,
-                    title: esNota
-                      ? 'El cálculo dio negativo (dato inconsistente). Agregar una nota explicativa antes de emitir.'
-                      : (esCalc ? 'Calculado desde 1.1 si hay datos; editable si querés override manual' : ''),
-                    onKeyDown: tablaResNavKeyDown,
+                    title: esCalc ? 'Calculado desde 1.1 si hay datos; editable si querés override manual' : '',
                     onChange: function (e) { setMuestra(i, p.k, e.target.value); },
                   }));
               })
@@ -1195,49 +1163,6 @@ function TraccionForm(props) {
     );
   }
 
-  // Navegación por teclado dentro de un card del bloque 1.1:
-  //   Enter / ↓ → siguiente input del MISMO card marcado con data-sc-nav.
-  //   ↑         → anterior. Tab funciona nativo (sin tocar).
-  function scNavKeyDown(e) {
-    if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    var card = e.target.closest('[data-sc-card]');
-    if (!card) return;
-    var inputs = Array.from(card.querySelectorAll('input[data-sc-nav]:not([disabled])'));
-    var idx = inputs.indexOf(e.target);
-    if (idx < 0) return;
-    e.preventDefault();
-    var next = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
-    if (next >= 0 && next < inputs.length) inputs[next].focus();
-  }
-
-  // Navegación por teclado en la tabla 1.5 (Resultados obtenidos):
-  //   Enter / ↓ → baja a la MISMA columna del siguiente parámetro (fila abajo).
-  //   ↑         → sube a la misma columna del parámetro anterior.
-  //   Tab funciona nativo (avanza por columna en la misma fila).
-  function tablaResNavKeyDown(e) {
-    if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    var td = e.target.closest('td');
-    var tr = td && td.parentNode;
-    var tbody = tr && tr.parentNode;
-    if (!td || !tr || !tbody) return;
-    var colIdx = Array.prototype.indexOf.call(tr.children, td);
-    var rows = Array.prototype.slice.call(tbody.children);
-    var rowIdx = rows.indexOf(tr);
-    if (rowIdx < 0 || colIdx < 0) return;
-    var delta = e.key === 'ArrowUp' ? -1 : 1;
-    // Buscar el próximo tr que tenga un input focuseable en la misma columna.
-    for (var i = rowIdx + delta; i >= 0 && i < rows.length; i += delta) {
-      var nextTd = rows[i].children[colIdx];
-      var nextInput = nextTd && nextTd.querySelector('input:not([disabled])');
-      if (nextInput) {
-        e.preventDefault();
-        nextInput.focus();
-        if (typeof nextInput.select === 'function') nextInput.select();
-        return;
-      }
-    }
-  }
-
   // Muestra un valor CALCULADO (readonly, fondo verde, para outputs del FM-044).
   function calcDisplay(valor, unidad) {
     var vacio = valor === '' || valor == null;
@@ -1288,7 +1213,7 @@ function TraccionForm(props) {
     var cardHeadStyleZona = Object.assign({}, scStyles.cardHead,
       esZona ? { background: '#fff3cd', borderBottomColor: '#e0c060' } : {});
 
-    return _r('div', { key: idxM, style: cardStyleZona, 'data-sc-card': String(idxM) },
+    return _r('div', { key: idxM, style: cardStyleZona },
       _r('div', { style: cardHeadStyleZona },
         _r('span', null,
           esZona
@@ -1391,178 +1316,71 @@ function TraccionForm(props) {
           ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 } },
               _r('span', { style: { fontWeight: 700, fontSize: 10, color: '#8a5a00', minWidth: 82 } }, 'Nombre zona:'),
               _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 4, padding: '4px 6px', fontSize: 11, flex: 1, background: '#fff', fontWeight: 600 },
-                'data-sc-nav': '1',
                 value: zonaLabel, placeholder: 'Ej: Superficie, Núcleo, Zona A…',
-                onKeyDown: scNavKeyDown,
                 onChange: function (e) { setMuestra(idxM, 'zona', e.target.value); } }))
           : null,
-        // ── LAYOUT TABULAR (v2 — más intuitivo) ─────────────────────────
-        // 3 tablas separadas con títulos claros. Cada input está en su celda,
-        // los cálculos aparecen en verde claro. Estructura pensada para que
-        // el técnico vea de un vistazo qué carga y qué se calcula.
+        // ── Mediciones dimensionales (3 valores + promedio) ──
+        tipo === 'rect' ? scDimRow(idxM, 'A', ['a1', 'a2', 'a3'], 'mm') : null,
+        tipo === 'rect' ? scDimRow(idxM, 'E', ['e1', 'e2', 'e3'], 'mm') : null,
+        tipo === 'cil'  ? scDimRow(idxM, 'D', ['d1', 'd2', 'd3'], 'mm') : null,
+
+        // ── Secciones S1/S2/S3 por medición individual (readonly) ──
+        // Sj = Aj × Ej (rect) o π × Dj² / 4 (cil). Sale del Excel FM-044.
         (function () {
           var secciones = calcSeccionesFM044(seccionCalc[idxM] || {});
-          var promA = prom3(idxM, ['a1', 'a2', 'a3']);
-          var promE = prom3(idxM, ['e1', 'e2', 'e3']);
-          var promD = prom3(idxM, ['d1', 'd2', 'd3']);
-          // Estilos comunes.
-          var stTable = { borderCollapse: 'collapse', width: '100%', fontSize: 11, marginTop: 4 };
-          var stTh    = { border: '1px solid #d0d7de', padding: '4px 6px', background: '#f6f8fa', fontWeight: 700, color: '#57606a', textAlign: 'center', fontSize: 10 };
-          var stTd    = { border: '1px solid #d0d7de', padding: 0, background: '#fff' };
-          var stTdCel = Object.assign({}, stTd, { padding: '3px 4px', textAlign: 'center', background: '#fafbfc', fontWeight: 700, color: '#24292f' });
-          var stTdCalc= Object.assign({}, stTd, { padding: '3px 4px', textAlign: 'center', background: '#e6f9ef', fontWeight: 700, color: '#0a7a55', borderColor: '#a8d9c1' });
-          var stTdCalcEmpty = Object.assign({}, stTd, { padding: '3px 4px', textAlign: 'center', color: '#c0c0c0' });
-          var stInpCell = { border: 'none', outline: 'none', width: '100%', padding: '4px 5px', textAlign: 'center', fontSize: 11, background: 'transparent' };
-          var stSubtit = { fontSize: 9, color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: 8, marginBottom: 2, fontWeight: 700 };
+          return _r('div', { style: scStyles.sRow },
+            ['S1', 'S2', 'S3'].map(function (lbl, j) {
+              var v = secciones[j];
+              var vacio = !v;
+              return _r('div', { key: lbl,
+                style: Object.assign({}, scStyles.sBox, vacio ? {} : { background: '#e6f9ef', borderColor: '#a8d9c1' }) },
+                _r('span', { style: scStyles.sLabel }, lbl),
+                _r('span', { style: {
+                  flex: 1, textAlign: 'center', fontSize: 11,
+                  fontWeight: 700, color: vacio ? '#c0c0c0' : '#0a7a55',
+                } }, vacio ? '—' : v),
+                _r('span', { style: scStyles.sUnit }, 'mm²'));
+            }));
+        })(),
 
-          function inpCell(key) {
-            return _r('td', { style: stTd },
-              _r('input', { style: stInpCell,
-                'data-sc-nav': '1',
-                value: scGet(idxM, key),
-                onKeyDown: scNavKeyDown,
-                onChange: function (e) { setSC(idxM, key, e.target.value); } }));
-          }
-          var stTdNota = Object.assign({}, stTd, { padding: '3px 4px', textAlign: 'center', background: '#ffd7d7', color: '#b02a2a', fontWeight: 800, borderColor: '#c07070' });
-          function calcCell(v, unidad) {
-            var vacio = v === '' || v == null;
-            var esNota = v === 'NOTA';
-            var st = esNota ? stTdNota : (vacio ? stTdCalcEmpty : stTdCalc);
-            return _r('td', {
-              style: st,
-              title: esNota ? 'Cálculo dio valor negativo — agregar nota explicativa' : '',
-            }, vacio ? '—' : (String(v) + (esNota || !unidad ? '' : ' ' + unidad)));
-          }
+        // ── Cargas y longitudes ──
+        _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 4 } },
+          inputRow('Carga rot.',  'fr', 'DaN'),
+          inputRow('Carga flu.',  'ff', 'DaN'),
+          inputRow('Long. inic.', 'l0', 'mm'),
+          inputRow('Long. final', 'lf', 'mm'),
+          tipo === 'cil' ? inputRow('Diám. final', 'df', 'mm') : null
+        ),
 
-          // ── TABLA 1 · DIMENSIONES (mediciones + sección por medición) ─
-          var dimensRows = [];
-          if (tipo === 'rect') {
-            dimensRows.push(_r('tr', { key: 'A' },
-              _r('td', { style: stTdCel }, 'Ancho (A)'),
-              inpCell('a1'), inpCell('a2'), inpCell('a3'),
-              calcCell(promA, ''), _r('td', { style: stTdCel }, 'mm')));
-            dimensRows.push(_r('tr', { key: 'E' },
-              _r('td', { style: stTdCel }, 'Espesor (E)'),
-              inpCell('e1'), inpCell('e2'), inpCell('e3'),
-              calcCell(promE, ''), _r('td', { style: stTdCel }, 'mm')));
-          } else {
-            dimensRows.push(_r('tr', { key: 'D' },
-              _r('td', { style: stTdCel }, 'Diámetro (D)'),
-              inpCell('d1'), inpCell('d2'), inpCell('d3'),
-              calcCell(promD, ''), _r('td', { style: stTdCel }, 'mm')));
-          }
-          dimensRows.push(_r('tr', { key: 'S' },
-            _r('td', { style: Object.assign({}, stTdCel, { background: '#fff8e5' }) }, 'Sección (S)'),
-            calcCell(secciones[0], ''), calcCell(secciones[1], ''), calcCell(secciones[2], ''),
-            calcCell(m.seccion_inicial, ''),
-            _r('td', { style: Object.assign({}, stTdCel, { background: '#fff8e5', color: '#8a5a00' }) }, 'mm² (S₀)')));
-
-          var tablaDimens = _r('table', { style: stTable },
-            _r('thead', null,
-              _r('tr', null,
-                _r('th', { style: stTh, rowSpan: 1 }, ''),
-                _r('th', { style: stTh }, 'Med. 1'),
-                _r('th', { style: stTh }, 'Med. 2'),
-                _r('th', { style: stTh }, 'Med. 3'),
-                _r('th', { style: stTh }, 'Promedio'),
-                _r('th', { style: stTh }, 'Unidad'))),
-            _r('tbody', null, dimensRows));
-
-          // ── TABLA 2 · CARGAS Y LONGITUDES (inputs manuales) ─────────
-          var cargaRows = [
-            { label: 'Carga de rotura',    key: 'fr', unit: 'DaN' },
-            { label: 'Carga de fluencia',  key: 'ff', unit: 'DaN' },
-            { label: 'Longitud inicial',   key: 'l0', unit: 'mm' },
-            { label: 'Longitud final',     key: 'lf', unit: 'mm' },
-          ];
-          if (tipo === 'cil') cargaRows.push({ label: 'Diámetro final', key: 'df', unit: 'mm' });
-
-          var tablaCarga = _r('table', { style: stTable },
-            _r('thead', null,
-              _r('tr', null,
-                _r('th', { style: Object.assign({}, stTh, { textAlign: 'left', paddingLeft: 10 }) }, 'Parámetro'),
-                _r('th', { style: stTh }, 'Valor'),
-                _r('th', { style: stTh, width: 60 }, 'Unidad'))),
-            _r('tbody', null,
-              cargaRows.map(function (r) {
-                return _r('tr', { key: r.key },
-                  _r('td', { style: Object.assign({}, stTdCel, { textAlign: 'left', paddingLeft: 10 }) }, r.label),
-                  inpCell(r.key),
-                  _r('td', { style: Object.assign({}, stTdCel, { color: '#8a8a8a', fontWeight: 500 }) }, r.unit));
-              })));
-
-          // ── VERIFICACIÓN DE EXTREMOS (compacta, con chip PASA/NO PASA) ─
-          var verifBlock = _r('div', { style: { marginTop: 6, padding: '6px 8px', border: '1px solid #d0d7de', borderRadius: 4, background: '#fafbfc',
-            display: 'grid', gridTemplateColumns: '110px 1fr 1fr auto', gap: 6, alignItems: 'center', fontSize: 11 } },
-            _r('span', { style: { fontWeight: 700, fontSize: 10, color: '#57606a', textTransform: 'uppercase' } }, 'Verif. extremos'),
-            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
-              _r('span', { style: { fontSize: 10, color: '#57606a' } }, extLabel.split(' ')[0] + ' 1'),
-              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, textAlign: 'center' },
-                'data-sc-nav': '1',
-                value: scGet(idxM, 'ext1'),
-                onKeyDown: scNavKeyDown,
-                onChange: function (e) { setSC(idxM, 'ext1', e.target.value); } })),
-            _r('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
-              _r('span', { style: { fontSize: 10, color: '#57606a' } }, extLabel.split(' ')[0] + ' 2'),
-              _r('input', { style: { border: '1px solid #d0d7de', borderRadius: 3, padding: '2px 5px', fontSize: 11, flex: 1, minWidth: 0, textAlign: 'center' },
-                'data-sc-nav': '1',
-                value: scGet(idxM, 'ext2'),
-                onKeyDown: scNavKeyDown,
-                onChange: function (e) { setSC(idxM, 'ext2', e.target.value); } })),
-            verif
-              ? _r('span', { style: {
-                  padding: '3px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800,
+        // ── Extremos para verificación PASA/NO PASA ──
+        _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 4, marginTop: 4, alignItems: 'center' } },
+          inputRow(extLabel + ' 1', 'ext1', 'mm'),
+          inputRow(extLabel + ' 2', 'ext2', 'mm'),
+          verif
+            ? _r('span', {
+                style: {
+                  padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700,
                   color: '#fff', background: verif === 'PASA' ? '#0f7d3a' : '#b02a2a',
                   whiteSpace: 'nowrap',
-                } }, verif)
-              : _r('span', { style: { fontSize: 10, color: '#8a8a8a', fontStyle: 'italic' } }, '—'));
+                },
+              }, verif)
+            : _r('span', { style: { fontSize: 10, color: '#8a8a8a', fontStyle: 'italic' } }, 'verif —')
+        ),
 
-          // ── TABLA 3 · RESULTADOS CALCULADOS (readonly, verde) ────────
-          var resultRows = [];
-          if (tipo === 'rect') {
-            resultRows.push({ label: 'Ancho promedio',    campo: 'ancho_promedio',    unit: 'mm' });
-            resultRows.push({ label: 'Espesor promedio',  campo: 'espesor_promedio',  unit: 'mm' });
-          } else {
-            resultRows.push({ label: 'Diámetro promedio', campo: 'diametro_promedio', unit: 'mm' });
-          }
-          resultRows.push({ label: 'Sección inicial (S₀)', campo: 'seccion_inicial',      unit: 'mm²', destacado: true });
-          resultRows.push({ label: 'Tensión de rotura',    campo: 'resistencia_traccion', unit: 'MPa', destacado: true });
-          resultRows.push({ label: 'Tensión de fluencia',  campo: 'tension_fluencia',     unit: 'MPa', destacado: true });
-          resultRows.push({ label: 'Alargamiento',         campo: 'alargamiento',         unit: '%',   destacado: true });
-          if (tipo === 'cil') {
-            resultRows.push({ label: 'Sección final (Sf)', campo: 'seccion_final', unit: 'mm²' });
-            resultRows.push({ label: 'Estricción',          campo: 'estriccion',    unit: '%',   destacado: true });
-          }
-
-          var tablaResult = _r('table', { style: stTable },
-            _r('thead', null,
-              _r('tr', null,
-                _r('th', { style: Object.assign({}, stTh, { textAlign: 'left', paddingLeft: 10, background: '#e6f9ef', color: '#0a7a55', borderColor: '#a8d9c1' }) }, 'Resultado'),
-                _r('th', { style: Object.assign({}, stTh, { background: '#e6f9ef', color: '#0a7a55', borderColor: '#a8d9c1' }) }, 'Valor'),
-                _r('th', { style: Object.assign({}, stTh, { background: '#e6f9ef', color: '#0a7a55', borderColor: '#a8d9c1', width: 60 }) }, 'Unidad'))),
-            _r('tbody', null,
-              resultRows.map(function (r) {
-                var val = m[r.campo];
-                var vacio = val === '' || val == null;
-                var esNota = val === 'NOTA';
-                var celValor = esNota ? stTdNota : (vacio ? stTdCalcEmpty : stTdCalc);
-                var fontLarge = r.destacado && !vacio && !esNota ? { fontSize: 13, fontWeight: 800 } : {};
-                return _r('tr', { key: r.campo, title: esNota ? 'Cálculo negativo — cargar nota explicativa' : '' },
-                  _r('td', { style: Object.assign({}, stTdCel, { textAlign: 'left', paddingLeft: 10, fontWeight: r.destacado ? 700 : 500 }) }, r.label),
-                  _r('td', { style: Object.assign({}, celValor, fontLarge) }, vacio ? '—' : String(val)),
-                  _r('td', { style: Object.assign({}, stTdCel, { color: '#8a8a8a', fontWeight: 500 }) }, r.unit));
-              })));
-
-          return _r(React.Fragment, null,
-            _r('div', { style: stSubtit }, 'Dimensiones · mediciones'),
-            tablaDimens,
-            _r('div', { style: stSubtit }, 'Cargas y longitudes'),
-            tablaCarga,
-            verifBlock,
-            _r('div', { style: Object.assign({}, stSubtit, { color: '#0a7a55', marginTop: 10 }) }, '⇩ Resultados calculados automáticamente'),
-            tablaResult
-          );
-        })()
+        // ── Resultados calculados (readonly) ──
+        _r('div', { style: { marginTop: 6, paddingTop: 6, borderTop: '1px dashed #d0d7de' } },
+          _r('div', { style: { fontSize: 9, color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4, fontWeight: 700 } }, 'Calculado automáticamente'),
+          _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 } },
+            tipo === 'rect' ? calcRow('Ancho prom.', 'ancho_promedio', 'mm') : null,
+            tipo === 'rect' ? calcRow('Espesor prom.', 'espesor_promedio', 'mm') : null,
+            tipo === 'cil'  ? calcRow('Diám. prom.', 'diametro_promedio', 'mm') : null,
+            calcRow('S₀',             'seccion_inicial',       'mm²'),
+            calcRow('Tens. rotura',   'resistencia_traccion',  'MPa'),
+            calcRow('Tens. fluencia', 'tension_fluencia',      'MPa'),
+            calcRow('Alargamiento',   'alargamiento',          '%'),
+            tipo === 'cil' ? calcRow('Sf',          'seccion_final', 'mm²') : null,
+            tipo === 'cil' ? calcRow('Estricción',  'estriccion',    '%')   : null
+          ))
       )
     );
   }
