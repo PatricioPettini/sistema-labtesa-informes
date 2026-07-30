@@ -92,6 +92,7 @@
           if (e.stage) err.stage = e.stage;
           if (e.code)  err.code  = e.code;
           err.status = r.status;
+          err.data = e;   // Body completo — permite acceder a ensayo_id, estado_firma, etc.
           throw err;
         }, function () { throw new Error(r.statusText || ('HTTP ' + r.status)); });
       }
@@ -282,13 +283,21 @@
 
     // ── Ensayos ───────────────────────────────────────────────────────────────
 
-    saveEnsayo: function (nro_ot, tipo, datos, existingId) {
+    saveEnsayo: function (nro_ot, tipo, datos, existingId, opts) {
+      // opts.onError(err): callback opcional para manejar errores custom (ej.
+      // interceptar 423 ENSAYO_FIRMADO y mostrar modal de desfirma en vez del
+      // toast por default). Si onError devuelve true, no se muestra el toast.
+      var onError = opts && typeof opts.onError === 'function' ? opts.onError : null;
+      function handleErr(er) {
+        if (onError && onError(er) === true) return;
+        apiErr('Error al guardar ensayo: ' + er.message);
+      }
       var jsonStr = JSON.stringify(datos);
       if (existingId) {
         var e = _db.ensayos.find(function (x) { return x.id === existingId; });
         if (e) { e.datos_json = jsonStr; }
         apiFetch('POST', '/api/ensayo', { id: existingId, nro_ot: nro_ot, tipo: tipo, datos_json: jsonStr })
-          .catch(function (er) { apiErr('Error al guardar ensayo: ' + er.message); });
+          .catch(handleErr);
         return e || null;
       }
       var orden = _db.ensayos.filter(function (x) { return x.nro_ot === nro_ot; }).length + 1;
@@ -302,7 +311,7 @@
           if (idx >= 0) _db.ensayos[idx] = row;
           ne.id = row.id;
         })
-        .catch(function (er) { apiErr('Error al guardar ensayo: ' + er.message); });
+        .catch(handleErr);
       return ne;
     },
 

@@ -214,6 +214,11 @@ function EnsayoForm(props) {
   var _mark = React.useState(false); var markEmpty = _mark[0], setMark = _mark[1];
   var _fm = React.useState(false); var fmOpen = _fm[0], setFmOpen = _fm[1]; // modal de firma al guardar
   var _ex = React.useState(existing); var ex = _ex[0], setEx = _ex[1]; // estado de firma reactivo del ensayo
+  // Modal "desfirmar y guardar": aparece cuando se intenta guardar un ensayo
+  // firmado (propio o de una OT hermana en multi-OT). Al confirmar el token,
+  // se desfirma el ensayo y se ejecuta el retry (que reintenta el save).
+  // { ensayoId, estadoFirma, retry: () => void } | null
+  var _dfm = React.useState(null); var desfirmarDlg = _dfm[0], setDesfirmarDlg = _dfm[1];
   var esFirmado = !!(ex && (ex.estado_firma === 'revisado' || ex.estado_firma === 'autorizado'));
   var esAprobado = !!(ex && ex.estado_firma === 'autorizado');
   var firmadoPor = ex && (ex.firmado_por || ex.revisado_por);
@@ -225,11 +230,39 @@ function EnsayoForm(props) {
     return n;
   }
 
+  // Handler común de error 423 (ENSAYO_FIRMADO / ENSAYO_APROBADO) que puede
+  // venir de una OT hermana en multi-OT. Muestra el modal de desfirma con retry.
+  function manejarErrorFirma(e, retryFn) {
+    if (!e) return false;
+    var d = e.data || {};
+    if (e.code === 'ENSAYO_FIRMADO' || e.code === 'ENSAYO_APROBADO' || d.code === 'ENSAYO_FIRMADO' || d.code === 'ENSAYO_APROBADO') {
+      setDesfirmarDlg({
+        ensayoId: d.ensayo_id || (ex && ex.id),
+        estadoFirma: d.estado_firma || (ex && ex.estado_firma) || 'firmado',
+        // Puede que el ensayo firmado sea de una OT HERMANA, no la actual —
+        // en ese caso el ensayoId puede ser distinto.
+        contexto: d.ensayo_id && ex && d.ensayo_id !== ex.id ? 'hermana' : 'actual',
+        retry: retryFn,
+      });
+      return true;
+    }
+    return false;
+  }
+
   function save() {
     if (esFirmado) {
-      toast(esAprobado
-        ? 'Ensayo APROBADO — bloqueado. Desfirmá con un token de AUTORIZANTE para editar.'
-        : 'Ensayo FIRMADO — bloqueado. Desfirmá con un token para editar.', 'warning');
+      // En vez de bloquear con toast, ofrecer desfirma + reintento inline.
+      setDesfirmarDlg({
+        ensayoId: ex && ex.id,
+        estadoFirma: (ex && ex.estado_firma) || 'firmado',
+        contexto: 'actual',
+        retry: function () {
+          // Refrescar el `ex` local a estado abierto antes de reintentar.
+          setEx(function (prev) { return Object.assign({}, prev || {}, { estado_firma: 'abierto', firmado_por: null, revisado_por: null }); });
+          // Llamar save() en el próximo tick — el estado ya se propagó y esFirmado será false.
+          setTimeout(save, 0);
+        },
+      });
       return;
     }
     if (tbl && tbl.required) {
@@ -259,7 +292,10 @@ function EnsayoForm(props) {
             toast(msg, 'success');
             nav('#/ot/' + ot.nro_ot);
           })
-          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
         return;
       }
     }
@@ -279,7 +315,10 @@ function EnsayoForm(props) {
             toast(msg, 'success');
             nav('#/ot/' + ot.nro_ot);
           })
-          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
         return;
       }
     }
@@ -299,7 +338,10 @@ function EnsayoForm(props) {
             toast(msg, 'success');
             nav('#/ot/' + ot.nro_ot);
           })
-          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
         return;
       }
     }
@@ -348,11 +390,16 @@ function EnsayoForm(props) {
             toast(msg, 'success');
             nav('#/ot/' + ot.nro_ot);
           })
-          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
         return;
       }
     }
-    window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null);
+    window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null, {
+      onError: function (er) { return manejarErrorFirma(er, save); },
+    });
     toast((window.LabStore.labels[tipo] || 'Ensayo') + ' guardado', 'success');
     nav('#/ot/' + ot.nro_ot);
   }
@@ -637,6 +684,96 @@ function EnsayoForm(props) {
       React.createElement('div', { className: 'form-footer-r' },
         React.createElement('span', { className: 'kbd-hint' }, React.createElement('kbd', null, 'Ctrl'), '+', React.createElement('kbd', null, 'S')),
         React.createElement(Button, { variant: 'primary', icon: 'save', onClick: save }, existing ? 'Guardar cambios' : 'Guardar ensayo')
+      )
+    ),
+    // Modal "Desfirmar y guardar": aparece cuando se intenta guardar un ensayo
+    // firmado (propio o de una OT hermana). Pide token y ejecuta desfirma +
+    // reintento del guardado en un solo paso.
+    desfirmarDlg
+      ? React.createElement(DesfirmarYGuardarModal, {
+          ensayoId: desfirmarDlg.ensayoId,
+          estadoFirma: desfirmarDlg.estadoFirma,
+          contexto: desfirmarDlg.contexto,
+          onCancel: function () { setDesfirmarDlg(null); },
+          onOk: function () {
+            var retry = desfirmarDlg.retry;
+            setDesfirmarDlg(null);
+            if (typeof retry === 'function') retry();
+          },
+        })
+      : null
+  );
+}
+
+// Modal para desfirmar un ensayo (con token) y luego reintentar el guardado.
+// Recibe ensayoId + estadoFirma. Al confirmar hace POST /api/ensayo/:id/desfirmar
+// y si sale OK, llama onOk() que dispara el retry del save original.
+function DesfirmarYGuardarModal(props) {
+  var _tok = React.useState(''); var token = _tok[0], setToken = _tok[1];
+  var _mot = React.useState(''); var motivo = _mot[0], setMotivo = _mot[1];
+  var _busy = React.useState(false); var busy = _busy[0], setBusy = _busy[1];
+  var _err = React.useState(''); var err = _err[0], setErr = _err[1];
+
+  var esAprobado = props.estadoFirma === 'autorizado';
+  var titulo = esAprobado ? 'Desfirmar ensayo APROBADO' : 'Desfirmar ensayo FIRMADO';
+  var subtitulo = props.contexto === 'hermana'
+    ? 'Una OT hermana tiene este ensayo firmado (id ' + props.ensayoId + '). Para sincronizar los cambios, hay que desfirmar primero.'
+    : (esAprobado
+        ? 'Necesitás un token con rol AUTORIZANTE para desfirmar.'
+        : 'Ingresá un token válido para desfirmar y aplicar los cambios.');
+
+  function submit() {
+    if (!token.trim()) { setErr('Ingresá el token.'); return; }
+    setBusy(true); setErr('');
+    fetch('/api/ensayo/' + props.ensayoId + '/desfirmar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token.trim(), motivo: motivo.trim() || null }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) {
+        if (!r.ok) { setErr(r.d.error || 'No se pudo desfirmar'); setBusy(false); return; }
+        setBusy(false);
+        props.onOk();
+      })
+      .catch(function (e) { setErr(e.message); setBusy(false); });
+  }
+
+  return React.createElement('div', {
+    style: {
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    },
+    onClick: function (e) { if (e.target === e.currentTarget) props.onCancel(); },
+  },
+    React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(90vw, 460px)', overflow: 'hidden' } },
+      React.createElement('div', { style: { background: '#fff8e5', borderBottom: '1px solid #e0c060', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement(window.Icon, { name: 'lock', size: 20, style: { color: '#8a5a00' } }),
+        React.createElement('div', null,
+          React.createElement('h3', { style: { margin: 0, color: '#8a5a00', fontSize: 15 } }, titulo),
+          React.createElement('div', { style: { fontSize: 12, color: '#8a5a00c0', marginTop: 3 } }, subtitulo)
+        )
+      ),
+      React.createElement('div', { style: { padding: 20 } },
+        React.createElement('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, 'Token' + (esAprobado ? ' (autorizante)' : '') + ':'),
+        React.createElement('input', {
+          type: 'password', autoFocus: true, value: token,
+          onChange: function (e) { setToken(e.target.value); },
+          onKeyDown: function (e) { if (e.key === 'Enter' && !busy) submit(); },
+          style: { width: '100%', padding: '7px 10px', border: '1px solid #d0d7de', borderRadius: 4, fontSize: 13, marginBottom: 12, fontFamily: 'ui-monospace, monospace' },
+        }),
+        React.createElement('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, 'Motivo (opcional):'),
+        React.createElement('input', {
+          type: 'text', value: motivo, placeholder: 'Ej: corregir valor de dureza',
+          onChange: function (e) { setMotivo(e.target.value); },
+          onKeyDown: function (e) { if (e.key === 'Enter' && !busy) submit(); },
+          style: { width: '100%', padding: '7px 10px', border: '1px solid #d0d7de', borderRadius: 4, fontSize: 13 },
+        }),
+        err ? React.createElement('div', { style: { color: '#b02a2a', fontSize: 12, marginTop: 10 } }, err) : null
+      ),
+      React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid #d0d7de', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+        React.createElement(window.Button, { variant: 'ghost', onClick: props.onCancel, disabled: busy }, 'Cancelar'),
+        React.createElement(window.Button, { variant: 'primary', icon: 'unlock', onClick: submit, loading: busy }, 'Desfirmar y guardar')
       )
     )
   );
