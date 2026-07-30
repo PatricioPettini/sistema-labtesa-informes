@@ -248,7 +248,11 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos.norma_a751)  normasASM.push(`ASTM A751${suf('norma_a751',  '-25')}`);
   if (datos.norma_e1024) normasASM.push(`ASTM E1024${suf('norma_e1024', '')}`);
   // "Otra norma": basta con que haya texto, sin requerir checkbox.
-  if (datos.norma_otra && datos.norma_otra.trim()) normasASM.push(datos.norma_otra.trim());
+  // Sólo emitir si el checkbox está tildado. Si el técnico destildó "Otra:"
+  // pero quedó texto residual, NO va al Word.
+  if (datos.norma_otra_chk && datos.norma_otra && datos.norma_otra.trim()) {
+    normasASM.push(datos.norma_otra.trim());
+  }
 
   // ITMs internos e ITQB (procedimientos internos, no ASTM). Se emiten como
   // líneas separadas con el prefijo "Metodología de ensayo:".

@@ -100,8 +100,9 @@ function construirBloqueEnsayo(datos) {
   };
   if (datos.norma_astm_e165) normas.push('ASTM E165' + anioSuf(datos.norma_astm_e165_year, '-'));
   if (datos.norma_asme_v)    normas.push('ASME BPVC Sección V' + (datos.norma_asme_v_year ? ` Ed. ${String(datos.norma_asme_v_year).trim()}` : ''));
-  // "Otra norma": basta con que haya texto, sin requerir checkbox.
-  if ((datos.norma_otra || '').trim()) normas.push(datos.norma_otra.trim());
+  // "Otra norma": SÓLO si el checkbox está tildado. Texto residual sin
+  // checkbox activo NO va al Word.
+  if (datos.norma_otra_chk && (datos.norma_otra || '').trim()) normas.push(datos.norma_otra.trim());
   if (normas.length) {
     partes.push(pHeading('ENSAYO SEGÚN'));
     normas.forEach(n => partes.push(pLinea(n)));

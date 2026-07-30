@@ -162,7 +162,9 @@ function generarVickersDesdeTemplate(ot, datos, fotosCaratula) {
   });
   // "Otro" — sólo se emite si el checkbox está tildado Y el texto no está vacío.
   // Norma "Otra": basta con que haya texto en el input, sin requerir checkbox.
-  if ((datos.norma_otra || '').trim()) {
+  // Sólo emitir si el checkbox está tildado. Si el técnico destildó "Otra:"
+  // pero el texto quedó residual, NO va al Word.
+  if (datos.norma_otra_chk && (datos.norma_otra || '').trim()) {
     pushNormaDedup(`Norma de ensayo: ${datos.norma_otra.trim()}`);
   }
   // Fallback legacy: `datos.norma` como texto libre (sólo si NO hay checkboxes

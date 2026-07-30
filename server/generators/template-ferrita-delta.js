@@ -307,7 +307,7 @@ function generarFerritaDeltaDesdeTemplate(ot, datos, fotosCaratula) {
       const _cond = [];
       if ((datos.cod_referencia || '').trim()) _cond.push(`Código de referencia: ${datos.cod_referencia.trim()}`);
       if ((datos.norma || '').trim())          _cond.push(`Norma de ensayo: ${datos.norma.trim()}`);
-      if ((datos.norma_otra || '').trim())     _cond.push(`Norma de ensayo: ${datos.norma_otra.trim()}`);
+      if (datos.norma_otra_chk && (datos.norma_otra || '').trim()) _cond.push(`Norma de ensayo: ${datos.norma_otra.trim()}`);
       _cond.push(_met);
       templateData.metodologia_linea = _cond.join('\n');
       templateData.norma_linea = '__SECTION_HIDE__';
@@ -374,7 +374,7 @@ function generarFerritaDeltaDesdeTemplate(ot, datos, fotosCaratula) {
     const lineasMet = [];
     if ((datos.cod_referencia || '').trim()) lineasMet.push(`Código de referencia: ${datos.cod_referencia.trim()}`);
     if ((datos.norma || '').trim()) lineasMet.push(`Norma de ensayo: ${datos.norma.trim()}`);
-    if ((datos.norma_otra || '').trim()) lineasMet.push(`Norma de ensayo: ${datos.norma_otra.trim()}`);
+    if (datos.norma_otra_chk && (datos.norma_otra || '').trim()) lineasMet.push(`Norma de ensayo: ${datos.norma_otra.trim()}`);
     lineasMet.push((datos.metodologia || '').trim()
       ? `Metodología de ensayo: ${datos.metodologia.trim()}`
       : 'Metodología de ensayo según procedimiento interno');
