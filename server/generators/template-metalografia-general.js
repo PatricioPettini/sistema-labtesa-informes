@@ -233,6 +233,41 @@ function generarMetalografiaGeneralDesdeTemplate(ot, datos, fotosCaratula) {
   const fotos = Array.isArray(fotosCaratula) ? fotosCaratula.filter(Boolean) : [];
   const nroOtBase = (ot.nro_ot || '').replace(/^O\.T\.?\s*/i, '');
 
+  // ── Multi-OT: filtrar imágenes y aplicar overrides por OT ───────────────
+  // Si datos._filtro_ot está seteado, emitimos solo lo que le corresponde a
+  // la OT actual: imágenes con nro_ot_override coincidente (o sin override
+  // cuando es la OT del ensayo), y overrides de analisis/textos si están.
+  if (datos && datos._filtro_ot != null) {
+    const otFiltro = String(datos._filtro_ot);
+    const esOtDelEnsayo = otFiltro === String(ot.nro_ot || '');
+    const filtrarImgs = (arr) => (Array.isArray(arr) ? arr : []).filter(p => {
+      const ov = String((p && p.nro_ot_override) || '').trim();
+      const perteneceA = ov || String(ot.nro_ot || '');
+      return perteneceA === otFiltro || (esOtDelEnsayo && !ov);
+    });
+    datos = Object.assign({}, datos);
+    ['imagenes_micro', 'imagenes_espesor', 'imagenes_grafito', 'imagenes_decarb'].forEach(k => {
+      if (Array.isArray(datos[k])) datos[k] = filtrarImgs(datos[k]);
+    });
+  }
+  // Overrides por OT: analisis + resultados_seccion. Aplican al aplanar los
+  // valores raíz del ensayo antes de emitir.
+  if (datos && datos.textos_por_ot && typeof datos.textos_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const t = datos.textos_por_ot[nroOtActual];
+    if (t) {
+      datos = Object.assign({}, datos);
+      if (t.resultados_seccion !== undefined) datos.resultados_seccion = t.resultados_seccion;
+    }
+  }
+  if (datos && datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const c = datos.condiciones_por_ot[nroOtActual];
+    if (c && c.analisis) {
+      datos = Object.assign({}, datos, { analisis: c.analisis });
+    }
+  }
+
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
   const doc = new Docxtemplater(zip, {

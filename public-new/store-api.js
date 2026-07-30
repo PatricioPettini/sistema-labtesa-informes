@@ -665,6 +665,168 @@
       });
     },
 
+    // Split multi-OT para metalografía general y anexo metalográfico.
+    // A diferencia de tracción/plegado/impacto (que dividen por FILAS), acá
+    // se dividen las IMÁGENES: cada imagen tiene su propio `nro_ot_override`.
+    // Los mapas `textos_por_ot` (para resultados_seccion) y `condiciones_por_ot`
+    // (para analisis por sección) también se aplanan por OT hija.
+    _saveEnsayoConImagenesMultiOt: function (tipo, IMAGE_KEYS, CONDICIONES_GLOBALES, nro_ot_actual, datos, existingId) {
+      var self = this;
+      return (function (nro_ot_actual, datos, existingId) {
+        var otActualStr = String(nro_ot_actual);
+        // Agrupar imágenes por OT destino, por cada campo de imagen.
+        function extraerImgs(imgsSource, nroOt) {
+          return (imgsSource || []).filter(function (p) {
+            var over = String((p && p.nro_ot_override) || '').trim();
+            var dest = over || otActualStr;
+            return dest === String(nroOt);
+          }).map(function (p) {
+            var copia = Object.assign({}, p);
+            delete copia.nro_ot_override;
+            return copia;
+          });
+        }
+        // Recolectar TODAS las OTs destino a partir de las imágenes.
+        var otsDest = {};
+        otsDest[otActualStr] = true;
+        IMAGE_KEYS.forEach(function (k) {
+          (datos[k] || []).forEach(function (p) {
+            var over = String((p && p.nro_ot_override) || '').trim();
+            var dest = over || otActualStr;
+            otsDest[dest] = true;
+          });
+        });
+        // Textos por OT (resultados_seccion).
+        var mapaTextos = (datos && datos.textos_por_ot) || {};
+        function aplanarTextosPara(nroOt) {
+          var m = mapaTextos[nroOt] || {};
+          var out = {};
+          if (m.resultados_seccion !== undefined) out.resultados_seccion = m.resultados_seccion;
+          else if (nroOt === otActualStr && datos.resultados_seccion !== undefined) {
+            out.resultados_seccion = datos.resultados_seccion;
+          } else {
+            out.resultados_seccion = {};
+          }
+          return out;
+        }
+        // Condiciones por OT (analisis por sección: on, ref, metodologia).
+        var mapaCond = (datos && datos.condiciones_por_ot) || {};
+        function condsPara(nroOt) {
+          var m = mapaCond[nroOt];
+          if (m && m.analisis) return { analisis: Object.assign({}, m.analisis) };
+          if (nroOt === otActualStr && datos.analisis) return { analisis: datos.analisis };
+          return {};
+        }
+        // Función que arma el datos_json final para una OT destino.
+        function armarDatosPara(nroOt, datosPrev) {
+          var out = datosPrev ? Object.assign({}, datosPrev) : {};
+          // Imágenes filtradas por esta OT.
+          IMAGE_KEYS.forEach(function (k) {
+            var filtradas = extraerImgs(datos[k], nroOt);
+            if (nroOt === otActualStr) {
+              // OT actual: reemplaza sus imágenes con las filtradas.
+              out[k] = filtradas;
+            } else {
+              // OT hermana: fusionar sin duplicar por name.
+              var prev = Array.isArray(out[k]) ? out[k] : [];
+              var seen = new Set(prev.map(function (p) { return String((p && p.name) || '').toLowerCase(); }));
+              var nuevas = filtradas.filter(function (p) { return !seen.has(String((p && p.name) || '').toLowerCase()); });
+              out[k] = prev.concat(nuevas);
+            }
+          });
+          // Aplanar textos y condiciones para esta OT.
+          Object.assign(out, aplanarTextosPara(nroOt), condsPara(nroOt));
+          delete out.textos_por_ot;
+          if (!out.condiciones_por_ot) delete out.condiciones_por_ot;
+          return out;
+        }
+        // OT actual: usa datos base + filtro imágenes propias.
+        var datosActual = armarDatosPara(otActualStr, datos);
+        var promActual = self.saveEnsayoAsync(nro_ot_actual, tipo, datosActual, existingId || null);
+        // OTs hermanas.
+        var hermanas = Object.keys(otsDest).filter(function (n) { return n !== otActualStr; });
+        var promsHermanas = hermanas.map(function (nroY) {
+          var existente = _db.ensayos.find(function (e) {
+            return e.nro_ot === nroY && e.tipo === tipo;
+          });
+          var accion, datosY, existingIdY;
+          if (existente) {
+            accion = 'actualizado';
+            existingIdY = existente.id;
+            var datosPrev = {};
+            try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+            datosY = armarDatosPara(nroY, datosPrev);
+          } else {
+            accion = 'creado';
+            // Copiar condiciones globales del ensayo actual (reactivos, equipamiento,
+            // temperatura, aumentos, muestra ensayada, etc.).
+            datosY = armarDatosPara(nroY, null);
+            (CONDICIONES_GLOBALES || []).forEach(function (k) {
+              if (datos[k] !== undefined) datosY[k] = datos[k];
+            });
+          }
+          // Contar cuántas imágenes reciben para el toast.
+          var cantidad = 0;
+          IMAGE_KEYS.forEach(function (k) {
+            cantidad += extraerImgs(datos[k], nroY).length;
+          });
+          return self.saveEnsayoAsync(nroY, tipo, datosY, existingIdY).then(function (row) {
+            return { nro_ot: nroY, accion: accion, cantidad: cantidad, id: row && row.id };
+          });
+        });
+        return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+          var actualRow = results[0];
+          var cantActual = 0;
+          IMAGE_KEYS.forEach(function (k) { cantActual += extraerImgs(datos[k], otActualStr).length; });
+          return {
+            otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: cantActual },
+            otsHermanas: results.slice(1),
+          };
+        });
+      })(nro_ot_actual, datos, existingId);
+    },
+
+    // ── Metalografía general ─────────────────────────────────────────────
+    // Delega en _saveEnsayoConImagenesMultiOt con los campos de imagen y las
+    // condiciones globales que copia al ensayo hermano recién creado.
+    saveEnsayoMetalografiaGeneralMultiOt: function (nro_ot_actual, datos, existingId) {
+      return this._saveEnsayoConImagenesMultiOt(
+        'metalografia-general',
+        ['imagenes_micro', 'imagenes_espesor', 'imagenes_grafito', 'imagenes_decarb'],
+        [
+          'oaa', 'temperatura', 'zona_ensayo', 'muestra_ensayada',
+          'reactivos', 'reactivo_otro', 'aumentos',
+          'equipamiento', 'equipamiento_tags', 'otros_equipos',
+          'observaciones_evaluacion', 'observaciones_extra',
+          'nota_evaluaciones', 'nota_no_conforme', 'nota_mecanizada',
+          'nota_incertidumbre', 'nota_externo',
+          'estado_superficie', 'estado_equipo', 'estado_reactivo',
+        ],
+        nro_ot_actual, datos, existingId
+      );
+    },
+
+    // ── Anexo metalográfico ──────────────────────────────────────────────
+    saveEnsayoAnexoMetalograficoMultiOt: function (nro_ot_actual, datos, existingId) {
+      return this._saveEnsayoConImagenesMultiOt(
+        'anexo-metalografico',
+        ['imagenes_grano', 'imagenes_inclusiones'],
+        [
+          'oaa', 'temperatura', 'zona_ensayo', 'muestra_ensayada',
+          'reactivos', 'reactivo_otro', 'aumentos',
+          'equipamiento', 'equipamiento_tags', 'otros_equipos',
+          'grano', 'inclu',  // sub-objetos con datos de resultado
+          'observaciones_evaluacion',
+          'nota_evaluaciones', 'nota_no_conforme',
+          'estado_superficie', 'estado_equipo', 'estado_reactivo',
+        ],
+        nro_ot_actual, datos, existingId
+      );
+    },
+
+    // Comentario informativo de la lógica compartida arriba.
+    // (Excluye `analisis` y `resultados_seccion` que se aplanan por OT, y
+    // `imagenes_*` que se filtran por OT.)
     // Igual que saveEnsayo pero devuelve una Promise con la fila guardada (id
     // real de la DB). Lo usa el flujo de firma-obligatoria-al-guardar, que
     // necesita el id para firmar inmediatamente después de guardar.

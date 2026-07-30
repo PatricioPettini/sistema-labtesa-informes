@@ -255,6 +255,13 @@ function AnexoMetalograficoForm(props) {
               photos: datos.imagenes_grano || [],
               hint: 'Micrografías con la estructura del grano (ASTM E112 / ITM 064). Se insertan bajo el resultado de Tamaño de Grano en el Word.',
               onChange: function (next) { upd('imagenes_grano', next); },
+              otsDisponibles: (function () {
+                if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+                var otA = window.LabStore.getOt(props.nroOt);
+                if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+                return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+              })(),
+              otNroActual: String(props.nroOt || ''),
             })
           : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
       ),
@@ -266,6 +273,13 @@ function AnexoMetalograficoForm(props) {
               photos: datos.imagenes_inclusiones || [],
               hint: 'Micrografías con las inclusiones (ASTM E45 / ITM 063). Se insertan bajo la tabla de Tenor Inclusionario en el Word.',
               onChange: function (next) { upd('imagenes_inclusiones', next); },
+              otsDisponibles: (function () {
+                if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+                var otA = window.LabStore.getOt(props.nroOt);
+                if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+                return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+              })(),
+              otNroActual: String(props.nroOt || ''),
             })
           : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
       )

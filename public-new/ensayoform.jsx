@@ -303,6 +303,36 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en metalografía general / anexo metalográfico: divide
+    // por IMÁGENES (cada imagen tiene su `nro_ot_override`), no por filas.
+    var IMG_KEYS_META = tipo === 'metalografia-general'
+      ? ['imagenes_micro', 'imagenes_espesor', 'imagenes_grafito', 'imagenes_decarb']
+      : (tipo === 'anexo-metalografico' ? ['imagenes_grano', 'imagenes_inclusiones'] : null);
+    if (IMG_KEYS_META) {
+      var hayOverrideImg = IMG_KEYS_META.some(function (k) {
+        return (clean[k] || []).some(function (p) {
+          var over = String((p && p.nro_ot_override) || '').trim();
+          return over && over !== String(ot.nro_ot);
+        });
+      });
+      var fnMulti = tipo === 'metalografia-general'
+        ? window.LabStore.saveEnsayoMetalografiaGeneralMultiOt
+        : window.LabStore.saveEnsayoAnexoMetalograficoMultiOt;
+      if (hayOverrideImg && typeof fnMulti === 'function') {
+        fnMulti.call(window.LabStore, ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var etiqueta = tipo === 'metalografia-general' ? 'Metalografía general' : 'Anexo metalográfico';
+            var msg = etiqueta + ' guardado · ' + resumen.otActual.cantidad + ' img en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) { toast('Error al sincronizar multi-OT: ' + e.message, 'danger'); });
+        return;
+      }
+    }
     window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null);
     toast((window.LabStore.labels[tipo] || 'Ensayo') + ' guardado', 'success');
     nav('#/ot/' + ot.nro_ot);
@@ -459,7 +489,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.LiquidosPenetrantesForm, { datos: datos, set: set })
         : null,
       tipo === 'metalografia-general' && typeof window.MetalografiaGeneralForm === 'function'
-        ? React.createElement(window.MetalografiaGeneralForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null })
+        ? React.createElement(window.MetalografiaGeneralForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'anexo-metalografico' && typeof window.AnexoMetalograficoForm === 'function'
         ? React.createElement(window.AnexoMetalograficoForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
@@ -494,6 +524,14 @@ function EnsayoForm(props) {
               photos: datos[sec.key] || [],
               hint: sec.hint,
               onChange: function (next) { set(sec.key, next); },
+              // Multi-OT: dropdown de OT en cada imagen si hay hermanas.
+              otsDisponibles: (function () {
+                if (!window.LabStore || !window.LabStore.getOt) return null;
+                var otA = window.LabStore.getOt(props.nro_ot);
+                if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+                return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+              })(),
+              otNroActual: String(props.nro_ot || ''),
             })
           );
         } else if (sec.type === 'dynamicTable') {
@@ -860,6 +898,40 @@ function EnsayoPhotos(props) {
               value: p.caption || '',
               onChange: function (e) { setCaption(i, e.target.value); },
             }),
+            // Dropdown de OT — aparece solo si props.otsDisponibles trae ≥2 OTs
+            // hermanas. Cada imagen puede asignarse a una OT distinta. Al
+            // guardar, el store la transfiere al ensayo de esa OT hermana.
+            (props.otsDisponibles && props.otsDisponibles.length > 1)
+              ? (function () {
+                  var otNroActual = props.otNroActual || '';
+                  var over = String(p.nro_ot_override || '').trim();
+                  var otEff = over || otNroActual;
+                  var esOtra = over && over !== otNroActual;
+                  return React.createElement('div', { style: { marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 } },
+                    React.createElement('span', { style: { color: 'var(--text-3)', fontSize: 10 } }, 'OT:'),
+                    React.createElement('select', {
+                      value: otEff,
+                      style: {
+                        padding: '2px 4px', fontSize: 11,
+                        background: esOtra ? '#fff8e5' : 'var(--surface)',
+                        color: esOtra ? '#8a5a00' : 'var(--text)',
+                        fontWeight: esOtra ? 700 : 400,
+                        border: '1px solid var(--border)', borderRadius: 3,
+                      },
+                      onChange: function (e) {
+                        var v = String(e.target.value || '').trim();
+                        if (v === otNroActual) v = '';
+                        props.onChange(photos.map(function (pp, idx) {
+                          return idx === i ? Object.assign({}, pp, { nro_ot_override: v }) : pp;
+                        }));
+                      },
+                    },
+                      props.otsDisponibles.map(function (o) {
+                        var label = o.nro_ot + (o.nro_ot === otNroActual ? ' (esta)' : '');
+                        return React.createElement('option', { key: o.nro_ot, value: o.nro_ot }, label);
+                      })));
+                })()
+              : null,
             React.createElement('div', { className: 'ensayo-photo-actions' },
               React.createElement('button', { className: 'btn-mini', title: 'Recortar / rotar',
                 onClick: function () { setEditing({ index: i, photo: p }); } },

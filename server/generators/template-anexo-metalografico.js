@@ -287,6 +287,36 @@ function generarAnexoMetalograficoDesdeTemplate(ot, datos, fotosCaratula) {
   const fotos = Array.isArray(fotosCaratula) ? fotosCaratula.filter(Boolean) : [];
   const nroOtBase = (ot.nro_ot || '').replace(/^O\.T\.?\s*/i, '');
 
+  // ── Multi-OT: filtrar imágenes por nro_ot_override + aplicar overrides ───
+  if (datos && datos._filtro_ot != null) {
+    const otFiltro = String(datos._filtro_ot);
+    const esOtDelEnsayo = otFiltro === String(ot.nro_ot || '');
+    const filtrarImgs = (arr) => (Array.isArray(arr) ? arr : []).filter(p => {
+      const ov = String((p && p.nro_ot_override) || '').trim();
+      const perteneceA = ov || String(ot.nro_ot || '');
+      return perteneceA === otFiltro || (esOtDelEnsayo && !ov);
+    });
+    datos = Object.assign({}, datos);
+    ['imagenes_grano', 'imagenes_inclusiones'].forEach(k => {
+      if (Array.isArray(datos[k])) datos[k] = filtrarImgs(datos[k]);
+    });
+  }
+  if (datos && datos.textos_por_ot && typeof datos.textos_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const t = datos.textos_por_ot[nroOtActual];
+    if (t) {
+      datos = Object.assign({}, datos);
+      if (t.resultados_seccion !== undefined) datos.resultados_seccion = t.resultados_seccion;
+    }
+  }
+  if (datos && datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+    const nroOtActual = String(ot.nro_ot || '');
+    const c = datos.condiciones_por_ot[nroOtActual];
+    if (c && c.analisis) {
+      datos = Object.assign({}, datos, { analisis: c.analisis });
+    }
+  }
+
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
   const doc = new Docxtemplater(zip, {

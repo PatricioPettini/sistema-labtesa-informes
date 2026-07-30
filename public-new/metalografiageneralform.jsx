@@ -354,6 +354,14 @@ function MetalografiaGeneralForm(props) {
                     photos: datos[key] || [],
                     hint: 'Se insertan dentro de la sección "' + etiqueta + '" del Word.',
                     onChange: function (next) { upd(key, next); },
+                    // Multi-OT: dropdown de OT en cada imagen (solo si hay hermanas).
+                    otsDisponibles: (function () {
+                      if (!props.nroOt || !window.LabStore || !window.LabStore.getOt) return null;
+                      var otA = window.LabStore.getOt(props.nroOt);
+                      if (!otA || !otA.nro_solicitud || !window.LabStore.listOtsBySolicitud) return null;
+                      return window.LabStore.listOtsBySolicitud(otA.nro_solicitud);
+                    })(),
+                    otNroActual: String(props.nroOt || ''),
                   })
                 : _r('div', { style: { fontSize: 11, color: '#999', border: '1px dashed #ccc', padding: 10, textAlign: 'center' } }, 'Widget de fotos no disponible')
             );
