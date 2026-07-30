@@ -36,10 +36,13 @@ const REACTIVOS = [
   ['kellers',     'Reactivo Kellers'],
 ];
 
+// [key, nombre, tagDefault]. El tagDefault se usa cuando el usuario tildó el
+// equipo pero no editó el input de TAG en el form (equipamiento_tags[key]
+// queda undefined). Debe coincidir con el catálogo MG_EQUIPOS del front.
 const EQUIPOS = [
-  ['olympus_016', 'Microscopio Olympus'],
-  ['leica_378',   'Microscopio Leica DM 750'],
-  ['termo_700',   'Termohigrómetro'],
+  ['olympus_016', 'Microscopio Olympus',      'MM-016'],
+  ['leica_378',   'Microscopio Leica DM 750', 'MM-378'],
+  ['termo_700',   'Termohigrómetro',          'MM-700'],
 ];
 
 const AUMENTOS = [
@@ -117,9 +120,13 @@ function construirBloqueEnsayo(datos) {
 
   // Equipamiento global
   const equiposLineasGlobal = [];
-  EQUIPOS.forEach(([key, nombre]) => {
+  EQUIPOS.forEach(([key, nombre, tagDefault]) => {
     if (!(datos.equipamiento && datos.equipamiento[key])) return;
-    const tag = (datos.equipamiento_tags && datos.equipamiento_tags[key] || '').trim();
+    // Si el usuario no editó el input, equipamiento_tags[key] es undefined —
+    // usar el tagDefault del catálogo (mismo valor que el front muestra por
+    // defecto). Si el usuario borró el campo a propósito, respetar '' vacío.
+    const tagRaw = datos.equipamiento_tags && datos.equipamiento_tags[key];
+    const tag = (tagRaw != null ? String(tagRaw) : String(tagDefault || '')).trim();
     equiposLineasGlobal.push(tag ? `${nombre} TAG N°${tag}` : nombre);
   });
   // Aumento: texto libre si está, si no listado de checkboxes.

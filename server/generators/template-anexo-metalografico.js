@@ -24,9 +24,11 @@ const REACTIVOS = [
   ['universal',   'Universal'],
 ];
 
+// [key, nombre, tagDefault]. tagDefault se usa cuando el usuario tildó el
+// equipo pero no editó el input de TAG (equipamiento_tags[key] undefined).
 const EQUIPOS = [
-  ['leica_378', 'Microscopio Leica DM 750'],
-  ['termo_700', 'Termohigrómetro'],
+  ['leica_378', 'Microscopio Leica DM 750', 'MM-378'],
+  ['termo_700', 'Termohigrómetro',          'MM-700'],
 ];
 
 const AUMENTOS = [
@@ -193,9 +195,12 @@ function construirBloqueEnsayo(datos) {
 
   // Equipamiento (compartido en ambas secciones).
   const equiposLineas = [];
-  EQUIPOS.forEach(([key, nombre]) => {
+  EQUIPOS.forEach(([key, nombre, tagDefault]) => {
     if (!(datos.equipamiento && datos.equipamiento[key])) return;
-    const tag = (datos.equipamiento_tags && datos.equipamiento_tags[key] || '').trim();
+    // Si el usuario no editó el input, equipamiento_tags[key] es undefined —
+    // usar el tagDefault del catálogo. Respeta '' vacío si el usuario lo borró.
+    const tagRaw = datos.equipamiento_tags && datos.equipamiento_tags[key];
+    const tag = (tagRaw != null ? String(tagRaw) : String(tagDefault || '')).trim();
     equiposLineas.push(tag ? `${nombre} TAG N°${tag}` : nombre);
   });
   // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
