@@ -176,84 +176,23 @@ function ImpactoForm(props) {
     twoCol: { display: 'grid', gridTemplateColumns: '1fr 1.15fr' },
   });
 
-  // ── 1.1 NORMAS / PROCEDIMIENTOS ────────────────────────────────────────
-  var norm11 = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: S.headTitle }, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+  // ── 1.1 METODOLOGÍA DE ENSAYO ──────────────────────────────────────────
+  // Antes había 1.1 NORMAS y 1.2 CÓDIGO DE REFERENCIA con checkboxes globales.
+  // Se removieron porque esos datos ahora se cargan por probeta en la sección
+  // "CONDICIONES POR PROBETA" — solo queda el campo Metodología (ITM).
+  var norm11 = _r('div', null,
+    _r('div', { style: S.headTitle }, '1.1  METODOLOGÍA DE ENSAYO'),
     _r('div', { style: S.padBox },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
         _r(window.ItmInput, { tipo: 'impacto', style: Object.assign({}, S.inputCell, { flex: 1 }), value: datos.metodologia || '', placeholder: 'ITM N°078',
-          onChange: function (e) { upd('metodologia', e.target.value); } })),
-      // Cada norma tiene un input de año al lado. Se guarda en `<key>_year`
-      // — el generator lo pega al nombre (ej. "ISO 148-1:2016").
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.norma_iso148_1, onChange: function (e) { updBool('norma_iso148_1', e.target.checked); } }),
-          'SEGÚN ISO 148-1'),
-        _r('span', { style: { color: '#555', fontSize: 10 } }, 'Año:'),
-        _r('input', {
-          style: Object.assign({}, S.inputCell, { width: 60 }),
-          placeholder: ':2016', value: datos.norma_iso148_1_year || '',
-          onChange: function (e) { upd('norma_iso148_1_year', e.target.value); },
-        })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.norma_astm_e23, onChange: function (e) { updBool('norma_astm_e23', e.target.checked); } }),
-          'SEGÚN ASTM E23'),
-        _r('span', { style: { color: '#555', fontSize: 10 } }, 'Año:'),
-        _r('input', {
-          style: Object.assign({}, S.inputCell, { width: 60 }),
-          placeholder: '-23a', value: datos.norma_astm_e23_year || '',
-          onChange: function (e) { upd('norma_astm_e23_year', e.target.value); },
-        })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-          _r('input', { type: 'checkbox', checked: !!datos.norma_din_10045, onChange: function (e) { updBool('norma_din_10045', e.target.checked); } }),
-          'SEGÚN DIN EN 10045'),
-        _r('span', { style: { color: '#555', fontSize: 10 } }, 'Año:'),
-        _r('input', {
-          style: Object.assign({}, S.inputCell, { width: 60 }),
-          placeholder: ':2020', value: datos.norma_din_10045_year || '',
-          onChange: function (e) { upd('norma_din_10045_year', e.target.value); },
-        })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('span', { style: { fontWeight: 600 } }, 'Otra:'),
-        _r(window.NormaInput, { tipo: 'impacto', categoria: 'ensayo', style: Object.assign({}, S.inputCell, { flex: 1 }), value: datos.norma || '', placeholder: 'Ej.: ISO 148-1:2016',
-          onChange: function (e) { upd('norma', e.target.value); } })),
-    ),
-    // 1.2
-    _r('div', { style: S.headTitle }, '1.2  CÓDIGO DE REFERENCIA'),
-    _r('div', { style: S.padBox },
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_asme, onChange: function (e) { updBool('cod_asme', e.target.checked); } }),
-        'ASME BPVC Secc. IX'),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('span', null, 'Edición ASME:'),
-        _r('input', { style: Object.assign({}, S.inputCell, { width: 80 }), value: datos.ed_asme || '', placeholder: '2025',
-          onChange: function (e) { upd('ed_asme', e.target.value); } })),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_api1104, onChange: function (e) { updBool('cod_api1104', e.target.checked); } }),
-        'API 1104'),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_api5l, onChange: function (e) { updBool('cod_api5l', e.target.checked); } }),
-        'API 5L'),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.cod_aws_d11, onChange: function (e) { updBool('cod_aws_d11', e.target.checked); } }),
-        'AWS D1.1/D1.1M:2025-AMD1'),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('span', null, 'Otros:'),
-        _r(window.NormaInput, {
-          tipo: 'impacto', categoria: 'referencia',
-          style: Object.assign({}, S.inputCell, { flex: 1 }),
-          value: datos.cod_extra || '', placeholder: 'Empezá a escribir (ej: ASME…, API…, AWS…)',
-          onChange: function (e) { upd('cod_extra', e.target.value); },
-        })),
+          onChange: function (e) { upd('metodologia', e.target.value); } }))
     )
   );
 
-  // ── 1.3 VERIFICACIONES Y CONDICIONES ───────────────────────────────────
+  // ── 1.2 VERIFICACIONES Y CONDICIONES ───────────────────────────────────
   var verif = _r('div', null,
-    _r('div', { style: S.headTitle }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: S.headTitle }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: S.padBox },
       // Temperatura
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
@@ -313,9 +252,14 @@ function ImpactoForm(props) {
         _r('span', { style: { fontWeight: 600 } }, 'RADIO DE IMPACTADOR:'),
         _r('input', { style: Object.assign({}, S.inputCell, { width: 80 }), value: datos.radio_impactador || '', placeholder: '8mm',
           onChange: function (e) { upd('radio_impactador', e.target.value); } }),
-        _r('em', { style: { color: '#888', fontSize: 10 } }, '(no va al informe)')),
-    ),
-    // 1.4 Equipamiento — filtrado por variante (caba=Galdabini, neuquen=Wolpert)
+        _r('em', { style: { color: '#888', fontSize: 10 } }, '(no va al informe)'))
+    )
+  );
+
+  // ── 1.4 EQUIPAMIENTO UTILIZADO ─────────────────────────────────────────
+  // Separado en su propio bloque para poder intercalar 1.3 CONDICIONES POR
+  // PROBETA entre VERIFICACIONES y EQUIPAMIENTO.
+  var equipBlock = _r('div', null,
     _r('div', { style: S.headTitle }, '1.4  EQUIPAMIENTO UTILIZADO' + (datos.variante === 'caba' ? ' — Set Galdabini (CABA)' : ' — Set Wolpert (Neuquén)')),
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11 } },
       (datos.variante === 'caba' ? IMPACTO_EQ_CABA : IMPACTO_EQ_NEUQUEN).map(function (e) {
@@ -471,19 +415,68 @@ function ImpactoForm(props) {
     )
   );
 
-  // ── 1.7 CONDICIONES POR PROBETA (mismo patrón que tracción) ─────────────
+  // ── 1.3 CONDICIONES POR PROBETA (mismo patrón que tracción) ─────────────
   // Tabla con una columna por probeta (M1..MN) y filas de campos que pueden
   // diferir por probeta: Norma de ensayo y Código de referencia. Al editar M1
   // el valor se propaga a las probetas que estaban vacías o tenían el mismo
   // valor previo de M1; las que fueron editadas manualmente quedan "fijas".
+  // El control "+/−" abajo mueve el tamaño del array `resultados[]`, así que
+  // esta tabla Y la de "1.5 RESULTADOS OBTENIDOS" comparten la cantidad.
   var COND_PROB_FIELDS = [
     { k: 'norma',              label: 'Norma de ensayo',      placeholder: 'Ej: ISO 148-1:2016' },
     { k: 'codigo_referencia',  label: 'Código de referencia', placeholder: 'Ej: ASME BPVC Sección IX Ed.2025' },
   ];
   var resultadosArr = Array.isArray(datos.resultados) ? datos.resultados : [];
-  var blockCondProbeta = resultadosArr.length > 0 ? _r('div', null,
-    _r('div', { style: S.headTitle }, '1.7  CONDICIONES POR PROBETA'),
-    _r('div', { style: { padding: 8, overflowX: 'auto' } },
+  function ajustarCantidadProbetas(nueva) {
+    var n = Math.max(1, Math.min(20, nueva | 0));
+    var curr = resultadosArr.slice();
+    if (curr.length === n) return;
+    if (curr.length > n) {
+      curr = curr.slice(0, n);
+    } else {
+      // Al agregar, propagar norma/código de M1 (M0) a las nuevas filas para
+      // que arranquen con el mismo valor y el técnico las pueda diferenciar
+      // manualmente si necesita.
+      var m1 = curr[0] || {};
+      while (curr.length < n) {
+        curr.push({
+          norma: m1.norma || '',
+          codigo_referencia: m1.codigo_referencia || '',
+        });
+      }
+    }
+    set('resultados', curr);
+  }
+  var blockCondProbeta = _r('div', null,
+    _r('div', { style: S.headTitle }, '1.3  CONDICIONES POR PROBETA'),
+    // Control +/- para modificar la cantidad de probetas. Al cambiar, se
+    // refleja simultáneamente en la tabla de resultados obtenidos (1.5).
+    _r('div', { style: { padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, borderBottom: '1px solid #ddd' } },
+      _r('span', { style: { fontWeight: 700 } }, 'Cantidad de probetas:'),
+      _r('button', {
+        type: 'button',
+        disabled: resultadosArr.length <= 1,
+        onClick: function () { ajustarCantidadProbetas(resultadosArr.length - 1); },
+        style: { width: 30, height: 30, border: '1px solid #999', background: resultadosArr.length <= 1 ? '#eee' : '#f4f4f4', cursor: resultadosArr.length <= 1 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
+      }, '−'),
+      _r('input', {
+        type: 'number', min: 1, max: 20, value: resultadosArr.length,
+        onChange: function (e) {
+          var v = parseInt(e.target.value, 10);
+          if (!isNaN(v)) ajustarCantidadProbetas(v);
+        },
+        style: { width: 60, height: 30, textAlign: 'center', border: '1px solid #999', borderRadius: 4, fontSize: 14, fontWeight: 700 },
+      }),
+      _r('button', {
+        type: 'button',
+        disabled: resultadosArr.length >= 20,
+        onClick: function () { ajustarCantidadProbetas(resultadosArr.length + 1); },
+        style: { width: 30, height: 30, border: '1px solid #999', background: resultadosArr.length >= 20 ? '#eee' : '#f4f4f4', cursor: resultadosArr.length >= 20 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
+      }, '+'),
+      _r('span', { style: { color: '#555', fontSize: 11, marginLeft: 8 } },
+        'Impacta esta tabla y la de resultados obtenidos.')
+    ),
+    resultadosArr.length > 0 ? _r('div', { style: { padding: 8, overflowX: 'auto' } },
       _r('div', { style: { fontSize: 10, color: '#555', marginBottom: 6 } },
         'Editar la columna M1 propaga automáticamente el valor a las demás probetas que tenían el mismo valor o estaban vacías. Si cambiás M2 (u otra) manualmente, esa queda "fija" y ya no se sobrescribe desde M1.'),
       _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 11, minWidth: 640 } },
@@ -559,13 +552,20 @@ function ImpactoForm(props) {
           );
         }))
       )
-    )
-  ) : null;
+    ) : null
+  );
 
+  // Orden final del form:
+  //   1.1 Metodología (solo ITM)  |  1.2 Verificaciones (en dos columnas)
+  //   1.3 Condiciones por probeta (tabla con control +/− de cantidad)
+  //   1.4 Equipamiento utilizado
+  //   1.5 Resultados obtenidos
+  //   1.6 Observaciones / Evaluación
   return _r('div', { style: S.sheet },
     _r('div', { style: S.twoCol }, norm11, verif),
-    resSection,
     blockCondProbeta,
+    equipBlock,
+    resSection,
     obs
   );
 }
