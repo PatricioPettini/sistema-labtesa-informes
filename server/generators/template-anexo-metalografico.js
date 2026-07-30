@@ -329,8 +329,10 @@ function generarAnexoMetalograficoDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos && datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
     const nroOtActual = String(ot.nro_ot || '');
     const c = datos.condiciones_por_ot[nroOtActual];
-    if (c && c.analisis) {
-      datos = Object.assign({}, datos, { analisis: c.analisis });
+    if (c && Object.keys(c).length > 0) {
+      // Aplicar TODOS los campos del mapa como overrides (temperatura,
+      // reactivos, equipamiento, grano, inclu, etc.).
+      datos = Object.assign({}, datos, c);
     }
   }
 

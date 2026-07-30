@@ -702,6 +702,16 @@
             otsDest[dest] = true;
           });
         });
+        // También agregar como destinos las OTs mencionadas en textos_por_ot
+        // y condiciones_por_ot — así al guardar sin imágenes con override pero
+        // con textos/condiciones cargados para otras OTs, esas hermanas
+        // reciben el ensayo con SUS datos igualmente.
+        if (datos && datos.textos_por_ot) {
+          Object.keys(datos.textos_por_ot).forEach(function (n) { if (n) otsDest[n] = true; });
+        }
+        if (datos && datos.condiciones_por_ot) {
+          Object.keys(datos.condiciones_por_ot).forEach(function (n) { if (n) otsDest[n] = true; });
+        }
         // Textos por OT. Aplanamos todos los campos del mapa (genéricos):
         // - metalografía general: `resultados_seccion` (objeto por sección).
         // - anexo metalográfico: `resultado_grano` y `resultado_inclusionario`
@@ -717,11 +727,19 @@
           });
           return out;
         }
-        // Condiciones por OT (analisis por sección: on, ref, metodologia).
+        // Condiciones por OT. Contiene `analisis` (por sección) + condiciones
+        // globales que el técnico haya copiado a otras OTs desde el botón
+        // "Copiar condiciones": temperatura, zona_ensayo, muestra_ensayada,
+        // reactivos, reactivo_otro, aumentos, equipamiento, equipamiento_tags,
+        // grano, inclu, otros_equipos, etc. Al aplanar para la OT destino, se
+        // aplican todos los campos del mapa (los que estén presentes).
         var mapaCond = (datos && datos.condiciones_por_ot) || {};
         function condsPara(nroOt) {
           var m = mapaCond[nroOt];
-          if (m && m.analisis) return { analisis: Object.assign({}, m.analisis) };
+          if (m && Object.keys(m).length > 0) {
+            // Devolver copia superficial de todo el mapa (incluyendo analisis).
+            return Object.assign({}, m);
+          }
           if (nroOt === otActualStr && datos.analisis) return { analisis: datos.analisis };
           return {};
         }

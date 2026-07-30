@@ -303,22 +303,41 @@ function EnsayoForm(props) {
         return;
       }
     }
-    // Split multi-OT en metalografía general / anexo metalográfico: divide
-    // por IMÁGENES (cada imagen tiene su `nro_ot_override`), no por filas.
+    // Split multi-OT en metalografía general / anexo metalográfico. Se dispara si:
+    //   a) Al menos una imagen tiene `nro_ot_override` distinto, O
+    //   b) `textos_por_ot` tiene datos para alguna OT hermana, O
+    //   c) `condiciones_por_ot` tiene datos para alguna OT hermana.
+    // Antes solo miraba (a) — bug: textos por OT no llegaban a hermanas.
     var IMG_KEYS_META = tipo === 'metalografia-general'
       ? ['imagenes_micro', 'imagenes_espesor', 'imagenes_grafito', 'imagenes_decarb']
       : (tipo === 'anexo-metalografico' ? ['imagenes_grano', 'imagenes_inclusiones'] : null);
     if (IMG_KEYS_META) {
+      var otActualStr = String(ot.nro_ot);
       var hayOverrideImg = IMG_KEYS_META.some(function (k) {
         return (clean[k] || []).some(function (p) {
           var over = String((p && p.nro_ot_override) || '').trim();
-          return over && over !== String(ot.nro_ot);
+          return over && over !== otActualStr;
         });
       });
+      var hayTextosOtras = clean.textos_por_ot && Object.keys(clean.textos_por_ot).some(function (n) {
+        if (n === otActualStr) return false;
+        var m = clean.textos_por_ot[n] || {};
+        return Object.keys(m).some(function (k) {
+          var v = m[k];
+          if (v == null) return false;
+          if (typeof v === 'string') return v.trim() !== '';
+          if (typeof v === 'object') return Object.keys(v).length > 0;
+          return true;
+        });
+      });
+      var hayCondsOtras = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        return n !== otActualStr && Object.keys(clean.condiciones_por_ot[n] || {}).length > 0;
+      });
+      var necesitaSplit = hayOverrideImg || hayTextosOtras || hayCondsOtras;
       var fnMulti = tipo === 'metalografia-general'
         ? window.LabStore.saveEnsayoMetalografiaGeneralMultiOt
         : window.LabStore.saveEnsayoAnexoMetalograficoMultiOt;
-      if (hayOverrideImg && typeof fnMulti === 'function') {
+      if (necesitaSplit && typeof fnMulti === 'function') {
         fnMulti.call(window.LabStore, ot.nro_ot, clean, existing ? existing.id : null)
           .then(function (resumen) {
             var etiqueta = tipo === 'metalografia-general' ? 'Metalografía general' : 'Anexo metalográfico';

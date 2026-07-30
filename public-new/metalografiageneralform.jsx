@@ -385,6 +385,84 @@ function MetalografiaGeneralForm(props) {
       set('textos_por_ot', mapa);
     }
   }
+  // Copiar TODAS las condiciones globales (temperatura, zona, muestra,
+  // reactivos, aumentos, equipamiento, analisis) al mapa condiciones_por_ot
+  // para las OTs destino seleccionadas. Se usa antes de guardar cuando el
+  // técnico configuró condiciones distintas por muestra.
+  var CONDICIONES_MG_COPIABLES = [
+    'temperatura', 'zona_ensayo', 'muestra_ensayada',
+    'reactivos', 'reactivo_otro', 'aumentos',
+    'equipamiento', 'equipamiento_tags', 'otros_equipos', 'analisis',
+  ];
+  var _copyCond = React.useState(false); var copyCondOpen = _copyCond[0], setCopyCondOpen = _copyCond[1];
+  var _copyCondDest = React.useState([]); var copyCondDest = _copyCondDest[0], setCopyCondDest = _copyCondDest[1];
+  function copiarCondicionesAOts(destinos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      CONDICIONES_MG_COPIABLES.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          // Deep copy superficial para objetos (reactivos, equipamiento, etc.)
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+  }
+
+  var botonCopiarCondMg = multiOtMg ? _r('div', { style: { position: 'relative', display: 'inline-block' } },
+    _r('button', {
+      type: 'button',
+      onClick: function () {
+        setCopyCondDest([]);
+        setCopyCondOpen(!copyCondOpen);
+      },
+      style: {
+        border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff',
+        padding: '4px 10px', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontWeight: 600,
+      },
+    }, '📋 Copiar condiciones a otras OTs'),
+    copyCondOpen ? _r('div', {
+      style: {
+        position: 'absolute', zIndex: 30, top: '100%', left: 0, marginTop: 4,
+        background: 'var(--surface)', border: '1px solid var(--border-strong)',
+        borderRadius: 6, boxShadow: 'var(--shadow-md)', padding: 10, minWidth: 260, fontSize: 11,
+      },
+    },
+      _r('div', { style: { fontWeight: 700, marginBottom: 6, color: 'var(--text)' } }, 'Copiar TODAS las condiciones a:'),
+      _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } },
+        'Temperatura, zona, muestra, reactivos, aumentos, equipamiento y análisis se replican como valores base para las OTs elegidas.'),
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+        otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) {
+          var nro = String(o.nro_ot);
+          var checked = copyCondDest.indexOf(nro) >= 0;
+          return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', checked: checked,
+              onChange: function () {
+                setCopyCondDest(checked ? copyCondDest.filter(function (n) { return n !== nro; }) : copyCondDest.concat([nro]));
+              } }),
+            _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+        })),
+      _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+        _r('button', { type: 'button', onClick: function () { setCopyCondOpen(false); },
+          style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+        _r('button', { type: 'button',
+          onClick: function () {
+            var destinos = copyCondDest.slice();
+            if (destinos.length === 0) {
+              destinos = otsHermMg.filter(function (o) { return String(o.nro_ot) !== otNroActualMg; }).map(function (o) { return String(o.nro_ot); });
+            }
+            copiarCondicionesAOts(destinos);
+            setCopyCondOpen(false); setCopyCondDest([]);
+          },
+          style: { border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+    ) : null
+  ) : null;
+
   var tabsOtMg = multiOtMg ? _r('div', {
     style: {
       display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
@@ -412,7 +490,8 @@ function MetalografiaGeneralForm(props) {
           },
         }, nro, esActual ? ' · actual' : '');
       })),
-    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos.')
+    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos.'),
+    _r('div', { style: { marginLeft: 'auto' } }, botonCopiarCondMg)
   ) : null;
 
   var block14 = _r('div', null,

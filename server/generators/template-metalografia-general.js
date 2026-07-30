@@ -280,8 +280,11 @@ function generarMetalografiaGeneralDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos && datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
     const nroOtActual = String(ot.nro_ot || '');
     const c = datos.condiciones_por_ot[nroOtActual];
-    if (c && c.analisis) {
-      datos = Object.assign({}, datos, { analisis: c.analisis });
+    if (c && Object.keys(c).length > 0) {
+      // Aplicar TODOS los campos del mapa como overrides sobre los valores raíz.
+      // Cubre analisis + temperatura + reactivos + equipamiento + zona_ensayo +
+      // muestra_ensayada + aumentos + etc. según lo que el técnico haya copiado.
+      datos = Object.assign({}, datos, c);
     }
   }
 
