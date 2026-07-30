@@ -32,7 +32,8 @@ yarn-error.log*
 _*
 debug-header-*.xml
 FM-*-analisis.*
-PROMPT-CONTINUACION.md
+# PROMPT-CONTINUACION.md ahora SÍ va al repo — sirve como onboarding para Claude
+# Code cuando otra persona clona el proyecto. Ver también CLAUDE.md en la raíz.
 PROMPT-CLAUDE-CODE-AUDIT.md
 SUPERPROMPT-CONTINUACION.md
 
