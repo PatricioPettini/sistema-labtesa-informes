@@ -290,12 +290,52 @@ function ImpactoForm(props) {
     var next = resultados.slice();
     next[i] = Object.assign({}, next[i] || {}, {});
     next[i][key] = val;
+    // Si cambia la zona o la OT, recalcular el N° de probeta de ESTA fila
+    // según su nuevo grupo (misma zona × misma OT en las filas anteriores).
+    // Reinicia en 1 cuando la fila cambia a un grupo nuevo. Sólo aplica si
+    // el técnico NO editó manualmente el N° antes (marca `_probetaManual`).
+    if ((key === 'zona' || key === 'nro_ot_override') && !next[i]._probetaManual) {
+      var zonaFila = String(next[i].zona || '').trim();
+      var otFila   = String(next[i].nro_ot_override || '').trim();
+      var count = 0;
+      for (var j = 0; j < i; j++) {
+        var r = next[j] || {};
+        var z = String(r.zona || '').trim();
+        var o = String(r.nro_ot_override || '').trim();
+        if (z === zonaFila && o === otFila) count++;
+      }
+      next[i].probeta = String(count + 1);
+    }
+    // Si el técnico edita `probeta` a mano, marcarla como manual — así deja
+    // de re-numerarse automáticamente al cambiar zona/OT.
+    if (key === 'probeta') next[i]._probetaManual = true;
     set('resultados', next);
   }
+  // Calcula el N° de probeta a asignar a una fila NUEVA que hereda zona/OT
+  // de la última fila (el técnico las cambiará después si corresponde). El
+  // contador reinicia en 1 cuando cambia zona o `nro_ot_override` respecto
+  // al grupo anterior.
+  function siguienteNroProbeta(arr, zonaNueva, otOverrideNueva) {
+    var zonaN = String(zonaNueva || '').trim();
+    var otN = String(otOverrideNueva || '').trim();
+    var count = 0;
+    (arr || []).forEach(function (r) {
+      var z = String((r && r.zona) || '').trim();
+      var o = String((r && r.nro_ot_override) || '').trim();
+      if (z === zonaN && o === otN) count++;
+    });
+    return String(count + 1);
+  }
   function addRow() {
-    // Auto-numerar N° probeta con el siguiente correlativo (editable).
-    var siguiente = String(resultados.length + 1);
-    set('resultados', resultados.concat([{ probeta: siguiente }]));
+    // Hereda zona/OT de la última fila y reinicia numeración por grupo.
+    var ultima = resultados[resultados.length - 1] || {};
+    var zonaHer = ultima.zona || '';
+    var otHer   = ultima.nro_ot_override || '';
+    var siguiente = siguienteNroProbeta(resultados, zonaHer, otHer);
+    var nueva = { probeta: siguiente };
+    if (zonaHer) nueva.zona = zonaHer;
+    if (otHer)   nueva.nro_ot_override = otHer;
+    set('resultados', resultados.concat([nueva]));
   }
   function delRow(i) { set('resultados', resultados.filter(function (_, idx) { return idx !== i; })); }
 
