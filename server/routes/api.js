@@ -713,10 +713,19 @@ router.patch('/ot/:nro_ot', (req, res) => {
 router.post('/ot/:nro_ot/fotos', upload.array('fotos'), (req, res) => {
   const { nro_ot } = req.params;
   try {
-    const items = (req.files || []).map(f => ({
+    // Modo 1: multipart file upload (drag&drop desde el navegador).
+    let items = (req.files || []).map(f => ({
       dataUrl: 'data:' + f.mimetype + ';base64,' + f.buffer.toString('base64'),
       name: f.originalname,
     }));
+    // Modo 2: body JSON con { items: [{ dataUrl, name }, ...] }. Se usa
+    // desde la propagación auto de fotos a hermanas — cada hermana ya tiene
+    // sus fotos en memoria (dataUrl base64) y solo hay que persistirlas.
+    if (items.length === 0 && Array.isArray(req.body && req.body.items)) {
+      items = req.body.items
+        .filter(x => x && x.dataUrl)
+        .map(x => ({ dataUrl: x.dataUrl, name: String(x.name || '') }));
+    }
     db.prepare('UPDATE ots SET fotos_json = ? WHERE nro_ot = ?')
       .run(JSON.stringify(items), nro_ot);
     res.json({ ok: true, count: items.length });
