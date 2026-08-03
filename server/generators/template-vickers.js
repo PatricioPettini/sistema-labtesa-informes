@@ -931,10 +931,15 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       grid + header + filas.join('') +
       '</w:tbl>';
 
-    // Solo caption debajo (nada arriba — el "Lado" va dentro de la tabla).
-    // pLinea(' ') antes del caption para que no quede pegado a la tabla.
-    const caption = pLinea('Tabla N°' + numTabla + ' - Resultados ensayo de dureza', { center: true });
-    return tabla + pLinea(' ') + caption + pLinea(' ');
+    // Caption debajo (nada arriba — el "Lado" va dentro de la tabla).
+    // Uso spacing before/after para separar de la tabla y de la próxima —
+    // más robusto que párrafos blank (que eliminarParrafosVacios podría borrar).
+    const captionSpacing = '<w:p><w:pPr>' +
+      '<w:spacing w:line="276" w:lineRule="auto" w:before="180" w:after="480"/>' +
+      '<w:jc w:val="center"/></w:pPr>' +
+      `<w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
+      `<w:t xml:space="preserve">Tabla N°${numTabla} - Resultados ensayo de dureza</w:t></w:r></w:p>`;
+    return tabla + captionSpacing;
   }
 
   // Párrafo con líneas separadas por <w:br/> (line breaks blandos, sin saltos
@@ -995,6 +1000,35 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     );
     // Limpiar el párrafo del marker (queda vacío tras la inserción).
     outXml = outXml.replace(new RegExp('<w:p\\b[^>]*>(?:(?!<w:p\\b)[\\s\\S])*?' + MARKER_IMG + '(?:(?!</w:p>)[\\s\\S])*?</w:p>', 'g'), '');
+    // Colapsar los PBLANK (párrafos con solo `⁠` U+2060 o vacíos) que estén
+    // inmediatamente ANTES del párrafo con "t = Espesor". Buscamos "t = Espesor"
+    // y removemos los <w:p> vacíos que lo preceden hasta llegar a un párrafo
+    // no vacío (típicamente el </w:drawing>).
+    const tEspIdx = outXml.indexOf('t = Espesor');
+    if (tEspIdx >= 0) {
+      const tPStart = outXml.lastIndexOf('<w:p', tEspIdx);
+      if (tPStart >= 0) {
+        // Recorrer hacia atrás desde tPStart, borrando párrafos vacíos.
+        let cursor = tPStart;
+        let borrarHasta = tPStart;
+        while (true) {
+          const close = outXml.lastIndexOf('</w:p>', cursor - 1);
+          if (close < 0) break;
+          const open = outXml.lastIndexOf('<w:p', close);
+          if (open < 0 || open >= close) break;
+          const para = outXml.slice(open, close + '</w:p>'.length);
+          const txts = [...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(x => x[1]).join('').replace(/[\s⁠]/g, '');
+          const tieneDrawing = /<w:drawing\b/.test(para);
+          if (tieneDrawing) break; // no borrar el párrafo con la imagen
+          if (txts) break; // hay texto real, parar
+          borrarHasta = open;
+          cursor = open;
+        }
+        if (borrarHasta < tPStart) {
+          outXml = outXml.slice(0, borrarHasta) + outXml.slice(tPStart);
+        }
+      }
+    }
   } catch (e) {
     console.warn('[vickers-mapa] no se pudo insertar la imagen del gráfico:', e.message);
     // Fallback: solo limpiar el marker.
@@ -1006,24 +1040,76 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
 // En modo mapa la tabla original del template queda vacía porque todos los
 // `resultado_N_impronta` son __HIDE__. eliminarFilasOcultas borra las filas
 // de datos pero deja el header residual. Esta función elimina la <w:tbl>
-// completa cuyo header contiene "N° Impronta" + "Dureza HV" (la del template).
-// Se ejecuta DESPUÉS de otros post-procesos que pudieron modificar el header
-// (quitarColumnaZonaVickers puede haber sacado "Ubicación"), por eso el
-// patrón acepta el header con o sin "Ubicación".
+// completa cuyo header contiene "N° Impronta" + "Dureza HV" (la del template),
+// y también el párrafo caption "Tabla N°X - Resultados..." que quedó
+// huérfano (viene ANTES o DESPUÉS de la tabla en el template).
 function eliminarTablaVickersClasica(xml) {
-  return xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, (tbl) => {
-    const textos = [...tbl.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join(' ');
-    // La tabla del template siempre tiene "N° Impronta" + "Dureza HV" en el
-    // header. Las tablas del mapa NO contienen "HV" en un solo texto — la
-    // etiqueta va como "Dureza HV **/15" completa.
-    if (/N[°˚º]?\s*Impronta[\s\S]{0,200}Dureza\s*HV/i.test(textos)) {
-      // Descartar tablas del bloque MAPA que ya insertamos (esas contienen
-      // muchas filas con "Metal Base" / "Z.A.C." / "SOLD.").
-      const esDelMapa = /Metal Base[\s\S]{0,80}Z\.A\.C\./i.test(textos);
-      if (!esDelMapa) return '';
+  // Regex para encontrar la <w:tbl> a borrar. Usamos exec para manejar
+  // párrafos huérfanos antes/después.
+  const RX_TABLA = /<w:tbl>[\s\S]*?<\/w:tbl>/g;
+  const RX_CAPTION = /^<w:p\b[^>]*>[\s\S]*?<\/w:p>$/;
+  const posMatches = [];
+  let m;
+  while ((m = RX_TABLA.exec(xml)) !== null) {
+    const tbl = m[0];
+    const textos = [...tbl.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(x => x[1]).join(' ');
+    if (!/N[°˚º]?\s*Impronta[\s\S]{0,200}Dureza\s*HV/i.test(textos)) continue;
+    // Descartar tablas del bloque MAPA (esas se insertan DESPUÉS de esta
+    // función pero por si acaso).
+    if (/Metal Base[\s\S]{0,80}Z\.A\.C\./i.test(textos)) continue;
+    posMatches.push({ start: m.index, end: m.index + tbl.length });
+  }
+  if (posMatches.length === 0) return xml;
+
+  function borrarCaptionEn(before, direction /* 'up'|'down' */) {
+    // Buscar el <w:p> inmediatamente adyacente y borrarlo si es un caption
+    // "Tabla N°X - Resultados ...".
+    if (direction === 'up') {
+      // Ir hacia atrás: buscar </w:p> más cercano y su <w:p> match.
+      const close = xml.lastIndexOf('</w:p>', before - 1);
+      if (close < 0) return null;
+      const open = xml.lastIndexOf('<w:p', close);
+      if (open < 0) return null;
+      const para = xml.slice(open, close + '</w:p>'.length);
+      const txt = [...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(x => x[1]).join(' ');
+      // Aceptar ° (00B0), ˚ (02DA), º (00BA) — el template usa ˚.
+      if (/Tabla\s*N\s*[°˚º]\s*\d+\s*[-–—]\s*Resultados/i.test(txt)) {
+        return { start: open, end: close + '</w:p>'.length };
+      }
+      return null;
+    } else {
+      // Ir hacia adelante: buscar <w:p ...> más cercano.
+      const open = xml.indexOf('<w:p', before);
+      if (open < 0) return null;
+      // Verificar que sea un tag <w:p>, no <w:pPr>.
+      const c = xml[open + 4];
+      if (c !== '>' && c !== ' ' && c !== '\r' && c !== '\n') return null;
+      const close = xml.indexOf('</w:p>', open);
+      if (close < 0) return null;
+      const para = xml.slice(open, close + '</w:p>'.length);
+      const txt = [...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(x => x[1]).join(' ');
+      // Aceptar ° (00B0), ˚ (02DA), º (00BA) — el template usa ˚.
+      if (/Tabla\s*N\s*[°˚º]\s*\d+\s*[-–—]\s*Resultados/i.test(txt)) {
+        return { start: open, end: close + '</w:p>'.length };
+      }
+      return null;
     }
-    return tbl;
+  }
+
+  // Recolectar todos los rangos a eliminar (tabla + captions adyacentes).
+  const rangos = [];
+  posMatches.forEach(t => {
+    const capArriba = borrarCaptionEn(t.start, 'up');
+    const capAbajo  = borrarCaptionEn(t.end, 'down');
+    rangos.push(t);
+    if (capArriba) rangos.push(capArriba);
+    if (capAbajo)  rangos.push(capAbajo);
   });
+  // Ordenar por start desc para borrar sin desalinear los offsets.
+  rangos.sort((a, b) => b.start - a.start);
+  let out = xml;
+  rangos.forEach(r => { out = out.slice(0, r.start) + out.slice(r.end); });
+  return out;
 }
 
 module.exports = { generarVickersDesdeTemplate };
