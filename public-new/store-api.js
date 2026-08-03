@@ -423,6 +423,16 @@
           try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
           var muestrasPrev = Array.isArray(datosPrev.muestras) ? datosPrev.muestras : [];
           var seccionPrev  = Array.isArray(datosPrev.seccion_calc) ? datosPrev.seccion_calc : [];
+          // Descartar fila blank inicial del form: si la hermana tiene UNA sola
+          // muestra y está totalmente vacía, no la mantenemos.
+          if (muestrasPrev.length === 1) {
+            var solaMu = muestrasPrev[0] || {};
+            var muVacia = Object.keys(solaMu).every(function (k) {
+              var v = solaMu[k];
+              return v == null || v === '' || v === false;
+            });
+            if (muVacia) { muestrasPrev = []; seccionPrev = []; }
+          }
           // Concatenar: las nuevas van al final. Reindexar _probeta_padre de las
           // muestras nuevas para que apunte a índices en el array combinado.
           var offset = muestrasPrev.length;
@@ -552,6 +562,17 @@
           var datosPrev = {};
           try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
           var resultadosPrev = Array.isArray(datosPrev.resultados) ? datosPrev.resultados : [];
+          // Descartar la fila blank inicial que el form inserta al crear un
+          // ensayo nuevo: si la hermana tiene UNA sola fila y está totalmente
+          // vacía, no concatenar (sino queda [vacía, fila1, fila2]).
+          if (resultadosPrev.length === 1) {
+            var solaRow = resultadosPrev[0] || {};
+            var vacia = Object.keys(solaRow).every(function (k) {
+              var v = solaRow[k];
+              return v == null || v === '' || v === false;
+            });
+            if (vacia) resultadosPrev = [];
+          }
           var textosY = aplanarTextosPara(nroY);
           datosY = Object.assign({}, datosPrev, textosY, condsPara(nroY), {
             resultados: resultadosPrev.concat(subResultados),
@@ -660,6 +681,15 @@
           var datosPrev = {};
           try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
           var resultadosPrev = Array.isArray(datosPrev.resultados) ? datosPrev.resultados : [];
+          // Descartar fila blank inicial del form.
+          if (resultadosPrev.length === 1) {
+            var solaImp = resultadosPrev[0] || {};
+            var impVacia = Object.keys(solaImp).every(function (k) {
+              var v = solaImp[k];
+              return v == null || v === '' || v === false;
+            });
+            if (impVacia) resultadosPrev = [];
+          }
           datosY = Object.assign({}, datosPrev, aplanarTextosPara(nroY), condsPara(nroY), {
             resultados: resultadosPrev.concat(subResultados),
           });
