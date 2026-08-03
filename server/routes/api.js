@@ -820,8 +820,18 @@ router.get('/ot/:nro_ot/fotos-auto', async (req, res) => {
     const nro_ot = req.params.nro_ot;
     const ot = db.prepare('SELECT nro_ot, nro_solicitud, razon_social, id_muestra FROM ots WHERE nro_ot = ?').get(nro_ot);
     if (!ot) return res.status(404).json({ error: 'OT no encontrada' });
+    // Posición de la OT dentro de la solicitud (1..N por nro_ot ordenado).
+    // Sirve para localizar subcarpetas "O.T 1" / "M 1" cuando el técnico organizó
+    // fotos por número secuencial en vez de por nro_ot real.
+    let numMuestra = null;
+    if (ot.nro_solicitud) {
+      const hermanas = db.prepare('SELECT nro_ot FROM ots WHERE nro_solicitud = ? ORDER BY nro_ot ASC')
+        .all(ot.nro_solicitud).map(x => String(x.nro_ot));
+      const idx = hermanas.indexOf(String(ot.nro_ot));
+      if (idx >= 0) numMuestra = idx + 1;
+    }
     const { buscarFotosOt, FOTOS_ROOT } = require('../utils/fotos-auto');
-    let r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+    let r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra, numMuestra);
     if (!r.root_ok) return res.status(503).json({
       error: 'Drive de fotos no accesible desde el servidor.',
       root: r.root,
@@ -848,7 +858,7 @@ router.get('/ot/:nro_ot/fotos-auto', async (req, res) => {
             db.prepare("INSERT OR IGNORE INTO cliente_alias (razon_social, carpeta_drive, fuente, verificado) VALUES (?, ?, 'ia', 0)")
               .run(ot.razon_social, decision.carpeta);
           } catch (_) {}
-          r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+          r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra, numMuestra);
         }
       } catch (e) {
         console.warn('[fotos-auto/cliente-agente] fallo — ' + e.message);
@@ -990,7 +1000,15 @@ router.get('/ot/:nro_ot/fotos-auto', async (req, res) => {
 // Función reusable para el endpoint clásico y el batch.
 async function armarFotosParaOtYTipo(ot, tipo, ensayoId) {
   const { buscarFotosOt } = require('../utils/fotos-auto');
-  const r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra);
+  // Posición dentro de la solicitud (para subcarpetas "O.T 1" / "M 1").
+  let numMuestra = null;
+  if (ot.nro_solicitud) {
+    const hermanas = db.prepare('SELECT nro_ot FROM ots WHERE nro_solicitud = ? ORDER BY nro_ot ASC')
+      .all(ot.nro_solicitud).map(x => String(x.nro_ot));
+    const idx = hermanas.indexOf(String(ot.nro_ot));
+    if (idx >= 0) numMuestra = idx + 1;
+  }
+  const r = buscarFotosOt(ot.razon_social, ot.nro_solicitud, ot.nro_ot, ot.id_muestra, numMuestra);
   if (!r.root_ok) return { error: 'Drive de fotos no accesible', root: r.root, http: 503 };
 
   let archivos = r.archivos || [];

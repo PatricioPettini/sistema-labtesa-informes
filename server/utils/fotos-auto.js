@@ -78,19 +78,39 @@ function buscarCarpetaSolicitud(carpetaCliente, nroSol) {
   return candidatos[0].abs;
 }
 
-// Si dentro de la carpeta de solicitud hay una subcarpeta "OT <nro>",
-// devolverla. Sino null.
-function buscarSubcarpetaOt(carpetaSol, nroOt) {
+// Si dentro de la carpeta de solicitud hay una subcarpeta "OT <nro>" (o
+// "O.T <n>" con puntos y número secuencial), devolverla. Sino null.
+//
+// Estrategia:
+//   1. Match exacto por nro_ot: "OT 536372", "OT-536372", "OT_536372".
+//   2. Si viene `numMuestra` (posición 1..N dentro de la solicitud) y no hubo
+//      match por nro_ot, buscar "O.T 1" / "OT 1" / "M1" con ese número — el
+//      lab usa esta convención cuando el técnico no conocía el nro_ot al
+//      crear las carpetas.
+function buscarSubcarpetaOt(carpetaSol, nroOt, numMuestra) {
   if (!carpetaSol || !fs.existsSync(carpetaSol)) return null;
   const nroOtInt = parseInt(String(nroOt || '').replace(/[^\d]/g, ''), 10);
-  if (isNaN(nroOtInt)) return null;
+  const numMuestraInt = numMuestra ? parseInt(String(numMuestra), 10) : NaN;
   let hijos;
   try { hijos = fs.readdirSync(carpetaSol, { withFileTypes: true }).filter(d => d.isDirectory()); }
   catch { return null; }
-  for (const d of hijos) {
-    const m = d.name.match(/^OT[\s\-_]*0*(\d+)\b/i);
-    if (m && parseInt(m[1], 10) === nroOtInt) {
-      return path.join(carpetaSol, d.name);
+  // Primer pass: match exacto por nro_ot.
+  if (!isNaN(nroOtInt)) {
+    for (const d of hijos) {
+      const m = d.name.match(/^OT[\s\-_]*0*(\d+)\b/i);
+      if (m && parseInt(m[1], 10) === nroOtInt) {
+        return path.join(carpetaSol, d.name);
+      }
+    }
+  }
+  // Segundo pass: match por número de muestra secuencial.
+  if (!isNaN(numMuestraInt)) {
+    for (const d of hijos) {
+      // Acepta "O.T 1", "O.T. 1", "OT 1", "OT-1", "M1", "MUESTRA 1"...
+      const m = d.name.match(/^(?:O\.?T\.?|M|MUESTRA)[\s\-_.]*0*(\d+)\s*$/i);
+      if (m && parseInt(m[1], 10) === numMuestraInt) {
+        return path.join(carpetaSol, d.name);
+      }
     }
   }
   return null;
@@ -267,7 +287,10 @@ function filtrarPorMuestras(archivos, numsM) {
 // Si viene `idMuestra` con menciones "M<n>", filtra archivos por esos números
 // (evita que en una carpeta compartida por varias OTs de la misma solicitud se
 // carguen fotos ajenas).
-function buscarFotosOt(razonSocial, nroSolicitud, nroOt, idMuestra) {
+// Si viene `numMuestra` (posición 1..N dentro de la solicitud), también se usa
+// para localizar subcarpetas "O.T 1" / "M 1" cuando el técnico organizó las
+// fotos por número secuencial en vez de por nro_ot real.
+function buscarFotosOt(razonSocial, nroSolicitud, nroOt, idMuestra, numMuestra) {
   const rootOk = fs.existsSync(FOTOS_ROOT);
   const out = {
     encontrada: false,
@@ -325,7 +348,7 @@ function buscarFotosOt(razonSocial, nroSolicitud, nroOt, idMuestra) {
     return out;
   }
   out.carpeta_sol = carpetaSol;
-  const carpetaOt = buscarSubcarpetaOt(carpetaSol, nroOt);
+  const carpetaOt = buscarSubcarpetaOt(carpetaSol, nroOt, numMuestra);
   const fuente = carpetaOt || carpetaSol;
   out.carpeta_ot = carpetaOt;
   // Recorrido recursivo con reglas de carpetas. Cada item viene con `abs`,
