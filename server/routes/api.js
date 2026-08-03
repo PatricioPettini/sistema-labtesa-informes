@@ -786,8 +786,23 @@ const _SECCION_ENSAYO_RE = /\b(metalograf|microestructura|micrograf|macrograf|es
 function _normSinAcentos(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
+// Carpetas M1/M2/MUESTRA 1/etc. son organizadores por muestra — NO son
+// subcarpetas de ensayo. Sus archivos siguen siendo fotos válidas de recepción.
+const _MUESTRA_DIR_RE_FOTO = /^(?:M|MUESTRA)[\s_\-]*\d+$/i;
+
 function _esFotoDeEnsayo(it) {
   const folders = it.folders || [];
+  // Si TODAS las folders son M<n>/MUESTRA <n>, la foto está en la carpeta de
+  // recepción (organizada por muestra). No es de ensayo — devolvemos false.
+  const foldersNoMuestra = folders.filter(f => !_MUESTRA_DIR_RE_FOTO.test(f));
+  if (foldersNoMuestra.length === 0 && folders.length > 0) {
+    // Todas las folders son M<n> → sigue siendo raíz-de-recepción.
+    // Chequear igual el nombre del archivo por si el técnico lo llamó
+    // "inclusiones.jpg" o similar dentro de M1/.
+    const base = _normSinAcentos(pathMod.basename(it.abs)).replace(/\.[a-z0-9]{2,5}$/i, '');
+    if (_SECCION_ENSAYO_RE.test(base)) return true;
+    return false;
+  }
   // Regla dura: si la foto está EN CUALQUIER subcarpeta (folders.length > 0)
   // y NO estamos en modo "carpeta OT propia", asumir que es de ensayo. La
   // convención del laboratorio es: fotos de recepción sueltas en la raíz,
