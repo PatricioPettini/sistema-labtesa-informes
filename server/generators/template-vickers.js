@@ -932,8 +932,24 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       '</w:tbl>';
 
     // Solo caption debajo (nada arriba — el "Lado" va dentro de la tabla).
+    // pLinea(' ') antes del caption para que no quede pegado a la tabla.
     const caption = pLinea('Tabla N°' + numTabla + ' - Resultados ensayo de dureza', { center: true });
-    return tabla + caption + pLinea(' ');
+    return tabla + pLinea(' ') + caption + pLinea(' ');
+  }
+
+  // Párrafo con líneas separadas por <w:br/> (line breaks blandos, sin saltos
+  // de párrafo). Usado para las 4 referencias que van compactas.
+  function pMultiLinea(lineas, opts) {
+    opts = opts || {};
+    const jc = opts.center ? '<w:jc w:val="center"/>' : '';
+    const ind = opts.noInd ? '' : '<w:ind w:left="851"/>';
+    const runs = lineas.map((l, i) =>
+      `<w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
+      (i > 0 ? '<w:br/>' : '') +
+      `<w:t xml:space="preserve">${esc(l)}</w:t></w:r>`
+    ).join('');
+    return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+      ind + jc + '</w:pPr>' + runs + '</w:p>';
   }
 
   let bloque = '';
@@ -941,16 +957,17 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     bloque += construirTabla(t, t + 1);
   }
 
-  // ─ Bloque del gráfico: "Gráfico N°XX" heading + imagen + referencias ─
-  const numGrafico = modoMapa === 'mapa45' ? '80' : '53';
-  bloque += pLinea('Gráfico N°' + numGrafico, { center: true, bold: true });
+  // ─ Bloque del gráfico: SOLO imagen + referencias + Figura N°1 ─
+  // (sin "Gráfico N°XX" arriba — el usuario prefiere no incluirlo.)
   const MARKER_IMG = '__VK_MAPA_IMG__';
   bloque += pLinea(MARKER_IMG);
-  // Referencias centradas debajo de la imagen (como el modelo original).
-  bloque += pLinea('t = Espesor del material base', { center: true });
-  bloque += pLinea('M.B. = Metal base', { center: true });
-  bloque += pLinea('Z.A.C. = Zona afectada por el calor', { center: true });
-  bloque += pLinea('SOLD = Soldadura', { center: true });
+  // Referencias apiladas en un solo párrafo con <w:br/> — sin blancos entre.
+  bloque += pMultiLinea([
+    't = Espesor del material base',
+    'M.B. = Metal base',
+    'Z.A.C. = Zona afectada por el calor',
+    'SOLD = Soldadura',
+  ], { center: true });
   bloque += pLinea('Figura N°1 - Esquema con ubicación de improntas - Mapa de durezas', { center: true });
 
   // Insertar el bloque justo antes de "NOTA" si existe, sino antes de "FIN DE INFORME".
@@ -986,18 +1003,25 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
   return outXml;
 }
 
-// En modo mapa la tabla original del template (Ubicación / N° Impronta /
-// Dureza HV) queda vacía porque todos los `resultado_N_impronta` son __HIDE__.
-// eliminarFilasOcultas borra las filas de datos, pero deja el header + una fila
-// blanca residual. Esta función elimina la <w:tbl> completa cuyo header
-// contiene "N°Impronta" o "N° Impronta".
+// En modo mapa la tabla original del template queda vacía porque todos los
+// `resultado_N_impronta` son __HIDE__. eliminarFilasOcultas borra las filas
+// de datos pero deja el header residual. Esta función elimina la <w:tbl>
+// completa cuyo header contiene "N° Impronta" + "Dureza HV" (la del template).
+// Se ejecuta DESPUÉS de otros post-procesos que pudieron modificar el header
+// (quitarColumnaZonaVickers puede haber sacado "Ubicación"), por eso el
+// patrón acepta el header con o sin "Ubicación".
 function eliminarTablaVickersClasica(xml) {
-  // Recorrer todas las <w:tbl> y quitar la que tenga el header típico.
   return xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, (tbl) => {
-    // Texto plano de las primeras celdas para identificar.
     const textos = [...tbl.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join(' ');
-    // La tabla del template arranca con "Ubicación N°Impronta Dureza HV".
-    if (/Ubicaci[oó]n\s*N[°˚º]\s*Impronta\s*Dureza\s*HV/i.test(textos)) return '';
+    // La tabla del template siempre tiene "N° Impronta" + "Dureza HV" en el
+    // header. Las tablas del mapa NO contienen "HV" en un solo texto — la
+    // etiqueta va como "Dureza HV **/15" completa.
+    if (/N[°˚º]?\s*Impronta[\s\S]{0,200}Dureza\s*HV/i.test(textos)) {
+      // Descartar tablas del bloque MAPA que ya insertamos (esas contienen
+      // muchas filas con "Metal Base" / "Z.A.C." / "SOLD.").
+      const esDelMapa = /Metal Base[\s\S]{0,80}Z\.A\.C\./i.test(textos);
+      if (!esDelMapa) return '';
+    }
     return tbl;
   });
 }
