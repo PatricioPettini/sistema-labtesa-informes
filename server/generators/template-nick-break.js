@@ -197,7 +197,7 @@ function generarNickBreakDesdeTemplate(ot, datos, fotosCaratula) {
   // tres líneas ordenadas en el primer placeholder y ocultamos los otros dos.
   const _condLineas = [];
   codigos.forEach(c => _condLineas.push(c));
-  if (datos.metodo_ensayo) _condLineas.push(`Método de ensayo: ${datos.metodo_ensayo}`);
+  if (datos.metodo_ensayo) _condLineas.push(`Código de referencia: ${datos.metodo_ensayo}`);
   _condLineas.push(`Metodología de ensayo: ${metodologia}`);
   const metodo_ensayo_linea = _condLineas.join('\n');
   const codigo_referencia_linea = '__SECTION_HIDE__';
