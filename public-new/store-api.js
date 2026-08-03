@@ -555,7 +555,18 @@
       //      otros_equipos) copiados con el botón "Copiar equipamiento a otras
       //      OT" — se APLANAN a la raíz del hijo (pisan lo que tenía).
       var mapaCond = (datos && datos.condiciones_por_ot) || {};
-      var OVERRIDE_RAIZ_KEYS = ['equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos'];
+      // Campos que se copian a la RAÍZ del hijo (no al mapa por-OT). Incluye
+      // los subsets de los botones "Copiar a otras OT" de las secciones 1.1
+      // (metodología), 1.2 (condiciones) y 1.4 (equipamiento).
+      var OVERRIDE_RAIZ_KEYS = [
+        // 1.1 metodología
+        'metodologia',
+        // 1.2 condiciones
+        'temperatura', 'estado_superficial', 'diametro_mandril',
+        'espesor_probeta', 'ancho_probeta', 'distancia_apoyos', 'zona_plegado',
+        // 1.4 equipamiento
+        'equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos',
+      ];
       function condsMapPara(nroOt) {
         var m = mapaCond[nroOt];
         if (!m) return {};

@@ -250,6 +250,9 @@ function TraccionForm(props) {
       mapaCond[nroOt] = entry;
     });
     set('condiciones_por_ot', mapaCond);
+    if (window._labToastOk) {
+      window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+    }
   }
   function botonCopiarSeccionTr(claveUnica, etiqueta, camposList, descripcion) {
     if (!multiOtTr) return null;
