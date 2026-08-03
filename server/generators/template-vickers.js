@@ -255,13 +255,23 @@ function generarVickersDesdeTemplate(ot, datos, fotosCaratula) {
   }
 
   // ── Resultados (30 filas) ─────────────────────────────────────────────────
+  // En modo mapa (mapa30/mapa45) ocultamos TODAS las filas de la tabla clásica
+  // del template. El bloque de mapa se inserta como XML dinámico en el
+  // post-proceso (ver insertarBloqueMapa más abajo).
+  const modoMapa = datos.modo_mapa === 'mapa30' || datos.modo_mapa === 'mapa45' ? datos.modo_mapa : null;
   const mediciones = datos.mediciones || [];
   const resultados = {};
   for (let i = 1; i <= 30; i++) {
-    const m = mediciones[i - 1] || {};
-    resultados[`resultado_${i}_impronta`] = m.impronta != null && m.impronta !== '' ? String(m.impronta) : '__HIDE__';
-    resultados[`resultado_${i}_zona`]     = m.zona     != null ? String(m.zona) : ''; // V3
-    resultados[`resultado_${i}_dureza`]   = m.dureza   != null && m.dureza   !== '' ? String(m.dureza)   : '';
+    if (modoMapa) {
+      resultados[`resultado_${i}_impronta`] = '__HIDE__';
+      resultados[`resultado_${i}_zona`]     = '';
+      resultados[`resultado_${i}_dureza`]   = '';
+    } else {
+      const m = mediciones[i - 1] || {};
+      resultados[`resultado_${i}_impronta`] = m.impronta != null && m.impronta !== '' ? String(m.impronta) : '__HIDE__';
+      resultados[`resultado_${i}_zona`]     = m.zona     != null ? String(m.zona) : ''; // V3
+      resultados[`resultado_${i}_dureza`]   = m.dureza   != null && m.dureza   !== '' ? String(m.dureza)   : '';
+    }
   }
 
   // ── Nota / Evaluación / OAA ───────────────────────────────────────────────
@@ -383,6 +393,13 @@ function generarVickersDesdeTemplate(ot, datos, fotosCaratula) {
   // Normalizar indentación de evaluación (w:left="1560" → w:left="851" para alinear con el resto)
   outXml = outXml.replace(/w:left="1560"/g, 'w:left="851"');
   outXml = outXml.replace(/w:pos="1560"/g,  'w:pos="851"');
+
+  // Bloque MAPA DE DUREZAS: si el ensayo es mapa30/mapa45, insertar N tablas
+  // + gráfico N°53 (30 improntas) o N°80 (45) + referencias, antes del texto
+  // de nota/OAA/FIN DE INFORME.
+  if (modoMapa) {
+    outXml = insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa);
+  }
 
   outXml = eliminarParrafosVacios(outXml);
   outXml = ajustarEspaciado(outXml);
@@ -794,6 +811,175 @@ function minimizarUltimoParagrafo(xml) {
     return before.slice(0, sectPrPos) + minimal + before.slice(sectPrPos) + xml.slice(bodyEnd);
   }
   return before + minimal + xml.slice(bodyEnd);
+}
+
+// ── Bloque MAPA DE DUREZAS (mapa30 / mapa45) ─────────────────────────────────
+// Inserta N tablas (2 o 3) de 15 improntas con zonas fijas (Metal Base ×3,
+// Z.A.C. ×3, SOLD. ×3, Z.A.C. ×3, Metal Base ×3), la imagen del gráfico
+// (N°53 o N°80) y la línea de referencias, antes del párrafo de FIN DE INFORME.
+const MAPA_ZONAS_POR_TABLA = [
+  { zona: 'Metal Base', filas: 3 },
+  { zona: 'Z.A.C.',     filas: 3 },
+  { zona: 'SOLD.',      filas: 3 },
+  { zona: 'Z.A.C.',     filas: 3 },
+  { zona: 'Metal Base', filas: 3 },
+];
+const MAPA_LADOS_DEFAULT = {
+  mapa30: ['Cara', 'Raíz'],
+  mapa45: ['Cara Superior', 'Medio', 'Cara Inferior'],
+};
+
+function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
+  const FONTS = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
+  const SZ    = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
+  const esc = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const cantTablas = modoMapa === 'mapa45' ? 3 : 2;
+  const improntasHV = Array.isArray(datos.mapa_improntas_hv) ? datos.mapa_improntas_hv : [];
+  const lados = Array.isArray(datos.mapa_lados) ? datos.mapa_lados.slice() : [];
+  const defaults = MAPA_LADOS_DEFAULT[modoMapa] || [];
+  for (let i = 0; i < cantTablas; i++) if (!lados[i]) lados[i] = defaults[i] || ('Lado ' + (i + 1));
+
+  // Carga (HV **/15) — mismo formato que la tabla clásica.
+  const cargaKey = String(datos.carga_aplicada || '').replace(',', '.').trim();
+  const hvLabel = CARGAS[cargaKey] || CARGAS[cargaKey.replace('.', ',')] || 'HV **/15';
+
+  function pLinea(texto, opts) {
+    opts = opts || {};
+    const b = opts.bold ? '<w:b/><w:bCs/>' : '';
+    const jc = opts.center ? '<w:jc w:val="center"/>' : '';
+    const ind = opts.noInd ? '' : '<w:ind w:left="851"/>';
+    return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+      ind + jc + '</w:pPr>' +
+      `<w:r><w:rPr>${FONTS}${b}${SZ}</w:rPr>` +
+      `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
+  }
+
+  // Celda de tabla — bordes finos negros, texto centrado.
+  function celda(texto, ancho, opts) {
+    opts = opts || {};
+    const bold = opts.header ? '<w:b/><w:bCs/>' : '';
+    const fill = opts.header ? '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>' : '';
+    const vMerge = opts.vMerge === 'restart' ? '<w:vMerge w:val="restart"/>'
+                : opts.vMerge === 'continue' ? '<w:vMerge/>' : '';
+    const BORD = '<w:tcBorders>' +
+      '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+      '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+      '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+      '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders>';
+    const contenido = opts.vMerge === 'continue'
+      ? '<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>'
+      : `<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>` +
+        `<w:r><w:rPr>${FONTS}${bold}${SZ}</w:rPr><w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
+    return `<w:tc><w:tcPr><w:tcW w:w="${ancho}" w:type="dxa"/>${BORD}${fill}${vMerge}<w:vAlign w:val="center"/></w:tcPr>${contenido}</w:tc>`;
+  }
+
+  function construirTabla(iTabla, numTabla) {
+    const baseImpronta = iTabla * 15;
+    const W_UB = 2500, W_N = 1500, W_HV = 2500;
+    const grid = '<w:tblGrid>' +
+      `<w:gridCol w:w="${W_UB}"/><w:gridCol w:w="${W_N}"/><w:gridCol w:w="${W_HV}"/></w:tblGrid>`;
+    const total = W_UB + W_N + W_HV;
+
+    const filas = [];
+    let absIdx = 0;
+    MAPA_ZONAS_POR_TABLA.forEach(sec => {
+      for (let k = 0; k < sec.filas; k++) {
+        const n = baseImpronta + absIdx + 1;
+        const hv = improntasHV[baseImpronta + absIdx] || '';
+        let vm = null;
+        if (sec.filas > 1) vm = (k === 0) ? 'restart' : 'continue';
+        const celdas = [
+          celda(k === 0 ? sec.zona : '', W_UB, { vMerge: vm }),
+          celda(String(n), W_N),
+          celda(hv, W_HV),
+        ];
+        filas.push('<w:tr>' + celdas.join('') + '</w:tr>');
+        absIdx++;
+      }
+    });
+
+    // Header
+    const header = '<w:tr>' +
+      celda('Ubicación', W_UB, { header: true }) +
+      celda('N° Impronta', W_N, { header: true }) +
+      celda('Dureza ' + hvLabel, W_HV, { header: true }) +
+      '</w:tr>';
+
+    const tabla = '<w:tbl>' +
+      '<w:tblPr>' +
+      `<w:tblW w:w="${total}" w:type="dxa"/>` +
+      '<w:jc w:val="center"/>' +
+      '<w:tblBorders>' +
+        '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+        '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+        '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+        '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+        '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+        '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>' +
+      '</w:tblBorders></w:tblPr>' +
+      grid + header + filas.join('') +
+      '</w:tbl>';
+
+    // Sub-heading "Lado <label>" arriba de la tabla, caption debajo.
+    const subheading = pLinea('Lado ' + lados[iTabla], { bold: true });
+    const caption = pLinea('Tabla N°' + numTabla + ' - Resultados ensayo de dureza', { center: true });
+    return subheading + tabla + caption + pLinea(' ');
+  }
+
+  let bloque = '';
+  for (let t = 0; t < cantTablas; t++) {
+    bloque += construirTabla(t, t + 1);
+  }
+
+  // Imagen del gráfico: se registra en processedZip como imagen y se inserta
+  // como <w:drawing>. Se usa insertarImagenesEnsayo con un marker temporal.
+  const MARKER_IMG = '__VK_MAPA_IMG__';
+  bloque += pLinea(MARKER_IMG);
+
+  // Referencias fijas + Figura N°1
+  const numGrafico = modoMapa === 'mapa45' ? '80' : '53';
+  bloque += pLinea('Figura N°1 - Esquema con ubicación de improntas - Mapa de durezas', { center: true });
+  bloque += pLinea(' ');
+  bloque += pLinea('t = Espesor del material base');
+  bloque += pLinea('M.B. = Metal base');
+  bloque += pLinea('Z.A.C. = Zona afectada por el calor');
+  bloque += pLinea('SOLD = Soldadura');
+  bloque += pLinea('Gráfico N°' + numGrafico + ' — referencias de improntas.', { bold: true });
+
+  // Insertar el bloque justo antes de "NOTA" si existe, sino antes de "FIN DE INFORME".
+  const refPos = (() => {
+    const p1 = outXml.indexOf('NOTA');
+    if (p1 >= 0) return p1;
+    const p2 = outXml.indexOf('FIN DE INFORME');
+    return p2 >= 0 ? p2 : -1;
+  })();
+  if (refPos < 0) return outXml;
+  const pStart = scanBackForTag(outXml, '<w:p', refPos);
+  if (pStart < 0) return outXml;
+  outXml = outXml.slice(0, pStart) + bloque + outXml.slice(pStart);
+
+  // Cargar imagen del asset y reemplazar el marker por <w:drawing>.
+  try {
+    const imgPath = path.join(__dirname, '..', 'assets',
+      modoMapa === 'mapa45' ? 'vickers-mapa-45.png' : 'vickers-mapa-30.png');
+    const buf = fs.readFileSync(imgPath);
+    outXml = insertarImagenesEnsayo(
+      processedZip, outXml,
+      [{ buffer: buf, caption: '', name: 'grafico_mapa.png' }],
+      'vickers_mapa', MARKER_IMG, 'after', 300,
+      { layout: 'vertical', maxAnchoCm: 15, maxAltoCm: 10 }
+    );
+    // Limpiar el párrafo del marker (queda vacío tras la inserción).
+    outXml = outXml.replace(new RegExp('<w:p\\b[^>]*>(?:(?!<w:p\\b)[\\s\\S])*?' + MARKER_IMG + '(?:(?!</w:p>)[\\s\\S])*?</w:p>', 'g'), '');
+  } catch (e) {
+    console.warn('[vickers-mapa] no se pudo insertar la imagen del gráfico:', e.message);
+    // Fallback: solo limpiar el marker.
+    outXml = outXml.replace(new RegExp(MARKER_IMG, 'g'), '');
+  }
+  return outXml;
 }
 
 module.exports = { generarVickersDesdeTemplate };

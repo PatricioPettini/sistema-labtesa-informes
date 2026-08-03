@@ -30,11 +30,51 @@ var VICKERS_EQ_CABA = [
 
 var VICKERS_EQ_NEUQUEN = VICKERS_EQ_CABA;
 
+// Estructura fija del "Mapa de durezas" — cada tabla tiene 15 improntas
+// divididas en 5 secciones de 3, siempre en este orden y sin cambios.
+var MAPA_ZONAS_POR_TABLA = [
+  { zona: 'Metal Base', filas: 3 },
+  { zona: 'Z.A.C.',     filas: 3 },
+  { zona: 'SOLD.',      filas: 3 },
+  { zona: 'Z.A.C.',     filas: 3 },
+  { zona: 'Metal Base', filas: 3 },
+];
+var MAPA_IMPRONTAS_POR_TABLA = 15;
+var MAPA_LADOS_DEFAULT = {
+  mapa30: ['Cara', 'Raíz'],
+  mapa45: ['Cara Superior', 'Medio', 'Cara Inferior'],
+};
+
 function VickersForm(props) {
   var datos = props.datos || {};
   var set = props.set;
   function upd(k, v) { set(k, v); }
   function updBool(k, checked) { set(k, !!checked); }
+
+  // Modo del ensayo: 'clasico' (default) o mapa de microdurezas ('mapa30' /
+  // 'mapa45'). En modo mapa se emite un bloque específico con 2 o 3 tablas
+  // de 15 improntas fijas + gráfico + referencias, en vez del "N/ZONA/HV" clásico.
+  var modoMapa = datos.modo_mapa || 'clasico';
+  var esMapa = modoMapa === 'mapa30' || modoMapa === 'mapa45';
+  var cantTablasMapa = modoMapa === 'mapa45' ? 3 : 2;
+  var mapaLados = Array.isArray(datos.mapa_lados) ? datos.mapa_lados.slice() : [];
+  // Rellenar con defaults si el array no tiene todos los lados.
+  var defaultsLados = MAPA_LADOS_DEFAULT[modoMapa] || [];
+  for (var _l = 0; _l < cantTablasMapa; _l++) {
+    if (mapaLados[_l] == null) mapaLados[_l] = defaultsLados[_l] || ('Lado ' + (_l + 1));
+  }
+  var mapaImprontasHV = Array.isArray(datos.mapa_improntas_hv) ? datos.mapa_improntas_hv.slice() : [];
+  function setMapaLado(iTabla, val) {
+    var next = mapaLados.slice();
+    next[iTabla] = val;
+    set('mapa_lados', next);
+  }
+  function setMapaImpronta(idxGlobal, hv) {
+    var next = mapaImprontasHV.slice();
+    while (next.length <= idxGlobal) next.push('');
+    next[idxGlobal] = hv;
+    set('mapa_improntas_hv', next);
+  }
 
   var mediciones = Array.isArray(datos.mediciones) ? datos.mediciones.slice() : [];
   if (mediciones.length === 0) {
@@ -272,15 +312,101 @@ function VickersForm(props) {
     );
   }
 
+  // Tabla del MAPA para una tabla (iTabla). Genera 15 filas con zonas fijas
+  // y un input de HV editable. Cada impronta se numera global (1..N).
+  function tablaMapaColumna(iTabla) {
+    var baseImpronta = iTabla * MAPA_IMPRONTAS_POR_TABLA;
+    var filas = [];
+    var absIdx = 0;
+    MAPA_ZONAS_POR_TABLA.forEach(function (sec, iSec) {
+      for (var k = 0; k < sec.filas; k++) {
+        var idxGlobal = baseImpronta + absIdx;
+        var esPrimerDeSec = (k === 0);
+        filas.push({
+          num: idxGlobal + 1,
+          zona: esPrimerDeSec ? sec.zona : '',
+          zonaRowspan: esPrimerDeSec ? sec.filas : 0,
+          idxGlobal: idxGlobal,
+          hv: mapaImprontasHV[idxGlobal] || '',
+        });
+        absIdx++;
+      }
+    });
+    return _r('div', null,
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 11 } },
+        _r('span', { style: { fontWeight: 700 } }, 'Lado:'),
+        _r('input', {
+          style: Object.assign({}, S.input, { flex: 1 }),
+          value: mapaLados[iTabla] || '',
+          onChange: function (e) { setMapaLado(iTabla, e.target.value); },
+          placeholder: 'Ej: Cara / Raíz / Superior…',
+        })),
+      _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10 } },
+        _r('thead', null,
+          _r('tr', { style: { background: '#e6e6e6' } },
+            _r('th', { style: { border: '1px solid #333', padding: 4 } }, 'Ubicación'),
+            _r('th', { style: { border: '1px solid #333', padding: 4, width: 60 } }, 'N° Impronta'),
+            _r('th', { style: { border: '1px solid #333', padding: 4, width: 90 } }, 'Dureza HV'))),
+        _r('tbody', null,
+          filas.map(function (f, iFila) {
+            var cells = [];
+            if (f.zonaRowspan > 0) {
+              cells.push(_r('td', {
+                key: 'z', rowSpan: f.zonaRowspan,
+                style: { border: '1px solid #333', textAlign: 'center', background: '#fafafa', fontWeight: 700 },
+              }, f.zona));
+            }
+            cells.push(_r('td', {
+              key: 'n',
+              style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' },
+            }, f.num));
+            cells.push(_r('td', { key: 'hv', style: { border: '1px solid #333', padding: 0 } },
+              _r('input', {
+                style: Object.assign({}, S.input, S.num, { border: 'none', width: '100%', padding: '4px 6px' }),
+                value: f.hv,
+                onChange: function (e) { setMapaImpronta(f.idxGlobal, e.target.value); },
+              })));
+            return _r('tr', { key: iFila }, cells);
+          })))
+    );
+  }
+
+  // Selector "Modo" arriba de la sección 1.4.
+  var selectorModo = _r('div', { style: { padding: '8px 12px', background: '#fff8e5', borderTop: '1px solid #e0c060', borderBottom: '1px solid #e0c060', display: 'flex', alignItems: 'center', gap: 12, fontSize: 11 } },
+    _r('span', { style: { fontWeight: 700, color: '#8a5a00', textTransform: 'uppercase', fontSize: 10 } }, 'Modo del ensayo:'),
+    _r('label', { style: S.label },
+      _r('input', { type: 'radio', name: 'vk-modo', checked: modoMapa === 'clasico',
+        onChange: function () { upd('modo_mapa', 'clasico'); } }), 'Vickers clásico'),
+    _r('label', { style: S.label },
+      _r('input', { type: 'radio', name: 'vk-modo', checked: modoMapa === 'mapa30',
+        onChange: function () { upd('modo_mapa', 'mapa30'); } }), 'Mapa 30 improntas (Gráfico N°53)'),
+    _r('label', { style: S.label },
+      _r('input', { type: 'radio', name: 'vk-modo', checked: modoMapa === 'mapa45',
+        onChange: function () { upd('modo_mapa', 'mapa45'); } }), 'Mapa 45 improntas (Gráfico N°80)')
+  );
+
   var block14 = _r('div', null,
     _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
-    _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } },
-      tablaColumna(colIzq), tablaColumna(colDer)),
-    _r('div', { style: { padding: '0 8px 8px', display: 'flex', gap: 8 } },
-      _r('button', { onClick: addPunto,
-        style: { fontFamily: 'inherit', fontSize: 11, padding: '5px 12px', border: '1px solid #999', background: '#f4f4f4', color: '#333', borderRadius: 4, cursor: 'pointer' } }, '+ Agregar punto'),
-      _r('button', { onClick: delUltimo,
-        style: { fontFamily: 'inherit', fontSize: 11, padding: '5px 12px', border: '1px solid #999', background: '#f4f4f4', color: '#333', borderRadius: 4, cursor: 'pointer' } }, '− Quitar último'))
+    selectorModo,
+    esMapa
+      ? _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: cantTablasMapa === 3 ? '1fr 1fr 1fr' : '1fr 1fr', gap: 12 } },
+          (function () {
+            var out = [];
+            for (var iT = 0; iT < cantTablasMapa; iT++) {
+              out.push(_r('div', { key: iT }, tablaMapaColumna(iT)));
+            }
+            return out;
+          })())
+      : _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } },
+          tablaColumna(colIzq), tablaColumna(colDer)),
+    esMapa
+      ? _r('div', { style: { padding: '0 8px 8px', fontSize: 11, color: '#555' } },
+          'Se emite Gráfico N°' + (modoMapa === 'mapa45' ? '80' : '53') + ' + referencias (t / M.B. / Z.A.C. / SOLD) automáticamente.')
+      : _r('div', { style: { padding: '0 8px 8px', display: 'flex', gap: 8 } },
+          _r('button', { onClick: addPunto,
+            style: { fontFamily: 'inherit', fontSize: 11, padding: '5px 12px', border: '1px solid #999', background: '#f4f4f4', color: '#333', borderRadius: 4, cursor: 'pointer' } }, '+ Agregar punto'),
+          _r('button', { onClick: delUltimo,
+            style: { fontFamily: 'inherit', fontSize: 11, padding: '5px 12px', border: '1px solid #999', background: '#f4f4f4', color: '#333', borderRadius: 4, cursor: 'pointer' } }, '− Quitar último'))
   );
 
   // ── 1.5 OBSERVACIONES / EVALUACIÓN ──────────────────────────────────────
