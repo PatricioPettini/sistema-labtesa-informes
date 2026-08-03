@@ -939,16 +939,32 @@ function insertarInspeccionAntesDeFin(buf, textoInspeccion) {
   const FONTS = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
   const SZ    = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
 
-  // Numerado con numId=16 (misma lista que "DETERMINACIÓN DE …" y los headings
-  // de cada ensayo). Al ir siempre al final, agarra automáticamente el número
-  // siguiente al último ensayo (ej: si hay 5 ensayos, sale "6. INSPECCIÓN").
+  // Calcular el número: el renumerador ya convirtió los numPr a texto literal
+  // ("1.", "2.", …) antes de este punto. Contamos cuántos títulos de nivel 0
+  // hay (patrón "<w:t>N.</w:t>" con N entero sin punto interno) y le asignamos
+  // el siguiente. Solo miramos después del primer page break para ignorar la
+  // carátula.
+  const carPBPos = xml.indexOf('w:type="page"');
+  const cuerpo = carPBPos >= 0 ? xml.slice(carPBPos) : xml;
+  let maxSeccion = 0;
+  const rxSecc = /<w:t[^>]*>(\d+)\.<\/w:t>/g;
+  let mSec;
+  while ((mSec = rxSecc.exec(cuerpo)) !== null) {
+    const n = parseInt(mSec[1], 10);
+    if (!isNaN(n) && n > maxSeccion) maxSeccion = n;
+  }
+  const numeroInspeccion = maxSeccion + 1;
+  const labelNum = numeroInspeccion + '.';
+  // Estructura idéntica a la que produce renumerarSecciones para los headings
+  // de ensayo: número literal + tab, sin numPr (ya "hardcodeado").
   const heading = '<w:p><w:pPr>' +
     '<w:pStyle w:val="Textosinformato"/>' +
-    '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="16"/></w:numPr>' +
-    '<w:tabs><w:tab w:val="left" w:pos="426"/></w:tabs>' +
     '<w:spacing w:line="300" w:lineRule="auto" w:before="120" w:after="60"/>' +
-    '<w:ind w:left="142" w:firstLine="0"/>' +
+    '<w:ind w:left="710" w:hanging="284"/>' +
     `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
+    `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
+    `<w:t xml:space="preserve">${labelNum}</w:t></w:r>` +
+    `<w:r><w:tab/></w:r>` +
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     '<w:t xml:space="preserve">INSPECCIÓN</w:t></w:r></w:p>';
 
