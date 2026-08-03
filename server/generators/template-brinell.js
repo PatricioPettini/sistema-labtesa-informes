@@ -378,6 +378,10 @@ function generarBrinellDesdeTemplate(ot, datos, fotosCaratula) {
     processedZip.file(hdrPath, hdrXml);
   });
 
+  // Insertar bloque MEMORIA ANALÍTICA antes de "EQUIPAMIENTO UTILIZADO" si
+  // hay algún dato del patrón cargado en el form.
+  outXml = insertarMemoriaAnalitica(outXml, datos);
+
   outXml = eliminarParrafosVacios(outXml);
   // EVALUACION primero, luego ajustarEspaciado (que normaliza blancos antes de cada
   // landmark, incluyendo EVALUACION). De lo contrario eliminarParrafosVacios borra
@@ -885,6 +889,52 @@ function insertarBloqueEvaluacion(xml, texto) {
   // Posición destino: antes de NOTA si existe, sino antes de FIN DE INFORME
   let ref = xml.indexOf('NOTA');
   if (ref < 0) ref = xml.indexOf('FIN DE INFORME');
+  if (ref < 0) return xml;
+  const pStart = scanBackForTag(xml, '<w:p', ref);
+  if (pStart < 0) return xml;
+  return xml.slice(0, pStart) + bloque + xml.slice(pStart);
+}
+
+// Inserta un heading "MEMORIA ANALÍTICA" + 4 líneas con los datos del patrón
+// usado para verificar el durómetro, antes de "EQUIPAMIENTO UTILIZADO". Si no
+// hay ningún dato cargado, no inserta nada (para no ensuciar informes viejos).
+// Campos: patron_tag, patron_valor, patron_diam_imp, patron_dureza_hb.
+function insertarMemoriaAnalitica(xml, datos) {
+  const tag       = String((datos && datos.patron_tag) || '').trim();
+  const valor     = String((datos && datos.patron_valor) || '').trim();
+  const diamImp   = String((datos && datos.patron_diam_imp) || '').trim();
+  const durezaHb  = String((datos && datos.patron_dureza_hb) || '').trim();
+  if (!tag && !valor && !diamImp && !durezaHb) return xml;
+
+  const fonts  = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
+  const sz     = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
+  const esc = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // Heading estilo subtítulo N.M (mismo ind que "CONDICIONES DE ENSAYO").
+  const heading = '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+    '<w:ind w:left="851"/></w:pPr>' +
+    `<w:r><w:rPr>${fonts}<w:b/><w:bCs/>${sz}</w:rPr>` +
+    '<w:t xml:space="preserve">MEMORIA ANALÍTICA</w:t></w:r></w:p>';
+
+  function pLinea(texto) {
+    return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+      '<w:ind w:left="851"/></w:pPr>' +
+      `<w:r><w:rPr>${fonts}${sz}</w:rPr>` +
+      `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
+  }
+
+  const lineas = [];
+  if (tag)      lineas.push(pLinea('Patrón utilizado TAG N°: ' + tag));
+  if (valor)    lineas.push(pLinea('Valor: ' + valor));
+  if (diamImp)  lineas.push(pLinea('Diámetro de impronta (mm): ' + diamImp));
+  if (durezaHb) lineas.push(pLinea('Dureza HB: ' + durezaHb));
+
+  const bloque = heading + lineas.join('');
+
+  // Insertar antes del párrafo que contiene "EQUIPAMIENTO UTILIZADO".
+  const ref = xml.indexOf('EQUIPAMIENTO UTILIZADO');
   if (ref < 0) return xml;
   const pStart = scanBackForTag(xml, '<w:p', ref);
   if (pStart < 0) return xml;
