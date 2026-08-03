@@ -14,12 +14,15 @@ const TEMPLATE_PATH = path.join(__dirname, '../templates/plegado.docx');
 // datos.equipamiento_tags[key] si existe, sino tagDefault. Se mantienen keys
 // legacy (calibre_571/570, dispositivo_779, termohigrometro, termo_702,
 // prensa_torne, calibre_694s) para no romper ensayos guardados.
+// tagDefault se usa cuando el técnico tildó el equipo pero no editó el input
+// de TAG (equipamiento_tags[key] queda undefined). Alineado con el catálogo
+// del front (public-new/plegadoform.jsx PLEGADO_EQ_*).
 const EQUIPO_EMIC = [
   { key: 'maquina_emic',       nombre: 'Máquina de tracción Emic',   tagDefault: 'MM-203' },
-  { key: 'mandril',             nombre: 'Mandril',                   tagDefault: '' },
-  { key: 'calibre',             nombre: 'Calibre digital',           tagDefault: '' },
+  { key: 'mandril',             nombre: 'Mandril',                   tagDefault: 'MM-803' },
+  { key: 'calibre',             nombre: 'Calibre digital',           tagDefault: 'MM-571' },
   { key: 'termohigro_545',      nombre: 'Termohigrómetro',           tagDefault: 'PCAL-545' },
-  { key: 'dispositivo_plegado', nombre: 'Dispositivo de plegado',    tagDefault: '' },
+  { key: 'dispositivo_plegado', nombre: 'Dispositivo de plegado',    tagDefault: 'MM-779' },
   // Legacy — se mantienen para retro-compat.
   { key: 'calibre_571',         nombre: 'Calibre digital',           tagDefault: 'MM-571' },
   { key: 'calibre_570',         nombre: 'Calibre digital',           tagDefault: 'MM-570' },
@@ -29,10 +32,10 @@ const EQUIPO_EMIC = [
 ];
 const EQUIPO_NEUQUEN = [
   { key: 'maquina_shimadzu',    nombre: 'Máquina de tracción Shimadzu', tagDefault: 'MM-151' },
-  { key: 'mandril',             nombre: 'Mandril',                   tagDefault: '' },
-  { key: 'calibre',             nombre: 'Calibre digital',           tagDefault: '' },
+  { key: 'mandril',             nombre: 'Mandril',                   tagDefault: 'MM-930' },
+  { key: 'calibre',             nombre: 'Calibre digital',           tagDefault: 'MM-694' },
   { key: 'termohigro_794',      nombre: 'Termohigrómetro',           tagDefault: 'MM-794' },
-  { key: 'dispositivo_plegado', nombre: 'Dispositivo de plegado',    tagDefault: '' },
+  { key: 'dispositivo_plegado', nombre: 'Dispositivo de plegado',    tagDefault: 'MM-779' },
   // Legacy
   { key: 'prensa_torne',        nombre: 'Prensa Plegadora TORNE Y MEC', tagDefault: 'MM-913' },
   { key: 'calibre_694',         nombre: 'Calibre digital',           tagDefault: 'MM-694' },
