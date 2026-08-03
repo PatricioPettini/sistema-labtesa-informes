@@ -715,8 +715,11 @@ function TraccionForm(props) {
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
       _r('span', null, '1.4  EQUIPAMIENTO UTILIZADO ' + (datos.variante === 'neuquen' ? '— Set Shimadzu (Neuquén)' : '— Set EMIC (CABA)')),
       botonCopiarSeccionTr('equip_14', 'Copiar equipamiento a otras OT',
-        ['equipamiento', 'equipamiento_tags', 'otros_equipos'],
-        'Copia los equipos tildados, sus TAGs y "otros equipos".')
+        // variante determina qué SET de equipos se muestra en el form (EMIC vs
+        // Shimadzu). Si no la copiamos, la hermana queda con equipos del set
+        // opuesto y no aparecen los checkboxes.
+        ['variante', 'equipamiento', 'equipamiento_tags', 'otros_equipos'],
+        'Copia set (EMIC/Shimadzu), equipos tildados, sus TAGs y "otros equipos".')
     ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 24px', fontSize: 11 } },
       equipos.map(function (e) {
