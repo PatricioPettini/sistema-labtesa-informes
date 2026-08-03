@@ -230,9 +230,59 @@ function OTDetail(props) {
           }
         }
         toast('Cargadas ' + aAgregar.length + ' de ' + nuevas.length + ' fotos.' + _extra, 'success');
+        // Propagar a OTs hermanas de la solicitud: por cada hermana, buscar
+        // sus propias fotos de recepción en el drive y setear ot.fotos_json.
+        // Se skipea la OT actual (ya se hizo arriba).
+        propagarFotosAHermanas();
       })
       .catch(function (e) { toast('Error al cargar fotos: ' + e.message, 'danger'); })
       .finally(function () { setFotosAutoLoading(false); });
+  }
+
+  // Propaga la búsqueda automática de fotos de recepción a cada OT hermana
+  // de la solicitud. Cada hermana busca en su carpeta del drive con SU nro_ot
+  // y SU id_muestra — cada una puede terminar con fotos distintas.
+  function propagarFotosAHermanas() {
+    if (!ot.nro_solicitud) return;
+    var hermanas = (window.LabStore.listOtsBySolicitud(ot.nro_solicitud) || [])
+      .filter(function (h) { return String(h.nro_ot) !== String(ot.nro_ot); });
+    if (hermanas.length === 0) return;
+    var proms = hermanas.map(function (h) {
+      return fetch('/api/ot/' + h.nro_ot + '/fotos-auto')
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d, nro_ot: h.nro_ot }; }); })
+        .then(function (r) {
+          if (!r.ok || !r.d.items || r.d.items.length === 0) {
+            return { nro_ot: r.nro_ot, cantidad: 0 };
+          }
+          // Merger con las fotos existentes de la hermana (dedupe por name).
+          return fetch('/api/ot/' + r.nro_ot + '/fotos')
+            .then(function (rExist) { return rExist.json(); })
+            .then(function (existentes) {
+              var existArr = Array.isArray(existentes) ? existentes : [];
+              var setNames = new Set(existArr.map(function (f) { return String(f.name || '').toLowerCase(); }));
+              var nuevas = r.d.items.filter(function (n) { return !setNames.has(String(n.name || '').toLowerCase()); });
+              if (nuevas.length === 0) return { nro_ot: r.nro_ot, cantidad: 0 };
+              var combinadas = existArr.concat(nuevas.map(function (n) { return { dataUrl: n.dataUrl, name: n.name }; }));
+              // POST /api/ot/:nro_ot/fotos guarda el fotos_json completo.
+              return fetch('/api/ot/' + r.nro_ot + '/fotos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: combinadas }),
+              }).then(function () { return { nro_ot: r.nro_ot, cantidad: nuevas.length }; });
+            });
+        })
+        .catch(function () { return { nro_ot: h.nro_ot, cantidad: 0, error: true }; });
+    });
+    Promise.all(proms).then(function (results) {
+      var conFotos = results.filter(function (r) { return r.cantidad > 0; });
+      var total = conFotos.reduce(function (a, r) { return a + r.cantidad; }, 0);
+      if (conFotos.length > 0) {
+        var detalle = conFotos.map(function (r) { return r.cantidad + ' → OT ' + r.nro_ot; }).join(', ');
+        toast('Propagado a ' + conFotos.length + ' OT(s) hermana(s) — ' + total + ' fotos: ' + detalle, 'success');
+      } else {
+        toast(hermanas.length + ' OT(s) hermana(s) revisada(s) — sin nuevas fotos', 'info');
+      }
+    });
   }
   function togglePre() { window.LabStore.updateOt(ot.nro_ot, { es_preinforme: ot.es_preinforme ? 0 : 1 }); refresh(); }
 
