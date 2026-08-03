@@ -885,7 +885,7 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     return `<w:tc><w:tcPr><w:tcW w:w="${ancho}" w:type="dxa"/>${BORD}${fill}${vMerge}<w:vAlign w:val="center"/></w:tcPr>${contenido}</w:tc>`;
   }
 
-  function construirTabla(iTabla, numTabla) {
+  function construirTabla(iTabla, numTabla, esUltima) {
     const baseImpronta = iTabla * 15;
     // Columna "Lado" (vMerge sobre las 15 filas) + Ubicación + N° + HV
     const W_LADO = 1800, W_UB = 2200, W_N = 1400, W_HV = 2200;
@@ -940,10 +940,10 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       '</w:tbl>';
 
     // Caption debajo (nada arriba — el "Lado" va dentro de la tabla).
-    // Uso spacing before/after para separar de la tabla y de la próxima —
-    // más robusto que párrafos blank (que eliminarParrafosVacios podría borrar).
+    // La última tabla no lleva espacio después (para que la imagen quede pegada).
+    const spacingAfter = esUltima ? '0' : '480';
     const captionSpacing = '<w:p><w:pPr>' +
-      '<w:spacing w:line="276" w:lineRule="auto" w:before="0" w:after="480"/>' +
+      '<w:spacing w:line="276" w:lineRule="auto" w:before="0" w:after="' + spacingAfter + '"/>' +
       '<w:jc w:val="center"/></w:pPr>' +
       `<w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
       `<w:t xml:space="preserve">Tabla N°${numTabla} - Resultados ensayo de dureza</w:t></w:r></w:p>`;
@@ -967,7 +967,7 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
 
   let bloque = '';
   for (let t = 0; t < cantTablas; t++) {
-    bloque += construirTabla(t, t + 1);
+    bloque += construirTabla(t, t + 1, t === cantTablas - 1);
   }
 
   // ─ Bloque del gráfico: SOLO imagen + referencias + Figura N°1 ─
