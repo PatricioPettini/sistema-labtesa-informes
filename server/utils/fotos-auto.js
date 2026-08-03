@@ -48,7 +48,10 @@ function esImagen(nombre) {
 
 // Localiza la subcarpeta de solicitud dentro de la carpeta del cliente.
 // Acepta patrones "SOL 12345", "SOL 00012 4-2-2026", "SOL-12345", etc.
-// Compara por número entero (ignora padding).
+// Compara por número entero (ignora padding). Si hay más de una carpeta que
+// matchea el mismo número (p.ej. "SOL 38314 27-07-26" y "SOL 38314 28-07-26"),
+// devuelve la de fecha de modificación más reciente — asumimos que es la
+// versión más actualizada de las fotos.
 function buscarCarpetaSolicitud(carpetaCliente, nroSol) {
   if (!carpetaCliente || !fs.existsSync(carpetaCliente)) return null;
   const nroSolInt = parseInt(String(nroSol || '').replace(/[^\d]/g, ''), 10);
@@ -56,13 +59,23 @@ function buscarCarpetaSolicitud(carpetaCliente, nroSol) {
   let hijos;
   try { hijos = fs.readdirSync(carpetaCliente, { withFileTypes: true }).filter(d => d.isDirectory()); }
   catch { return null; }
+  const candidatos = [];
   for (const d of hijos) {
     const m = d.name.match(/^SOL[\s\-_]*0*(\d+)\b/i);
     if (m && parseInt(m[1], 10) === nroSolInt) {
-      return path.join(carpetaCliente, d.name);
+      const abs = path.join(carpetaCliente, d.name);
+      try {
+        const st = fs.statSync(abs);
+        candidatos.push({ abs, mtime: st.mtimeMs });
+      } catch {
+        candidatos.push({ abs, mtime: 0 });
+      }
     }
   }
-  return null;
+  if (candidatos.length === 0) return null;
+  // Ordenar por mtime desc y devolver la más reciente.
+  candidatos.sort((a, b) => b.mtime - a.mtime);
+  return candidatos[0].abs;
 }
 
 // Si dentro de la carpeta de solicitud hay una subcarpeta "OT <nro>",
