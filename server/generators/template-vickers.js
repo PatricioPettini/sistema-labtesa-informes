@@ -843,9 +843,17 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
   const defaults = MAPA_LADOS_DEFAULT[modoMapa] || [];
   for (let i = 0; i < cantTablas; i++) if (!lados[i]) lados[i] = defaults[i] || ('Lado ' + (i + 1));
 
-  // Carga (HV **/15) — mismo formato que la tabla clásica.
-  const cargaKey = String(datos.carga_aplicada || '').replace(',', '.').trim();
-  const hvLabel = CARGAS[cargaKey] || CARGAS[cargaKey.replace('.', ',')] || 'HV **/15';
+  // Carga (HV X/T) — X = kgf, T = tiempo de aplicación (default 15 s).
+  // Se acepta cualquier número (0.1, 0.3, 1, 5, 15, 50, 100…), formato coma o
+  // punto. Se extrae el número del string (tolera "15", "15 kgf", "0,5 Kgf").
+  const cargaRawInput = String(datos.carga_aplicada || '').trim();
+  const numMatch = cargaRawInput.replace(',', '.').match(/^\s*(\d+(?:\.\d+)?)/);
+  const cargaNum = numMatch ? numMatch[1] : '';
+  // Salida con coma (convención del laboratorio para decimales españoles).
+  const cargaFmt = cargaNum ? cargaNum.replace('.', ',') : '**';
+  const tiempoRaw = String(datos.tiempo_aplicacion != null ? datos.tiempo_aplicacion : 15).trim();
+  const tiempoFmt = /^\d+(?:\.\d+)?$/.test(tiempoRaw) ? tiempoRaw : '15';
+  const hvLabel = 'HV ' + cargaFmt + '/' + tiempoFmt;
 
   function pLinea(texto, opts) {
     opts = opts || {};
