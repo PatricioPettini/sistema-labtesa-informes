@@ -394,10 +394,11 @@ function generarVickersDesdeTemplate(ot, datos, fotosCaratula) {
   outXml = outXml.replace(/w:left="1560"/g, 'w:left="851"');
   outXml = outXml.replace(/w:pos="1560"/g,  'w:pos="851"');
 
-  // Bloque MAPA DE DUREZAS: si el ensayo es mapa30/mapa45, insertar N tablas
-  // + gráfico N°53 (30 improntas) o N°80 (45) + referencias, antes del texto
-  // de nota/OAA/FIN DE INFORME.
+  // Bloque MAPA DE DUREZAS: si el ensayo es mapa30/mapa45, eliminar la tabla
+  // clásica del template e insertar N tablas + gráfico N°53 (30 improntas) o
+  // N°80 (45) + referencias, antes del texto de nota/OAA/FIN DE INFORME.
   if (modoMapa) {
+    outXml = eliminarTablaVickersClasica(outXml);
     outXml = insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa);
   }
 
@@ -878,10 +879,12 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
 
   function construirTabla(iTabla, numTabla) {
     const baseImpronta = iTabla * 15;
-    const W_UB = 2500, W_N = 1500, W_HV = 2500;
+    // Columna "Lado" (vMerge sobre las 15 filas) + Ubicación + N° + HV
+    const W_LADO = 1800, W_UB = 2200, W_N = 1400, W_HV = 2200;
     const grid = '<w:tblGrid>' +
-      `<w:gridCol w:w="${W_UB}"/><w:gridCol w:w="${W_N}"/><w:gridCol w:w="${W_HV}"/></w:tblGrid>`;
-    const total = W_UB + W_N + W_HV;
+      `<w:gridCol w:w="${W_LADO}"/><w:gridCol w:w="${W_UB}"/>` +
+      `<w:gridCol w:w="${W_N}"/><w:gridCol w:w="${W_HV}"/></w:tblGrid>`;
+    const total = W_LADO + W_UB + W_N + W_HV;
 
     const filas = [];
     let absIdx = 0;
@@ -889,10 +892,13 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       for (let k = 0; k < sec.filas; k++) {
         const n = baseImpronta + absIdx + 1;
         const hv = improntasHV[baseImpronta + absIdx] || '';
-        let vm = null;
-        if (sec.filas > 1) vm = (k === 0) ? 'restart' : 'continue';
+        let vmZona = null;
+        if (sec.filas > 1) vmZona = (k === 0) ? 'restart' : 'continue';
+        // Columna Lado: vMerge en TODAS las 15 filas (restart en la primera).
+        const vmLado = absIdx === 0 ? 'restart' : 'continue';
         const celdas = [
-          celda(k === 0 ? sec.zona : '', W_UB, { vMerge: vm }),
+          celda(absIdx === 0 ? 'Lado ' + lados[iTabla] : '', W_LADO, { vMerge: vmLado, header: true }),
+          celda(k === 0 ? sec.zona : '', W_UB, { vMerge: vmZona }),
           celda(String(n), W_N),
           celda(hv, W_HV),
         ];
@@ -901,8 +907,10 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       }
     });
 
-    // Header
+    // Header — la columna Lado queda vacía en el header (arranca su vMerge
+    // recién en la primera fila de datos).
     const header = '<w:tr>' +
+      celda('', W_LADO, { header: true }) +
       celda('Ubicación', W_UB, { header: true }) +
       celda('N° Impronta', W_N, { header: true }) +
       celda('Dureza ' + hvLabel, W_HV, { header: true }) +
@@ -923,10 +931,9 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       grid + header + filas.join('') +
       '</w:tbl>';
 
-    // Sub-heading "Lado <label>" arriba de la tabla, caption debajo.
-    const subheading = pLinea('Lado ' + lados[iTabla], { bold: true });
+    // Solo caption debajo (nada arriba — el "Lado" va dentro de la tabla).
     const caption = pLinea('Tabla N°' + numTabla + ' - Resultados ensayo de dureza', { center: true });
-    return subheading + tabla + caption + pLinea(' ');
+    return tabla + caption + pLinea(' ');
   }
 
   let bloque = '';
@@ -934,20 +941,17 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     bloque += construirTabla(t, t + 1);
   }
 
-  // Imagen del gráfico: se registra en processedZip como imagen y se inserta
-  // como <w:drawing>. Se usa insertarImagenesEnsayo con un marker temporal.
+  // ─ Bloque del gráfico: "Gráfico N°XX" heading + imagen + referencias ─
+  const numGrafico = modoMapa === 'mapa45' ? '80' : '53';
+  bloque += pLinea('Gráfico N°' + numGrafico, { center: true, bold: true });
   const MARKER_IMG = '__VK_MAPA_IMG__';
   bloque += pLinea(MARKER_IMG);
-
-  // Referencias fijas + Figura N°1
-  const numGrafico = modoMapa === 'mapa45' ? '80' : '53';
+  // Referencias centradas debajo de la imagen (como el modelo original).
+  bloque += pLinea('t = Espesor del material base', { center: true });
+  bloque += pLinea('M.B. = Metal base', { center: true });
+  bloque += pLinea('Z.A.C. = Zona afectada por el calor', { center: true });
+  bloque += pLinea('SOLD = Soldadura', { center: true });
   bloque += pLinea('Figura N°1 - Esquema con ubicación de improntas - Mapa de durezas', { center: true });
-  bloque += pLinea(' ');
-  bloque += pLinea('t = Espesor del material base');
-  bloque += pLinea('M.B. = Metal base');
-  bloque += pLinea('Z.A.C. = Zona afectada por el calor');
-  bloque += pLinea('SOLD = Soldadura');
-  bloque += pLinea('Gráfico N°' + numGrafico + ' — referencias de improntas.', { bold: true });
 
   // Insertar el bloque justo antes de "NOTA" si existe, sino antes de "FIN DE INFORME".
   const refPos = (() => {
@@ -970,7 +974,7 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
       processedZip, outXml,
       [{ buffer: buf, caption: '', name: 'grafico_mapa.png' }],
       'vickers_mapa', MARKER_IMG, 'after', 300,
-      { layout: 'vertical', maxAnchoCm: 15, maxAltoCm: 10 }
+      { layout: 'vertical', maxAnchoCm: 15, maxAltoCm: 10, sinCaption: true }
     );
     // Limpiar el párrafo del marker (queda vacío tras la inserción).
     outXml = outXml.replace(new RegExp('<w:p\\b[^>]*>(?:(?!<w:p\\b)[\\s\\S])*?' + MARKER_IMG + '(?:(?!</w:p>)[\\s\\S])*?</w:p>', 'g'), '');
@@ -980,6 +984,22 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     outXml = outXml.replace(new RegExp(MARKER_IMG, 'g'), '');
   }
   return outXml;
+}
+
+// En modo mapa la tabla original del template (Ubicación / N° Impronta /
+// Dureza HV) queda vacía porque todos los `resultado_N_impronta` son __HIDE__.
+// eliminarFilasOcultas borra las filas de datos, pero deja el header + una fila
+// blanca residual. Esta función elimina la <w:tbl> completa cuyo header
+// contiene "N°Impronta" o "N° Impronta".
+function eliminarTablaVickersClasica(xml) {
+  // Recorrer todas las <w:tbl> y quitar la que tenga el header típico.
+  return xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, (tbl) => {
+    // Texto plano de las primeras celdas para identificar.
+    const textos = [...tbl.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join(' ');
+    // La tabla del template arranca con "Ubicación N°Impronta Dureza HV".
+    if (/Ubicaci[oó]n\s*N[°˚º]\s*Impronta\s*Dureza\s*HV/i.test(textos)) return '';
+    return tbl;
+  });
 }
 
 module.exports = { generarVickersDesdeTemplate };

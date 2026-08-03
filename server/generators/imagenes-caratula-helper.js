@@ -422,6 +422,9 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
     ? opciones.layout : null;
   const maxAnchoCm = (opciones && opciones.maxAnchoCm) || 10;
   const maxAltoCm  = (opciones && opciones.maxAltoCm)  || 10;
+  // sinCaption: si es true, NO se emite el párrafo con "Imagen N°X – …"
+  // debajo de la imagen. Útil cuando el caller ya provee su propio pie.
+  const sinCaption = !!(opciones && opciones.sinCaption);
 
   // Contar cuántas imágenes ya existen en el documento (carátula + otros
   // ensayos previos en documentos combinados) para numerar en continuidad.
@@ -579,7 +582,7 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
       ({ cx, cy } = capImagen(cx, cy, it.aspect));
       bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
-      bloque += parrafoCaption(armarCaption(it.f, it.indice));
+      if (!sinCaption) bloque += parrafoCaption(armarCaption(it.f, it.indice));
       bloque += PBLANK;
     });
   } else {
@@ -595,7 +598,7 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
       ({ cx, cy } = capImagen(cx, cy, it.aspect));
       bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
-      bloque += parrafoCaption(armarCaption(it.f, it.indice));
+      if (!sinCaption) bloque += parrafoCaption(armarCaption(it.f, it.indice));
       bloque += PBLANK;
     });
   }
