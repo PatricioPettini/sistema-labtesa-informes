@@ -310,7 +310,14 @@ function EnsayoForm(props) {
         var over = String((r && r.nro_ot_override) || '').trim();
         return over && over !== String(ot.nro_ot);
       });
-      if (hayOverridePlg && typeof window.LabStore.saveEnsayoPlegadoMultiOt === 'function') {
+      // Trigger también si hay copias de equipamiento a hermanas via
+      // condiciones_por_ot con campos de equipo (equipo/equipamiento/...).
+      var hayCondsOtrasPlg = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if ((hayOverridePlg || hayCondsOtrasPlg) && typeof window.LabStore.saveEnsayoPlegadoMultiOt === 'function') {
         window.LabStore.saveEnsayoPlegadoMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
           .then(function (resumen) {
             var msg = 'Plegado guardado · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;

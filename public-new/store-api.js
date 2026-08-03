@@ -532,18 +532,49 @@
         });
         return out;
       }
-      // condiciones_por_ot: mapa análogo a textos_por_ot pero para las
-      // condiciones específicas (norma, código, orientación, probeta_mec).
-      // Cada hijo se lleva SOLO la entrada de su propia OT.
+      // condiciones_por_ot: mapa análogo a textos_por_ot pero con dos usos:
+      //   1. Campos "por-OT" del generator (norma_ensayo_ot, codigo_referencia_ot,
+      //      orientacion_ot, probeta_mec_ot) — se conservan en el mapa del hijo
+      //      para que el generator los lea al emitir.
+      //   2. Campos "raíz" (equipo, equipamiento, equipamiento_tags,
+      //      otros_equipos) copiados con el botón "Copiar equipamiento a otras
+      //      OT" — se APLANAN a la raíz del hijo (pisan lo que tenía).
       var mapaCond = (datos && datos.condiciones_por_ot) || {};
-      function condsPara(nroOt) {
+      var OVERRIDE_RAIZ_KEYS = ['equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos'];
+      function condsMapPara(nroOt) {
         var m = mapaCond[nroOt];
-        return m ? { condiciones_por_ot: { [nroOt]: Object.assign({}, m) } } : {};
+        if (!m) return {};
+        // Copia SIN los campos raíz — solo los que le tocan al mapa por-OT.
+        var soloMap = {};
+        Object.keys(m).forEach(function (k) {
+          if (OVERRIDE_RAIZ_KEYS.indexOf(k) < 0) soloMap[k] = m[k];
+        });
+        return Object.keys(soloMap).length > 0
+          ? { condiciones_por_ot: { [nroOt]: soloMap } }
+          : {};
       }
-      // OT actual
-      var otsDest = Object.keys(grupos);
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      // OT actual: los destinos incluyen las OTs con probetas override y las
+      // OTs mencionadas en condiciones_por_ot (aunque no tengan probetas
+      // hermanas — permite propagar solo el equipamiento).
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
       var idxActual = grupos[otActualStr] || [];
-      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsPara(otActualStr));
+      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsMapPara(otActualStr));
       delete datosActual.textos_por_ot;
       if (!datosActual.condiciones_por_ot) delete datosActual.condiciones_por_ot;
       datosActual.resultados = extraerGrupo(idxActual);
@@ -551,10 +582,11 @@
       // OTs hermanas: buscar / crear ensayo de plegado y agregar las probetas.
       var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
       var promsHermanas = hermanas.map(function (nroY) {
-        var subResultados = extraerGrupo(grupos[nroY]);
+        var subResultados = grupos[nroY] ? extraerGrupo(grupos[nroY]) : [];
         var existente = _db.ensayos.find(function (e) {
           return String(e.nro_ot) === String(nroY) && e.tipo === 'plegado';
         });
+        var overrideRaiz = overridesRaizPara(nroY);
         var accion, datosY, existingIdY;
         if (existente) {
           accion = 'actualizado';
@@ -574,9 +606,12 @@
             if (vacia) resultadosPrev = [];
           }
           var textosY = aplanarTextosPara(nroY);
-          datosY = Object.assign({}, datosPrev, textosY, condsPara(nroY), {
+          datosY = Object.assign({}, datosPrev, textosY, condsMapPara(nroY), {
             resultados: resultadosPrev.concat(subResultados),
           });
+          // Aplicar overrides "raíz" del botón Copiar equipamiento (equipo,
+          // equipamiento, equipamiento_tags, otros_equipos) al final para pisar.
+          Object.assign(datosY, overrideRaiz);
           delete datosY.textos_por_ot;
           if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
         } else {
@@ -598,12 +633,14 @@
             'nota_evaluaciones', 'nota_no_conforme', 'nota_mecanizada',
             'nota_incertidumbre', 'nota_externo',
           ];
-          datosY = Object.assign({}, aplanarTextosPara(nroY), condsPara(nroY), {
+          datosY = Object.assign({}, aplanarTextosPara(nroY), condsMapPara(nroY), {
             resultados: subResultados,
           });
           CONDICIONES_GLOBALES.forEach(function (k) {
             if (datos[k] !== undefined) datosY[k] = datos[k];
           });
+          // Aplicar overrides "raíz" del botón (pisan lo global).
+          Object.assign(datosY, overrideRaiz);
           if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
         }
         return self.saveEnsayoAsync(nroY, 'plegado', datosY, existingIdY).then(function (row) {

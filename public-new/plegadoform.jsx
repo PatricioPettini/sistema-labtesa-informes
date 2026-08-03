@@ -84,6 +84,80 @@ function PlegadoForm(props) {
     set(out);
   }
 
+  // ── Multi-OT: botón "Copiar equipamiento a otras OT" ─────────────────────
+  // Escribe en datos.condiciones_por_ot[<destino>] los campos equipo /
+  // equipamiento / equipamiento_tags / otros_equipos. El saver los detecta
+  // como "overrides raíz" y los aplica sobre los ensayos hermanos existentes.
+  var multiOtPl = otsDisponibles.length > 1;
+  var otNroActualStrPl = String(otNroActual || '');
+  var _copyKeyPl = React.useState(''); var copyOpenKeyPl = _copyKeyPl[0], setCopyOpenKeyPl = _copyKeyPl[1];
+  var _copyDestPl = React.useState([]); var copyDestGenPl = _copyDestPl[0], setCopyDestGenPl = _copyDestPl[1];
+  function copiarCamposPlAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+  }
+  function botonCopiarSeccionPl(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtPl) return null;
+    var abierto = copyOpenKeyPl === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () { setCopyDestGenPl([]); setCopyOpenKeyPl(abierto ? '' : claveUnica); },
+        style: {
+          border: '1px solid #0969da', background: '#fff', color: '#0969da',
+          padding: '3px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: '#24292f' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: '#57606a', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrPl; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenPl.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenPl(checked ? copyDestGenPl.filter(function (n) { return n !== nro; }) : copyDestGenPl.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyPl(''); },
+            style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenPl.slice();
+              if (destinos.length === 0) {
+                destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrPl; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposPlAOts(destinos, camposList);
+              setCopyOpenKeyPl(''); setCopyDestGenPl([]);
+            },
+            style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
   var resultados = Array.isArray(datos.resultados) ? datos.resultados.slice() : [];
   function setRow(i, key, val) {
     var next = resultados.slice();
@@ -163,7 +237,15 @@ function PlegadoForm(props) {
               : PLEGADO_EQ_EMIC;
   var eqLabel = datos.equipo === 'torne' ? '— Set TORNE' : datos.equipo === 'shimadzu' ? '— Set Shimadzu' : '— Set EMIC';
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO ' + eqLabel),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.4  EQUIPAMIENTO UTILIZADO ' + eqLabel),
+      // "equipo" determina qué SET se muestra (EMIC/TORNE/Shimadzu). Si no
+      // lo copiamos, la hermana queda con equipos del set opuesto y los
+      // checkboxes no aparecen (mismo bug que en tracción).
+      botonCopiarSeccionPl('equip_14', 'Copiar equipamiento a otras OT',
+        ['equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos'],
+        'Copia set (EMIC/TORNE/Shimadzu), equipos tildados, sus TAGs y "otros equipos".')
+    ),
     _r('div', { style: { padding: 8, display: 'flex', gap: 12, alignItems: 'center' } },
       _r('span', { style: { fontWeight: 600, fontSize: 11 } }, 'Máquina:'),
       _r('label', { style: S.label },
