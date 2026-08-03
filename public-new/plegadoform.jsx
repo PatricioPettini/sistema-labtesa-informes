@@ -182,7 +182,12 @@ function PlegadoForm(props) {
   // 1.3 (por OT) con desplegables autopoblados del catálogo — misma UX que
   // tracción. Acá solo queda la metodología (ITM).
   var block11 = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: S.head }, '1.1  METODOLOGÍA DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.1  METODOLOGÍA DE ENSAYO'),
+      botonCopiarSeccionPl('metodo_11', 'Copiar metodología a otras OT',
+        ['metodologia'],
+        'Copia el ITM a las OTs seleccionadas.')
+    ),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
@@ -193,7 +198,13 @@ function PlegadoForm(props) {
 
   // ── 1.2 CONDICIONES ────────────────────────────────────────────────────
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+      botonCopiarSeccionPl('cond_12', 'Copiar condiciones a otras OT',
+        ['temperatura', 'estado_superficial', 'diametro_mandril',
+         'espesor_probeta', 'ancho_probeta', 'distancia_apoyos', 'zona_plegado'],
+        'Copia temperatura, estado superficial, mandril, espesores/ancho, distancia y zona.')
+    ),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA:'),
