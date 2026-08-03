@@ -282,6 +282,14 @@ function OTDetail(props) {
       } else {
         toast(hermanas.length + ' OT(s) hermana(s) revisada(s) — sin nuevas fotos', 'info');
       }
+      // Refrescar el store local para que al navegar a las hermanas se vean
+      // las fotos recién persistidas. init() vuelve a traer todas las OTs
+      // desde el backend con fotos_json actualizado.
+      if (window.LabStore && typeof window.LabStore.init === 'function') {
+        window.LabStore.init().then(refresh).catch(function () { refresh(); });
+      } else {
+        refresh();
+      }
     });
   }
   function togglePre() { window.LabStore.updateOt(ot.nro_ot, { es_preinforme: ot.es_preinforme ? 0 : 1 }); refresh(); }
