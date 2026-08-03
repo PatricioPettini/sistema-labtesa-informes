@@ -228,13 +228,15 @@ function generarPlegadoDesdeTemplate(ot, datos, fotosCaratula) {
   const metodologia_ensayo_linea = '__SECTION_HIDE__';
 
   // ── Parámetros de ensayo ──────────────────────────────────────────────────
-  // Diámetro mandril: NO agregar " mm" si el valor ya trae unidad/texto
-  // (ej "3 Espesores", "90mm"). Solo agregar " mm" si es número puro.
+  // Diámetro mandril: unidad seleccionable desde el form ('mm' o 'Espesores').
+  // Legacy: si el valor ya trae texto (ej "3 Espesores"), respeta lo escrito y
+  // no agrega unidad. Fallback default 'mm' para OTs sin la selección nueva.
   let diametro_mandril_linea = '__SECTION_HIDE__';
   if (datos.diametro_mandril) {
     const v = String(datos.diametro_mandril).trim();
     const esNumeroPuro = /^[\d.,]+$/.test(v);
-    diametro_mandril_linea = `Diámetro mandril: ${v}${esNumeroPuro ? ' mm' : ''}`;
+    const unidad = datos.diametro_mandril_unidad || 'mm';
+    diametro_mandril_linea = `Diámetro mandril: ${v}${esNumeroPuro ? ' ' + unidad : ''}`;
   }
 
   const espesor_probeta_linea = datos.espesor_probeta

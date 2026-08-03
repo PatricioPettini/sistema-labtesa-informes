@@ -217,11 +217,20 @@ function PlegadoForm(props) {
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.estado_superficial, onChange: function (e) { updBool('estado_superficial', e.target.checked); } }),
         _r('span', { style: { fontWeight: 600 } }, 'ESTADO SUPERFICIAL DE MUESTRA'), ' OK'),
+      // Diámetro mandril + selector de unidad. Puede ser en "Espesores" (multiplos
+      // del espesor de probeta, ej "4 Espesores") o en "mm". Se guarda la unidad
+      // en `datos.diametro_mandril_unidad` (default 'mm' por retrocompat).
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'DIÁMETRO MANDRIL / ESPESORES:'),
+        _r('span', { style: { fontWeight: 600 } }, 'DIÁMETRO MANDRIL:'),
         _r('input', { style: Object.assign({}, S.input, { width: 120 }), value: datos.diametro_mandril || '',
           onChange: function (e) { upd('diametro_mandril', e.target.value); } }),
-        _r('span', null, 'mm')),
+        _r('select', {
+          style: Object.assign({}, S.input, { width: 120 }),
+          value: datos.diametro_mandril_unidad || 'mm',
+          onChange: function (e) { upd('diametro_mandril_unidad', e.target.value); },
+        },
+          _r('option', { value: 'mm' }, 'mm'),
+          _r('option', { value: 'Espesores' }, 'Espesores'))),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'ESPESOR DE PROBETA:'),
         _r('input', { style: Object.assign({}, S.input, S.num, { width: 80 }), value: datos.espesor_probeta || '',

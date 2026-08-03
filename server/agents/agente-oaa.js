@@ -180,6 +180,30 @@ function detectarAcreditacion(tipo, datos) {
       partesNorma.push('DIN EN 10045' + y);
     }
   }
+  if (tipo === 'plegado') {
+    // Form nuevo: la norma va en checkboxes con año — norma_iso5173 e
+    // norma_astm_e190 (con <key>_year), Y en `condiciones_por_ot[<ot>].norma_ensayo_ot`
+    // (texto libre por-OT que puede sobrescribir). Componemos todas las
+    // fuentes en un string único para que el regex matchee cualquiera.
+    if (datos.norma_iso5173) {
+      const y = String(datos.norma_iso5173_year || '').trim();
+      partesNorma.push('ISO 5173' + (y || ':2023'));
+    }
+    if (datos.norma_astm_e190) {
+      const y = String(datos.norma_astm_e190_year || '').trim();
+      partesNorma.push('ASTM E190' + (y || '-21'));
+    }
+    // Legacy: `norma_ensayo` (dropdown viejo) o `norma_ensayo_otra` si eligió "otra".
+    if (datos.norma_ensayo && datos.norma_ensayo !== 'otra') partesNorma.push(datos.norma_ensayo);
+    if (datos.norma_ensayo_otra) partesNorma.push(datos.norma_ensayo_otra);
+    // Overrides por OT (texto libre "norma_ensayo_ot"). Puede haber varias OTs
+    // en el mapa — agregamos todas y el regex busca match en cualquiera.
+    if (datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+      Object.values(datos.condiciones_por_ot).forEach(m => {
+        if (m && m.norma_ensayo_ot) partesNorma.push(String(m.norma_ensayo_ot));
+      });
+    }
+  }
   if (tipo === 'traccion') {
     // Los form nuevos tienen checkboxes con input de año al lado. Sólo el año
     // acreditado (ISO 6892-1:2019, ASTM E8-24) hace que el ensayo sea acred.
