@@ -1317,6 +1317,30 @@ router.post('/generate/:nro_ot', upload.array('fotos'), async (req, res) => {
     } catch {}
   }
 
+  // Reemisión OAA: si ya hay un informe vigente y esta OT tiene ensayos
+  // acreditados, adjuntar al `ot` los datos necesarios para que el generator
+  // emita las 2 líneas obligatorias (anula-y-reemplaza + motivo del cambio).
+  try {
+    const { informeVigente, contarEmitidos } = require('../utils/versionado');
+    const prevInfo = informeVigente(nro_ot);
+    const total = contarEmitidos(nro_ot);
+    // Es reemisión si ya hubo emisiones previas.
+    if (prevInfo && total > 0) {
+      const acreditado = ensayos.some(e => {
+        const d = typeof e.datos_json === 'string' ? JSON.parse(e.datos_json) : (e.datos_json || {});
+        return d._es_acreditado === true;
+      });
+      const motivoRecibido = String((req.query && req.query.motivo_cambio)
+                                 || (req.body && req.body.motivo_cambio) || '').trim();
+      if (acreditado && motivoRecibido) {
+        ot._reemision_oaa = {
+          nro_ot_previo: nro_ot,
+          motivo_cambio: motivoRecibido,
+        };
+      }
+    }
+  } catch (e) { console.warn('[reemision-oaa] check:', e.message); }
+
   try {
     const buffer = await generarWordCompleto(ot, ensayos, fotosCaratula);
     const razonSocial  = (ot.razon_social  || '').replace(/[/\\:*?"<>|]/g, '').trim();
@@ -1493,6 +1517,12 @@ router.post('/generate/:nro_ot', upload.array('fotos'), async (req, res) => {
       // dentro del generator/template y no es 1 solo archivo. Guardamos SHA
       // del buffer pre-versión como referencia estable de "formato").
       const templateSha = crypto.createHash('sha256').update(buffer).digest('hex');
+      // Motivo del cambio: obligatorio para reemisiones OAA (version > 1 y
+      // acreditado). Viene del query/body — el modal del front lo pide antes
+      // de reemitir. Se persiste en informes_emitidos.motivo_cambio.
+      const motivoCambio = (req.query && req.query.motivo_cambio)
+                        || (req.body && req.body.motivo_cambio)
+                        || '';
       const reg = registrarInformeEmitido({
         nro_ot,
         filename: filenameFinal,
@@ -1506,6 +1536,7 @@ router.post('/generate/:nro_ot', upload.array('fotos'), async (req, res) => {
         version: versionEmitir,
         template_sha256: templateSha,
         ruta_original: rutaGuardada,
+        motivo_cambio: motivoCambio || null,
       });
       __registroInforme = reg;
       const marcaCorr = (reg && reg.correlativo) ? ` [${reg.correlativo}]` : '';

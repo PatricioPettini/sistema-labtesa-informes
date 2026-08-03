@@ -44,7 +44,7 @@ function siguienteCorrelativo() {
 function registrarInformeEmitido({
   nro_ot, filename, ruta, sha256, size_bytes,
   acreditado, es_preinforme, payload_ot, payload_ensayos,
-  version, template_sha256, ruta_original,
+  version, template_sha256, ruta_original, motivo_cambio,
 }) {
   try {
     const correlativo = siguienteCorrelativo();
@@ -52,8 +52,8 @@ function registrarInformeEmitido({
       INSERT INTO informes_emitidos
         (nro_ot, filename, ruta, sha256, size_bytes, acreditado, es_preinforme,
          payload_ot_json, payload_ens_json,
-         version, template_sha256, ruta_original, correlativo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         version, template_sha256, ruta_original, correlativo, motivo_cambio)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       nro_ot, filename, ruta || null, sha256, size_bytes,
       acreditado ? 1 : 0, es_preinforme ? 1 : 0,
@@ -63,6 +63,7 @@ function registrarInformeEmitido({
       template_sha256 || null,
       ruta_original || ruta || null,
       correlativo,
+      motivo_cambio || null,
     );
     return { id: info.lastInsertRowid, correlativo };
   } catch (e) {

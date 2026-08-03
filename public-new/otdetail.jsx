@@ -96,6 +96,8 @@ function OTDetail(props) {
   // Modal genérico para reemplazar window.confirm/alert nativos.
   // { title, message, tone, confirmLabel, confirmIcon, onConfirm (o null si es alert) }
   var _mdl = React.useState(null); var mdl = _mdl[0], setMdl = _mdl[1];
+  // Modal "Motivo del cambio" para reemisión de informe OAA acreditado.
+  var _motivoDlg = React.useState(null); var motivoDlg = _motivoDlg[0], setMotivoDlg = _motivoDlg[1];
   // Modal específico para colisión de nombre de archivo con 3 opciones.
   // { filename, carpeta, opts }  → sobrescribir / -1 / renombrar.
   var _arch = React.useState(null); var archExiste = _arch[0], setArchExiste = _arch[1];
@@ -317,7 +319,8 @@ function OTDetail(props) {
            + (opts.nombreCustom ? '&nombre_custom=1' : '')
            + (opts.forzar ? '&forzar=true' : '')
            + (opts.confirmarVersion ? '&confirmar_version_nueva=true' : '')
-           + (opts.modoConflicto ? '&modo_conflicto=' + encodeURIComponent(opts.modoConflicto) : '');
+           + (opts.modoConflicto ? '&modo_conflicto=' + encodeURIComponent(opts.modoConflicto) : '')
+           + (opts.motivoCambio ? '&motivo_cambio=' + encodeURIComponent(opts.motivoCambio) : '');
     fetch('/api/generate/' + ot.nro_ot + qs, { method: 'POST' })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
       .then(function (r) {
@@ -328,17 +331,21 @@ function OTDetail(props) {
           var v  = r.d.version_a_emitir;
           var vg = r.d.vigente || {};
           setGen('');
-          setMdl({
-            title: 'Nueva versión del informe',
-            message: 'Ya existe un informe vigente para esta OT (versión ' + (vg.version || 1) + '). Si continuás, se emitirá como versión ' + v + ' (' + (r.d.filename_nuevo || '') + ') y la versión anterior se moverá a la carpeta SUPERADO/. ¿Confirmás emitir la nueva versión?',
-            tone: 'warning', confirmLabel: 'Emitir nueva versión', confirmIcon: 'download',
-            cancelLabel: 'Cancelar',
-            onConfirm: function () {
-              setMdl(null);
-              ejecutarGenerarWord(carpetaDestino, filename, Object.assign({}, opts, { confirmarVersion: true }));
+          // Nuevo modal con textarea para el motivo del cambio (requisito OAA
+          // en reemisiones acreditadas). El motivo se emite en el Word entre
+          // la carátula y el primer ensayo.
+          setMotivoDlg({
+            titulo: 'Nueva versión del informe',
+            versionActual: vg.version || 1,
+            versionNueva: v,
+            filenameNuevo: r.d.filename_nuevo || '',
+            onConfirm: function (motivo) {
+              setMotivoDlg(null);
+              ejecutarGenerarWord(carpetaDestino, filename,
+                Object.assign({}, opts, { confirmarVersion: true, motivoCambio: motivo }));
             },
             onCancel: function () {
-              setMdl(null);
+              setMotivoDlg(null);
               toast('Emisión cancelada. No se modificó la versión vigente.', 'warning');
             },
           });
@@ -1049,6 +1056,8 @@ function OTDetail(props) {
       onConfirm:    mdl.onConfirm,
       onCancel:     mdl.onCancel,
     }) : null,
+    // Modal "Motivo del cambio" para reemisión OAA acreditada (versión > 1).
+    motivoDlg ? React.createElement(MotivoCambioModal, motivoDlg) : null,
     // Modal específico de colisión de nombre de archivo (radios + nombre editable).
     archExiste ? React.createElement(ArchivoExistenteModal, {
       filename: archExiste.filename,
@@ -1094,6 +1103,54 @@ function OTDetail(props) {
      - "Cambiar nombre"            → nombre libre que escriba el técnico.
    Al aceptar, el backend recibe el `filename` que quedó en el input +
    `modo_conflicto` según la opción elegida. */
+// Modal "Nueva versión del informe" con textarea de motivo. Se muestra cuando
+// el backend detecta que ya hay un informe vigente (código CONFIRMAR_VERSION_NUEVA).
+// El motivo se emite en el Word entre la carátula y el primer ensayo. Es un
+// requisito OAA cuando la OT tiene ensayos acreditados.
+function MotivoCambioModal(props) {
+  var _m = React.useState(''); var motivo = _m[0], setMotivo = _m[1];
+  var puedeConfirmar = motivo.trim().length >= 3;
+  return React.createElement('div', {
+    style: {
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    },
+    onClick: function (e) { if (e.target === e.currentTarget) props.onCancel(); },
+  },
+    React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(92vw, 560px)', overflow: 'hidden' } },
+      React.createElement('div', { style: { background: '#fff8e5', borderBottom: '1px solid #e0c060', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement(Icon, { name: 'alertTri', size: 20, style: { color: '#8a5a00' } }),
+        React.createElement('div', null,
+          React.createElement('h3', { style: { margin: 0, color: '#8a5a00', fontSize: 15 } }, props.titulo || 'Nueva versión del informe'),
+          React.createElement('div', { style: { fontSize: 12, color: '#8a5a00c0', marginTop: 3 } },
+            'Versión ' + props.versionActual + ' → versión ' + props.versionNueva + ' · ' + (props.filenameNuevo || ''))
+        )
+      ),
+      React.createElement('div', { style: { padding: 20 } },
+        React.createElement('p', { style: { fontSize: 12, color: 'var(--text-2)', margin: '0 0 12px' } },
+          'Al confirmar, la versión anterior se moverá a SUPERADO/ y se emitirá la nueva. ' +
+          'Si el informe es acreditado (OAA), el motivo se emite obligatoriamente en el Word entre la carátula y el primer ensayo.'),
+        React.createElement('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, 'Motivo del cambio:'),
+        React.createElement('textarea', {
+          autoFocus: true, value: motivo,
+          onChange: function (e) { setMotivo(e.target.value); },
+          placeholder: 'Ej: Eliminación de marcación de fuera de alcance. Acero inoxidable dentro del alcance acreditado.',
+          style: { width: '100%', minHeight: 90, border: '1px solid #d0d7de', borderRadius: 4, padding: '7px 10px', fontSize: 12, fontFamily: 'inherit', resize: 'vertical' },
+        }),
+        React.createElement('div', { style: { fontSize: 10.5, color: 'var(--text-3)', marginTop: 6 } },
+          'Mínimo 3 caracteres. Queda registrado en informes_emitidos.motivo_cambio.')
+      ),
+      React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid #d0d7de', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+        React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, 'Cancelar'),
+        React.createElement(Button, {
+          variant: 'warning', icon: 'download', disabled: !puedeConfirmar,
+          onClick: function () { if (puedeConfirmar) props.onConfirm(motivo.trim()); },
+        }, 'Emitir nueva versión')
+      )
+    )
+  );
+}
+
 function ArchivoExistenteModal(props) {
   var filename = props.filename || '';
   var filenameSugerido = props.filenameSugerido || filename;

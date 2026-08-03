@@ -649,6 +649,12 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
     if (resultBuf && ot.inspeccion_texto) {
       resultBuf = insertarInspeccionAntesDeFin(resultBuf, ot.inspeccion_texto);
     }
+    // Reemisión OAA: si ot._reemision_oaa está seteado (informe acreditado
+    // versión > 1), insertar las 2 líneas obligatorias entre la carátula y
+    // el primer ensayo.
+    if (resultBuf && ot._reemision_oaa) {
+      resultBuf = insertarReemisionOAA(resultBuf, ot._reemision_oaa);
+    }
     if (resultBuf) resultBuf = limitarAnchoTablas(resultBuf);
     // Uniformar interlineado a 1.15 en todo el informe ANTES de spacingCeroEnCeldas,
     // así las celdas de tabla se recomprimen a 1.0 y sólo el cuerpo queda en 1.15.
@@ -914,6 +920,70 @@ function asegurarBlanksAntesDeOAA(buf) {
   for (const pos of inserts) {
     xml = xml.slice(0, pos) + BLANK + xml.slice(pos);
   }
+  zip.file('word/document.xml', xml);
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// Reemisión OAA: inserta las 2 líneas obligatorias entre la carátula y el
+// primer ensayo cuando se emite una versión acreditada > 1:
+//   1. "El presente certificado anula y reemplaza al certificado de análisis OT NNN"
+//   2. "Motivo del cambio: <texto libre>"
+// Punto de inserción: JUSTO ANTES del párrafo que contiene el heading del
+// primer ensayo (típicamente "ENSAYO DE …" o similar) — que es lo primero
+// después del caption "Imagen N°1 - Estado de recepción".
+function insertarReemisionOAA(buf, info) {
+  const nroOtPrev = String(info && info.nro_ot_previo || '').trim();
+  const motivo = String(info && info.motivo_cambio || '').trim();
+  if (!nroOtPrev || !motivo) return buf;
+  const zip = new PizZip(buf);
+  const docEntry = zip.files['word/document.xml'];
+  if (!docEntry) return buf;
+  let xml = docEntry.asText();
+
+  // Localizar el primer heading de ensayo: los templates usan numeración
+  // automática (numPr numId=16 ilvl=0) O texto literal "N.\t...". Como el
+  // post-proceso puede haberlos convertido a literal, buscamos ambos.
+  // Estrategia: buscar el primer <w:p> DESPUÉS de la carátula que contenga
+  // "Estado de recepción" y tomar el SIGUIENTE párrafo.
+  let cursor = 0;
+  const recepIdx = xml.indexOf('Estado de recepci');
+  if (recepIdx >= 0) {
+    const closeCaption = xml.indexOf('</w:p>', recepIdx);
+    if (closeCaption > 0) cursor = closeCaption + '</w:p>'.length;
+  }
+  if (cursor === 0) {
+    // Fallback: usar el marker de fin de recepción.
+    const pageBreakIdx = xml.indexOf('w:type="page"');
+    if (pageBreakIdx > 0) {
+      const closeBreak = xml.indexOf('</w:p>', pageBreakIdx);
+      if (closeBreak > 0) cursor = closeBreak + '</w:p>'.length;
+    }
+  }
+  if (cursor === 0) return buf;
+
+  const esc = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const FONTS = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
+  const SZ    = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
+  const pLinea = (texto, opts) => {
+    opts = opts || {};
+    const b = opts.bold ? '<w:b/><w:bCs/>' : '';
+    const jc = opts.center ? '<w:jc w:val="center"/>' : '';
+    return '<w:p><w:pPr>' +
+      '<w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+      '<w:ind w:left="851"/>' + jc +
+      `<w:rPr>${FONTS}${b}${SZ}</w:rPr></w:pPr>` +
+      `<w:r><w:rPr>${FONTS}${b}${SZ}</w:rPr>` +
+      `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
+  };
+
+  const bloque =
+    pLinea('"El presente certificado anula y reemplaza al certificado de análisis OT ' + nroOtPrev + '"', { bold: true, center: true }) +
+    pLinea('Motivo del cambio: ' + motivo, { bold: true }) +
+    pLinea(' ');
+
+  xml = xml.slice(0, cursor) + bloque + xml.slice(cursor);
   zip.file('word/document.xml', xml);
   return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 }

@@ -62,6 +62,11 @@ const _migrations = [
   `ALTER TABLE informes_emitidos ADD COLUMN ruta_original TEXT`,
   `ALTER TABLE informes_emitidos ADD COLUMN template_sha256 TEXT`,
   `ALTER TABLE informes_emitidos ADD COLUMN correlativo TEXT`,
+  // Motivo de reemisión — obligatorio en informes OAA acreditados con version>1.
+  // Se emite en el Word entre la carátula y el primer ensayo:
+  //   "El presente certificado anula y reemplaza al certificado de análisis OT NNN"
+  //   Motivo del cambio: <motivo_cambio>
+  `ALTER TABLE informes_emitidos ADD COLUMN motivo_cambio TEXT`,
   // Marca datos faltantes en OTs importadas del bot cuando la tarjeta Trello
   // tenía etiqueta FALTA O.T o FALTA ID. JSON array, ej ["nro_ot","id_muestra"].
   // La UI muestra chip rojo y bloquea la generación de informe.
