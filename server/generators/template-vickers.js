@@ -943,7 +943,7 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
     // Uso spacing before/after para separar de la tabla y de la próxima —
     // más robusto que párrafos blank (que eliminarParrafosVacios podría borrar).
     const captionSpacing = '<w:p><w:pPr>' +
-      '<w:spacing w:line="276" w:lineRule="auto" w:before="180" w:after="480"/>' +
+      '<w:spacing w:line="276" w:lineRule="auto" w:before="0" w:after="480"/>' +
       '<w:jc w:val="center"/></w:pPr>' +
       `<w:r><w:rPr>${FONTS}${SZ}</w:rPr>` +
       `<w:t xml:space="preserve">Tabla N°${numTabla} - Resultados ensayo de dureza</w:t></w:r></w:p>`;
