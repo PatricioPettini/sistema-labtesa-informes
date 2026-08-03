@@ -938,9 +938,15 @@ function insertarInspeccionAntesDeFin(buf, textoInspeccion) {
   const FONTS = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/>';
   const SZ    = '<w:sz w:val="22"/><w:szCs w:val="22"/>';
 
+  // Numerado con numId=16 (misma lista que "DETERMINACIÓN DE …" y los headings
+  // de cada ensayo). Al ir siempre al final, agarra automáticamente el número
+  // siguiente al último ensayo (ej: si hay 5 ensayos, sale "6. INSPECCIÓN").
   const heading = '<w:p><w:pPr>' +
+    '<w:pStyle w:val="Textosinformato"/>' +
+    '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="16"/></w:numPr>' +
+    '<w:tabs><w:tab w:val="left" w:pos="426"/></w:tabs>' +
     '<w:spacing w:line="300" w:lineRule="auto" w:before="120" w:after="60"/>' +
-    '<w:ind w:left="142"/>' +
+    '<w:ind w:left="142" w:firstLine="0"/>' +
     `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     '<w:t xml:space="preserve">INSPECCIÓN</w:t></w:r></w:p>';
