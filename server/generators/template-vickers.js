@@ -966,14 +966,16 @@ function insertarBloqueMapaVickers(processedZip, outXml, datos, modoMapa) {
   // (sin "Gráfico N°XX" arriba — el usuario prefiere no incluirlo.)
   const MARKER_IMG = '__VK_MAPA_IMG__';
   bloque += pLinea(MARKER_IMG);
-  // Referencias apiladas en un solo párrafo con <w:br/> — sin blancos entre.
+  // Referencias + "Figura N°1" apiladas en UN SOLO párrafo con <w:br/> — así
+  // Word no inserta espacio visual entre líneas (evita el enter extra arriba
+  // de "Figura N°1").
   bloque += pMultiLinea([
     't = Espesor del material base',
     'M.B. = Metal base',
     'Z.A.C. = Zona afectada por el calor',
     'SOLD = Soldadura',
+    'Figura N°1 - Esquema con ubicación de improntas - Mapa de durezas',
   ], { center: true });
-  bloque += pLinea('Figura N°1 - Esquema con ubicación de improntas - Mapa de durezas', { center: true });
 
   // Insertar el bloque justo antes de "NOTA" si existe, sino antes de "FIN DE INFORME".
   const refPos = (() => {
