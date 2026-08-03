@@ -122,6 +122,13 @@ function parsearOtsDeDesc(desc) {
       muestrasEnLinea.push(mm[1]);
       if (mm[2]) muestrasEnLinea.push(mm[2]);
     }
+    // Formato "(O.T. NNN)M :" o "(O.T. NNN) M:" — la M es un dígito pegado
+    // al ")" sin la letra "M" delante. Estilo del laboratorio para tarjetas
+    // con múltiples OTs. Ej: "(O.T. 536372)1 :" → OT 536372, muestra 1.
+    if (muestrasEnLinea.length === 0 && otEnLinea) {
+      const mSuelto = trim.match(/\)\s*(\d+)\s*:/);
+      if (mSuelto) muestrasEnLinea.push(mSuelto[1]);
+    }
 
     // Extraer descripción. Estrategia:
     //   1. Sacar "(OT: NNN)" — sino, el lastIndexOf(':') caía en "OT:" y el
@@ -130,6 +137,8 @@ function parsearOtsDeDesc(desc) {
     //   3. Sacar ":" o "ID:" que hayan quedado al inicio.
     let descTexto = trim
       .replace(/\(\s*O\.?T\.?\s*:?\s*\d+\s*\)/gi, '')
+      // Formato "(...)N :" — sacar el dígito suelto y los dos puntos.
+      .replace(/^\s*\d+\s*:\s*/, '')
       .replace(/^\s*(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+(?:\s+y\s+(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+)?\s*/i, '')
       .replace(/^\s*:\s*/, '')
       .replace(/^\s*ID:\s*/i, '')
