@@ -762,35 +762,17 @@ function PlegadoForm(props) {
                 value: getCondOt(otActivaTextos, 'codigo_referencia_ot') || '',
                 onChange: function (e) { onCodigoChange(e.target.value); } });
         })()),
-      // Orientación de probeta — click en la opción ya seleccionada la
-      // deselecciona (queda sin orientación → línea no se emite en el Word).
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
+      // Orientación de probeta — desplegable (Longitudinal / Transversal / —).
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Orientación de probeta:'),
-        _r('label', { style: Object.assign({}, S.label, { cursor: 'pointer' }) },
-          _r('input', { type: 'checkbox',
-            checked: getCondOt(otActivaTextos, 'orientacion_ot') === 'Longitudinal',
-            onChange: function () {
-              var actual = getCondOt(otActivaTextos, 'orientacion_ot');
-              setCondOt(otActivaTextos, 'orientacion_ot', actual === 'Longitudinal' ? '' : 'Longitudinal');
-            } }),
-          'Longitudinal'),
-        _r('label', { style: Object.assign({}, S.label, { cursor: 'pointer' }) },
-          _r('input', { type: 'checkbox',
-            checked: getCondOt(otActivaTextos, 'orientacion_ot') === 'Transversal',
-            onChange: function () {
-              var actual = getCondOt(otActivaTextos, 'orientacion_ot');
-              setCondOt(otActivaTextos, 'orientacion_ot', actual === 'Transversal' ? '' : 'Transversal');
-            } }),
-          'Transversal'),
-        getCondOt(otActivaTextos, 'orientacion_ot')
-          ? _r('button', { type: 'button', title: 'Limpiar orientación',
-              onClick: function () { setCondOt(otActivaTextos, 'orientacion_ot', ''); },
-              style: {
-                border: '1px solid #d0d7de', background: '#fff', padding: '2px 8px',
-                borderRadius: 3, fontSize: 10, cursor: 'pointer', color: '#666', marginLeft: 4,
-              },
-            }, 'Limpiar')
-          : null),
+        _r('select', {
+          style: Object.assign({}, S.input, { flex: 1, maxWidth: 220 }),
+          value: getCondOt(otActivaTextos, 'orientacion_ot') || '',
+          onChange: function (e) { setCondOt(otActivaTextos, 'orientacion_ot', e.target.value); },
+        },
+          _r('option', { value: '' }, '—'),
+          _r('option', { value: 'Longitudinal' }, 'Longitudinal'),
+          _r('option', { value: 'Transversal' }, 'Transversal'))),
       // Probeta mecanizada según — desplegable ídem código. Editar acá marca
       // el campo como "manual" (no auto-completa después de ediciones).
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
