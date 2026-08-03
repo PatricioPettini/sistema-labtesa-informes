@@ -73,6 +73,20 @@ function NickBreakForm(props) {
   if (probetas.length === 0) {
     for (var _i = 0; _i < 4; _i++) probetas.push({});
   }
+  // Renumeración automática de la columna PROBETA: 1, 2, 3… por índice.
+  // Persistimos en `id` (compat legacy) para que el generator la lea sin
+  // cambios. Solo pisa si el valor actual no coincide.
+  React.useEffect(function () {
+    var next = probetas.map(function (p, i) {
+      var esperado = String(i + 1);
+      if (!p) p = {};
+      if (String(p.id || '') !== esperado) return Object.assign({}, p, { id: esperado });
+      return p;
+    });
+    // Detectar si hubo cambios comparando referencia.
+    var hayCambio = next.some(function (p, i) { return p !== probetas[i]; });
+    if (hayCambio) set('probetas', next);
+  }, [probetas.length]);
   function setProb(i, key, val) {
     var next = probetas.slice();
     next[i] = Object.assign({}, next[i] || {}, {});
@@ -176,9 +190,6 @@ function NickBreakForm(props) {
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 90 } }, 'MUESTRA N° / OT N°'),
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 70 } }, 'PROBETA'),
-            _r('th', { style: { border: '1px solid #333', padding: 4, width: 52 } }, 'OP 1'),
-            _r('th', { style: { border: '1px solid #333', padding: 4, width: 52 } }, 'OP 2'),
-            _r('th', { style: { border: '1px solid #333', padding: 4, width: 52 } }, 'OP 3'),
             _r('th', { style: { border: '1px solid #333', padding: 4 } }, 'RESULTADO'),
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 30 } }, '')
           )
@@ -190,15 +201,11 @@ function NickBreakForm(props) {
               _r('td', { style: { border: '1px solid #333', padding: 0 } },
                 _r('input', { style: Object.assign({}, S.input, { border: 'none', width: '100%' }),
                   value: p.muestra || '', onChange: function (e) { setProb(i, 'muestra', e.target.value); } })),
-              _r('td', { style: { border: '1px solid #333', padding: 0 } },
-                _r('input', { style: Object.assign({}, S.input, { border: 'none', width: '100%' }),
-                  value: p.id || p.probeta || '', onChange: function (e) { setProb(i, 'id', e.target.value); } })),
-              _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'checkbox', checked: !!p.op1, onChange: function (e) { setProb(i, 'op1', e.target.checked); } })),
-              _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'checkbox', checked: !!p.op2, onChange: function (e) { setProb(i, 'op2', e.target.checked); } })),
-              _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'checkbox', checked: !!p.op3, onChange: function (e) { setProb(i, 'op3', e.target.checked); } })),
+              // PROBETA: numeración automática 1, 2, 3… (read-only, se rellena
+              // por índice al momento de emitir/mostrar). Guardamos también en
+              // p.id para que el generator y la exportación sigan viendo el
+              // valor como antes.
+              _r('td', { style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' } }, i + 1),
               _r('td', { style: { border: '1px solid #333', padding: 0 } },
                 _r('select', {
                   style: Object.assign({}, S.input, { border: 'none', width: '100%', fontSize: 9, background: 'transparent' }),
