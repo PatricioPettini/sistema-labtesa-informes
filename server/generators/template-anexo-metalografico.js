@@ -72,6 +72,14 @@ function pBlanco() {
     '<w:ind w:left="1135"/></w:pPr></w:p>';
 }
 
+// Caption debajo de tablas (Tabla N°X – …): centrado, cursiva, sin negrita.
+function pCaption(texto) {
+  return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
+    '<w:jc w:val="center"/></w:pPr>' +
+    `<w:r><w:rPr>${FONTS}<w:i/><w:iCs/>${SZ}</w:rPr>` +
+    `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
+}
+
 // Celda de tabla — bordes finos negros, texto centrado, fuente Calibri 11.
 function celdaTabla(texto, ancho, header) {
   const BORD = '<w:tcBorders>' +
@@ -161,12 +169,23 @@ function _aplicarAnio(nombre, anio) {
 // Arma la línea "Norma de ensayo: ..." a partir de los flags del form.
 // Prioridad: si viene `norma_completa` (texto libre), se usa tal cual;
 // si no, se combinan checkboxes con año + método + "otra norma" con "y".
+// El `defaultAstm` debe ser el nombre SIN año (ej. "ASTM E112") — el año se
+// aplica desde bloc.astm_year (ingresado por el usuario). Método se pega al
+// final del nombre ASTM como "Método X" (no con " y ").
 function armarNorma(bloc, defaultAstm) {
   const completa = (bloc.norma_completa || '').trim();
   if (completa) return completa;
   const partes = [];
-  if (bloc.astm) partes.push(_aplicarAnio(defaultAstm, bloc.astm_year));
-  if (bloc.metodo_chk && (bloc.metodo || '').trim()) partes.push(bloc.metodo.trim());
+  if (bloc.astm) {
+    let base = _aplicarAnio(defaultAstm, bloc.astm_year);
+    if (bloc.metodo_chk && (bloc.metodo || '').trim()) {
+      base += ' Método ' + bloc.metodo.trim();
+    }
+    partes.push(base);
+  } else if (bloc.metodo_chk && (bloc.metodo || '').trim()) {
+    // Caso raro: método marcado sin ASTM base. Emitirlo solo con "Método X".
+    partes.push('Método ' + bloc.metodo.trim());
+  }
   // "Otra norma": se concatena con "y" al final de la línea.
   const otra = (bloc.otra || '').trim();
   if (otra) partes.push(otra);
@@ -232,7 +251,7 @@ function construirBloqueEnsayo(datos) {
 
   // ─── SECCIÓN 1: TAMAÑO DE GRANO ───────────────────────────────────────
   const resultadoGrano = (datos.resultado_grano || '').trim();
-  const normaGrano = armarNorma(g, 'ASTM E112-25');
+  const normaGrano = armarNorma(g, 'ASTM E112');
   const itmGrano   = armarItm(g, '064');
   const hayGrano = normaGrano || itmGrano || resultadoGrano;
   if (hayGrano) {
@@ -266,7 +285,7 @@ function construirBloqueEnsayo(datos) {
   // ─── SECCIÓN 2: DETERMINACIÓN DE INCLUSIONES ──────────────────────────
   const resultadoInclu = (datos.resultado_inclusionario || '').trim();
   const hayTablaInc = tieneDatosInclusiones(datos.inclusiones);
-  const normaInclu = armarNorma(inc, 'ASTM E45-25');
+  const normaInclu = armarNorma(inc, 'ASTM E45');
   const itmInclu   = armarItm(inc, '063');
   const hayInclu = normaInclu || itmInclu || resultadoInclu || hayTablaInc;
   if (hayInclu) {
@@ -293,7 +312,10 @@ function construirBloqueEnsayo(datos) {
       }
       if (hayTablaInc) {
         partes.push(construirTablaInclusiones(datos.inclusiones));
-        partes.push(pLinea('Tabla – Resultados ensayo determinación de inclusiones', true));
+        // Caption centrado, en cursiva (sin negrita). Empieza con "Tabla N°1"
+        // como placeholder — renumerarTablas del word-generator reemplaza el
+        // "1" por el número correcto en el orden global del informe.
+        partes.push(pCaption('Tabla N°1 – Resultados ensayo determinación de inclusiones'));
         partes.push(pBlanco());
       }
     }
