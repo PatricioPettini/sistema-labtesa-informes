@@ -224,6 +224,21 @@
         apiFetch('POST', '/api/ot', Object.assign({ nro_ot: nro_ot }, data))
           .catch(function (e) { apiErr('Error al actualizar OT: ' + e.message); });
       }
+      // La fecha de aprobación es una decisión de GERENCIA sobre la solicitud
+      // completa, no por OT individual. Si se está actualizando, propagar a
+      // todas las OTs hermanas de la misma solicitud (mutación local + PATCH).
+      if (Object.prototype.hasOwnProperty.call(data, 'fecha_aprobacion') && ot && ot.nro_solicitud) {
+        var sol = String(ot.nro_solicitud).trim();
+        if (sol) {
+          _db.ots.forEach(function (h) {
+            if (String(h.nro_solicitud || '').trim() !== sol) return;
+            if (h.nro_ot === nro_ot) return; // ya se actualizó arriba
+            h.fecha_aprobacion = data.fecha_aprobacion;
+            apiFetch('PATCH', '/api/ot/' + encodeURIComponent(h.nro_ot), { fecha_aprobacion: data.fecha_aprobacion })
+              .catch(function (e) { apiErr('Error al propagar fecha de aprobación a OT ' + h.nro_ot + ': ' + e.message); });
+          });
+        }
+      }
       return ot;
     },
 
