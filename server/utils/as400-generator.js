@@ -111,6 +111,16 @@ function numeroATexto(v, forzarEntero) {
   return s.replace('.', ',');
 }
 
+// Formatea a 1 decimal con coma. 30.28 → "30,3"; 30 → "30"; 30.50 → "30,5".
+function numeroA1Decimal(v) {
+  const f = Number(v);
+  if (isNaN(f)) return String(v);
+  let s = f.toFixed(1);
+  // Quitar decimal si es cero (30.0 → 30).
+  if (s.endsWith('.0')) s = s.slice(0, -2);
+  return s.replace('.', ',');
+}
+
 function abreviarTratamiento(txt) {
   if (esValorNulo(txt)) return '';
   const key = norm(txt);
@@ -621,15 +631,26 @@ function llenarBloque(sheetXml, baseRow, informe) {
     } else {
       escritura = String(transformado);
     }
-    // Filas 16 y 27 = MB/MA Alargamiento (%). Si el valor final tiene 2+
-    // decimales (ej. "12,34"), suele indicar un dato mal cargado en el fuente
-    // que hay que revisar manualmente. Registramos advertencia.
-    if ((r === 16 || r === 27) && typeof escritura === 'string' && /,\d{2,}/.test(escritura)) {
-      advertenciasAlargamiento.push({
-        fila: r,
-        campo: r === 16 ? 'MB Alargamiento (%)' : 'MA Alargamiento (%)',
-        valor: escritura,
-      });
+    // Filas 16 y 27 = MB/MA Alargamiento (%). Convención del laboratorio:
+    // redondear siempre a 1 decimal (30,28 → 30,3). Si el fuente traía 2+
+    // decimales, además dejamos advertencia para revisión (probablemente el
+    // dato del AS/400 estaba mal cargado y conviene chequear el original).
+    if (r === 16 || r === 27) {
+      const valorOriginal = escritura;
+      const teniaMasDe1Decimal = typeof escritura === 'string' && /[,.]\d{2,}/.test(escritura);
+      if (typeof escritura === 'string' && escritura.trim()) {
+        // Parsear el número (acepta coma o punto decimal) y reescribir a 1 decimal.
+        const n = Number(escritura.replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(n)) escritura = numeroA1Decimal(n);
+      }
+      if (teniaMasDe1Decimal) {
+        advertenciasAlargamiento.push({
+          fila: r,
+          campo: r === 16 ? 'MB Alargamiento (%)' : 'MA Alargamiento (%)',
+          valor: valorOriginal,
+          redondeado: escritura,
+        });
+      }
     }
     out = reemplazarCelda(out, 'C' + (baseRow + r - 1), escritura);
   }
