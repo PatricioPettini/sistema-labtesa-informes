@@ -115,34 +115,20 @@ function NickBreakForm(props) {
           onChange: function (e) { upd('metodologia', e.target.value); } })),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'CÓDIGO DE REFERENCIA:'),
-        _r(window.NormaInput, { tipo: 'nick-break', style: S.inline, placeholder: 'API 1104', value: datos.metodo_ensayo || '',
-          onChange: function (e) { upd('metodo_ensayo', e.target.value); } })),
-      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 6 } },
-        _r('label', { style: S.label },
-          _r('input', { type: 'checkbox', checked: !!datos.cod_api1104,
-            onChange: function (e) { setCod({ cod_api1104: e.target.checked }); } }),
-          'API 1104 22a Ed.'),
-        _r('label', { style: S.label },
-          _r('input', { type: 'checkbox', checked: !!datos.cod_asme_pcc2,
-            onChange: function (e) { setCod({ cod_asme_pcc2: e.target.checked }); } }),
-          'ASME PCC-2-2022'),
-        _r('label', { style: S.label },
-          _r('input', { type: 'checkbox', checked: !!datos.cod_api1104_fig,
-            onChange: function (e) { setCod({ cod_api1104_fig: e.target.checked }); } }),
-          'API 1104 Fig. 5 / API 1104 Fig. 11'),
-        _r('label', { style: S.label },
-          _r('input', { type: 'checkbox', checked: !!datos.cod_aws_b40,
-            onChange: function (e) { setCod({ cod_aws_b40: e.target.checked }); } }),
-          'AWS B4.0:2016 Fig. 6.6'),
-        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-          _r('input', { type: 'checkbox', checked: !!datos.cod_otro_chk,
-            onChange: function (e) { setCod({ cod_otro_chk: e.target.checked }); } }),
-          'Otro:',
-          _r(window.NormaInput, { tipo: 'nick-break', categoria: 'referencia',
-            style: S.inline, placeholder: 'Empezá a escribir (ej: ASME…, API…, AWS…)',
-            value: datos.cod_otro || '',
-            onChange: function (e) { setCod({ cod_otro: e.target.value }); } }))
-      ),
+        _r(window.NormaInput, { tipo: 'nick-break', style: S.inline, placeholder: 'API 1104',
+          value: datos.metodo_ensayo || '',
+          onChange: function (e) {
+            var val = e.target.value;
+            // Autocompletar "PROBETA MECANIZADA SEGÚN" con el mismo texto si
+            // el campo está vacío o marcado como auto. Si el técnico lo editó
+            // a mano (_mecAuto=false), respetar su valor.
+            var patch = { metodo_ensayo: val };
+            if (datos._mecAuto || !(datos.mecanizado_segun || '').trim()) {
+              patch.mecanizado_segun = val;
+              patch._mecAuto = true;
+            }
+            set(patch);
+          } })),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA DE ENSAYO:'),
         _r('input', { style: Object.assign({}, S.input, S.num, { width: 56 }), value: datos.temperatura || '',
