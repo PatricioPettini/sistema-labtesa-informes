@@ -420,12 +420,11 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
   // → "Código de referencia: ASME BPVC (M1); API 5L (M2, M3)".
   procs.push(...agruparPorProbeta('Código de referencia', 'codigo_referencia'));
 
-  // Probeta. Orden: booleanos primero (soldada / mecanizada por cliente),
-  // luego "Probeta mecanizada según" y "Plano de probeta según" — pedido del
-  // laboratorio, coincide con los preinformes físicos FM-*.
+  // Probeta. Orden: primero las líneas "según" (Probeta mecanizada según,
+  // Plano de probeta según), luego los booleanos (Probeta soldada, Probeta
+  // mecanizada por el cliente) — pedido del laboratorio, así "Probeta soldada"
+  // queda justo arriba de "Orientación de la probeta".
   const probetaLineas = [];
-  if (datos.prob_soldada) probetaLineas.push('Probeta soldada');
-  if (datos.prob_cliente) probetaLineas.push('Probeta mecanizada por el cliente');
   const probetaSegun = normalizarNorma((datos.probeta_segun || datos.figura_spec || datos.plano_asme || '').toString().trim());
   const habilitado   = datos.tiene_probeta_segun || datos.tiene_figura_spec || datos.tiene_plano_asme || !!probetaSegun;
   if (habilitado && probetaSegun)
@@ -436,6 +435,8 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
   const planoHabilitado = datos.tiene_plano_probeta || !!planoProbeta;
   if (planoHabilitado && planoProbeta)
     probetaLineas.push(`Plano de probeta según ${planoProbeta}`);
+  if (datos.prob_soldada) probetaLineas.push('Probeta soldada');
+  if (datos.prob_cliente) probetaLineas.push('Probeta mecanizada por el cliente');
 
   // Imagen — multi-imagen vía helper en post-proceso
   const fotos = Array.isArray(fotosCaratula) ? fotosCaratula.filter(Boolean) : [];
