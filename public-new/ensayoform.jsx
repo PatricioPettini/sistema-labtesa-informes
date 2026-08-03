@@ -1313,6 +1313,7 @@ function AutoLoadPhotosBtn(props) {
                 var resumenNulo = items.map(function (it) { return 'OT ' + it.nro_ot + ' (' + it.accion + ')'; }).join('; ');
                 if (items.length > 0) {
                   setMsg(function (prev) { return prev + ' · ' + items.length + ' hermana(s) revisada(s) sin cambios: ' + resumenNulo; });
+                  if (window._labToastOk) window._labToastOk('Solicitud revisada — ' + items.length + ' OT(s) hermana(s) sin nuevas fotos');
                 }
                 return;
               }
@@ -1320,6 +1321,10 @@ function AutoLoadPhotosBtn(props) {
                 return it.cantidad + ' → OT ' + it.nro_ot + ' (' + it.accion + ')';
               }).join('; ');
               setMsg(function (prev) { return prev + ' · Propagado: ' + extra; });
+              if (window._labToastOk) {
+                var totalFotos = conFotos.reduce(function (a, it) { return a + (it.cantidad || 0); }, 0);
+                window._labToastOk('Propagado a ' + conFotos.length + ' OT(s) hermana(s) · ' + totalFotos + ' fotos totales');
+              }
             })
             .catch(function (e) {
               console.error('[fotos-batch] error', e);
@@ -1344,7 +1349,7 @@ function AutoLoadPhotosBtn(props) {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     },
       React.createElement('div', { style: { fontSize: 11, color: 'var(--accent)' } },
-        props.hint || '⚡ Busca fotos en el drive y las asigna a esta sección automáticamente.'),
+        props.hint || '⚡ Busca fotos en el drive y las asigna automáticamente — también a las OTs hermanas de la solicitud.'),
       React.createElement('button', {
         type: 'button', onClick: cargar, disabled: loading,
         style: {
