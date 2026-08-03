@@ -25,7 +25,7 @@ const EQUIPO_EMIC = [
 // Se mantienen `shimadzu_151` y `prensa_torne` como keys legacy por si hay
 // ensayos guardados con esa referencia.
 const EQUIPO_TORNE = [
-  { key: 'prensa_torne_413', nombre: 'Prensa Plegadora TORNE Y MEC', tagDefault: 'MM-413' },
+  { key: 'prensa_torne_413', nombre: 'Prensa Plegadora TORNE Y MEC', tagDefault: 'MM-913' },
   { key: 'calibre_694',      nombre: 'Calibre digital',              tagDefault: 'MM-694' },
   { key: 'termo_794',        nombre: 'Termohigrómetro',              tagDefault: 'MM-794' },
   // Legacy

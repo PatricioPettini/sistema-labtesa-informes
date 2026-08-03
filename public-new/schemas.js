@@ -78,7 +78,7 @@
     { key: 'termohigrometro', label: 'Termohigrómetro TAG N°PCAL-545' },
   ];
   var EQ_NB_TORNE = [
-    { key: 'prensa_torne_413', label: 'Prensa Plegadora TORNE Y MEC TAG N°MM-413' },
+    { key: 'prensa_torne_413', label: 'Prensa Plegadora TORNE Y MEC TAG N°MM-913' },
     { key: 'calibre_694',      label: 'Calibre digital TAG N°MM-694' },
     { key: 'termo_794',        label: 'Termohigrómetro TAG N°MM-794' },
   ];

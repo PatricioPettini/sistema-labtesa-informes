@@ -28,7 +28,7 @@ var NB_EQ_EMIC = [
 ];
 
 var NB_EQ_TORNE = [
-  { key: 'prensa_torne_413', nombre: 'PRENSA PLEGADORA TORNE Y MEC', tagDefault: 'MM-413' },
+  { key: 'prensa_torne_413', nombre: 'PRENSA PLEGADORA TORNE Y MEC', tagDefault: 'MM-913' },
   { key: 'calibre_694',      nombre: 'CALIBRE DIGITAL',              tagDefault: 'MM-694' },
   { key: 'termo_794',        nombre: 'TERMOHIGRÓMETRO',              tagDefault: 'MM-794' },
 ];
