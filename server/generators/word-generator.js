@@ -657,6 +657,7 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
     if (resultBuf) resultBuf = forzarCompatModerno(resultBuf);
     if (resultBuf) resultBuf = normalizarTamanoLetra(resultBuf);
     if (resultBuf) resultBuf = asegurarBlankoAntesFin(resultBuf);
+    if (resultBuf) resultBuf = eliminarParrafosVaciosTrasFin(resultBuf);
     if (resultBuf) resultBuf = asegurarBlanksAntesDeOAA(resultBuf);
     if (resultBuf) resultBuf = quitarBlankTrasHeading(resultBuf, 'EVALUACION DE RESULTADOS');
     if (ot.es_preinforme && resultBuf) resultBuf = aplicarCambiosPreinforme(resultBuf);
@@ -983,6 +984,40 @@ function insertarInspeccionAntesDeFin(buf, textoInspeccion) {
   const parrafos = texto.split(/\r?\n/).map(parrafoTexto).join('');
   const bloque = (previoEsBlank ? '' : BLANK) + heading + parrafos + BLANK;
   xml = xml.slice(0, pStart) + bloque + xml.slice(pStart);
+  zip.file('word/document.xml', xml);
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// Elimina párrafos vacíos que queden DESPUÉS de "FIN DE INFORME" y antes del
+// <w:sectPr> final. El template original tiene 3 párrafos vacíos ahí que
+// hacen que Word abra una página vacía extra al final. Los borramos.
+function eliminarParrafosVaciosTrasFin(buf) {
+  const zip = new PizZip(buf);
+  const docEntry = zip.files['word/document.xml'];
+  if (!docEntry) return buf;
+  let xml = docEntry.asText();
+
+  // Encontrar el párrafo que contiene "FIN DE INFORME" y quedarnos con la
+  // posición del </w:p> que lo cierra.
+  const finPos = xml.indexOf('FIN DE INFORME');
+  if (finPos < 0) return buf;
+  const closeFin = xml.indexOf('</w:p>', finPos);
+  if (closeFin < 0) return buf;
+  const trasFin = closeFin + '</w:p>'.length;
+
+  // Encontrar el <w:sectPr> final del body (el que cierra el documento).
+  const sectPrIdx = xml.indexOf('<w:sectPr', trasFin);
+  if (sectPrIdx < 0) return buf;
+
+  // Borrar todos los párrafos VACÍOS (sin <w:t> con texto) entre FIN y sectPr.
+  const bloque = xml.slice(trasFin, sectPrIdx);
+  const limpio = bloque.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (parrafo) => {
+    const txts = [...parrafo.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('').trim();
+    return txts ? parrafo : '';
+  });
+  if (limpio === bloque) return buf;
+
+  xml = xml.slice(0, trasFin) + limpio + xml.slice(sectPrIdx);
   zip.file('word/document.xml', xml);
   return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 }

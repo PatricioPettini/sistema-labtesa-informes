@@ -45,10 +45,13 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Sangría izquierda +0.5cm (284 twips) para no pisar el membrete lateral
+// "BTESA". Body text = 1135, sub-headings numerados = 1135 con hanging 425
+// (número queda a 710), heading principal = 426.
 function pLinea(texto, bold) {
   const b = bold ? '<w:b/><w:bCs/>' : '';
   return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
-    '<w:ind w:left="851"/></w:pPr>' +
+    '<w:ind w:left="1135"/></w:pPr>' +
     `<w:r><w:rPr>${FONTS}${b}${SZ}</w:rPr>` +
     `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
 }
@@ -56,9 +59,9 @@ function pLinea(texto, bold) {
 function pHeading(texto) {
   return '<w:p><w:pPr><w:pStyle w:val="Textosinformato"/>' +
     '<w:numPr><w:ilvl w:val="1"/><w:numId w:val="16"/></w:numPr>' +
-    '<w:tabs><w:tab w:val="left" w:pos="851"/></w:tabs>' +
+    '<w:tabs><w:tab w:val="left" w:pos="1135"/></w:tabs>' +
     '<w:spacing w:line="300" w:lineRule="auto"/>' +
-    '<w:ind w:left="851" w:hanging="425"/>' +
+    '<w:ind w:left="1135" w:hanging="425"/>' +
     `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     `<w:t>${esc(texto)}</w:t></w:r></w:p>`;
@@ -66,7 +69,7 @@ function pHeading(texto) {
 
 function pBlanco() {
   return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0" w:before="0"/>' +
-    '<w:ind w:left="851"/></w:pPr></w:p>';
+    '<w:ind w:left="1135"/></w:pPr></w:p>';
 }
 
 // Celda de tabla — bordes finos negros, texto centrado, fuente Calibri 11.
@@ -140,7 +143,7 @@ function pTituloAnalisis(texto) {
     '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="16"/></w:numPr>' +
     '<w:tabs><w:tab w:val="left" w:pos="426"/></w:tabs>' +
     '<w:spacing w:line="300" w:lineRule="auto"/>' +
-    '<w:ind w:left="142" w:firstLine="0"/>' +
+    '<w:ind w:left="426" w:firstLine="0"/>' +
     `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
