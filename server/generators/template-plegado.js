@@ -854,7 +854,7 @@ function reemplazarResultadosCeldas(xml, probetas) {
       return out;
     }
 
-    // ── Columna extra "Muestra N° / OT N°" ────────────────────────────────
+    // ── Columna extra "Muestra N°" ────────────────────────────────
     // Si alguna probeta trae `muestra` (valor libre que el técnico escribió en
     // la columna PROBETA del form, distinto de la auto-etiqueta PC/PR/PL), se
     // inserta al principio de la tabla una columna "Muestra N°/OT N°". Filas
@@ -869,6 +869,32 @@ function reemplazarResultadosCeldas(xml, probetas) {
       if (anterior === val) return { text: '', vMerge: 'continue' };
       return { text: val, vMerge: siguiente === val ? 'restart' : null };
     }) : null;
+
+    // Helper: fuerza centrado horizontal (<w:jc w:val="center"/> en <w:pPr>) y
+    // vertical (<w:vAlign w:val="center"/> en <w:tcPr>) en una celda. Se aplica
+    // a la columna "Muestra N°" para que el label quede centrado dentro de la
+    // celda mergeada aun si la celda-plantilla venía con alineación al costado.
+    function forzarCentradoCelda(cellXml) {
+      let out = cellXml;
+      // Vertical: dentro de <w:tcPr>.
+      if (/<w:vAlign\b[^/]*\/>/.test(out)) {
+        out = out.replace(/<w:vAlign\b[^/]*\/>/, '<w:vAlign w:val="center"/>');
+      } else if (out.includes('<w:tcPr>')) {
+        out = out.replace('<w:tcPr>', '<w:tcPr><w:vAlign w:val="center"/>');
+      }
+      // Horizontal: dentro de cada <w:pPr>.
+      out = out.replace(/<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/g, (match, inner) => {
+        if (/<w:jc\b[^/]*\/>/.test(inner)) {
+          inner = inner.replace(/<w:jc\b[^/]*\/>/, '<w:jc w:val="center"/>');
+        } else {
+          inner = '<w:jc w:val="center"/>' + inner;
+        }
+        return '<w:pPr>' + inner + '</w:pPr>';
+      });
+      // Si algún <w:p> no tenía <w:pPr>, agregarle uno con jc center.
+      out = out.replace(/<w:p>(\s*<w:r\b)/g, '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>$1');
+      return out;
+    }
 
     // Helper: insertar una <w:tc> al inicio de una fila, respetando <w:trPr>.
     function insertarCeldaAlInicio(rowXml, tcXml) {
@@ -913,13 +939,16 @@ function reemplazarResultadosCeldas(xml, probetas) {
           + row.slice(c1.index + c1[0].length, c2.index) + newC2
           + row.slice(c2.index + c2[0].length);
 
-      // Si esta tabla lleva columna "Muestra N°/OT N°", insertar la celda al
+      // Si esta tabla lleva columna "Muestra N°", insertar la celda al
       // inicio (clonada de c0/Probeta para preservar el estilo del template).
+      // Se fuerza centrado horizontal + vertical para que el label quede
+      // centrado dentro de la celda mergeada.
       if (hayMuestra && muestraCells) {
         const info = muestraCells[idx];
         let celdaMuestra = reemplazarTextoCelda(c0[0], info.vMerge === 'continue' ? '' : info.text);
         if (info.vMerge === 'restart') celdaMuestra = injectVMerge(celdaMuestra, 'restart');
         else if (info.vMerge === 'continue') celdaMuestra = injectVMerge(celdaMuestra, 'continue');
+        celdaMuestra = forzarCentradoCelda(celdaMuestra);
         row = insertarCeldaAlInicio(row, celdaMuestra);
       }
       return row;
@@ -931,13 +960,14 @@ function reemplazarResultadosCeldas(xml, probetas) {
     const lastEnd = lastDataRow.index + lastDataRow[0].length;
     let tblOut = tbl.slice(0, firstStart) + newRows.join('') + tbl.slice(lastEnd);
 
-    // Header + gridCol: agregar celda "Muestra N° / OT N°" al principio del
+    // Header + gridCol: agregar celda "Muestra N°" al principio del
     // header row y un <w:gridCol> al <w:tblGrid> para el ancho.
     if (hayMuestra && headerRow) {
       const headerFirstTc = headerRow[0].match(/<w:tc\b[^>]*>[\s\S]*?<\/w:tc>/);
-      const headerMuestraTc = headerFirstTc
-        ? reemplazarTextoCelda(headerFirstTc[0], 'Muestra N° / OT N°')
-        : '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:r><w:t xml:space="preserve">Muestra N° / OT N°</w:t></w:r></w:p></w:tc>';
+      let headerMuestraTc = headerFirstTc
+        ? reemplazarTextoCelda(headerFirstTc[0], 'Muestra N°')
+        : '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t xml:space="preserve">Muestra N°</w:t></w:r></w:p></w:tc>';
+      headerMuestraTc = forzarCentradoCelda(headerMuestraTc);
       const headerModificado = insertarCeldaAlInicio(headerRow[0], headerMuestraTc);
       tblOut = tblOut.replace(headerRow[0], headerModificado);
       tblOut = tblOut.replace(/<w:tblGrid\b[^>]*>/, m => m + '<w:gridCol w:w="1800"/>');

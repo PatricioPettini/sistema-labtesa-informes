@@ -83,7 +83,7 @@ function esParrafoBlanco(para) {
 
 // ── Construcción dinámica de la tabla de resultados ───────────────────────────
 
-// Devuelve el XML de la celda "Muestra N° / OT N°" según info de merge.
+// Devuelve el XML de la celda "Muestra N°" según info de merge.
 //   info = null                 → no se emite la celda (la tabla no tiene columna)
 //   info = { text }             → celda normal
 //   info = { text, vMergeStart } → primera celda de un grupo (con texto)
@@ -144,7 +144,7 @@ function escapeXml(s) {
 // Reemplaza la <w:tbl> existente en el XML por una construida con todas las probetas.
 function construirYReemplazarTabla(xml, probetas) {
   // Si alguna probeta trae `muestra` no vacío, agregamos la columna
-  // "Muestra N° / OT N°" antes de "Probeta". Filas consecutivas con el mismo
+  // "Muestra N°" antes de "Probeta". Filas consecutivas con el mismo
   // valor de muestra se fusionan por w:vMerge (mismo agrupamiento que en el
   // form). Sin ninguna muestra cargada, la tabla mantiene solo 2 columnas.
   const hayMuestra = probetas.some(p => String((p && p.muestra) || '').trim() !== '');
@@ -187,7 +187,7 @@ function construirYReemplazarTabla(xml, probetas) {
   const headerMuestra = hayMuestra
     ? '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/></w:tcPr>' +
       '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:line="276" w:lineRule="auto" w:after="0"/></w:pPr>' +
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:b/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">Muestra N° / OT N°</w:t></w:r></w:p></w:tc>'
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:b/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">Muestra N°</w:t></w:r></w:p></w:tc>'
     : '';
 
   // Tabla de resultados con AUTOAJUSTE al contenido (w:tblLayout autofit +
