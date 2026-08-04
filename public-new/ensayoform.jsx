@@ -393,6 +393,31 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Propagación multi-OT en líquidos penetrantes: no tiene filas/probetas,
+    // solo replica todo el ensayo a las hermanas listadas en condiciones_por_ot.
+    if (tipo === 'liquidos-penetrantes') {
+      var hayCondsOtrasLp = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if (hayCondsOtrasLp && typeof window.LabStore.saveEnsayoLiquidosPenetrantesMultiOt === 'function') {
+        window.LabStore.saveEnsayoLiquidosPenetrantesMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Líquidos penetrantes guardado en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
+        return;
+      }
+    }
     // Propagación multi-OT en brinell: no divide mediciones, solo replica
     // normas / condiciones / equipamiento a las hermanas listadas en
     // condiciones_por_ot.
@@ -656,7 +681,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.RugosidadForm, { datos: datos, set: set })
         : null,
       tipo === 'liquidos-penetrantes' && typeof window.LiquidosPenetrantesForm === 'function'
-        ? React.createElement(window.LiquidosPenetrantesForm, { datos: datos, set: set })
+        ? React.createElement(window.LiquidosPenetrantesForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'metalografia-general' && typeof window.MetalografiaGeneralForm === 'function'
         ? React.createElement(window.MetalografiaGeneralForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })

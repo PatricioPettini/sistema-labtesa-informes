@@ -59,6 +59,110 @@ function LiquidosPenetrantesForm(props) {
 
   var S = window.FORM_STYLES;
 
+  // ── Multi-OT: mismo patrón que brinell ─────────────────────────────────────
+  // Líquidos penetrantes no divide filas por OT (todos los campos son
+  // globales al ensayo). El único caso de uso multi-OT es propagar la MISMA
+  // configuración (instrumentos + normas + condiciones + resultado) a otras
+  // OTs hermanas de la misma solicitud → crear/actualizar ensayos hermanos.
+  var otNroActual = props.otNro || '';
+  var otActualObj = otNroActual && window.LabStore && window.LabStore.getOt
+    ? window.LabStore.getOt(otNroActual) : null;
+  var solActual = otActualObj && otActualObj.nro_solicitud;
+  var otsDisponibles = (solActual && window.LabStore.listOtsBySolicitud)
+    ? window.LabStore.listOtsBySolicitud(solActual)
+    : (otActualObj ? [otActualObj] : []);
+  var otNroActualStrLp = String(otNroActual || '');
+  var otsHermanasLp = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrLp; });
+
+  var CAMPOS_TODO_LP = [
+    // Instrumentos + tags
+    'instrumentos', 'instrumentos_tags', 'otros_equipos',
+    // Ensayo según (normas)
+    'norma_astm_e165', 'norma_astm_e165_year',
+    'norma_asme_v', 'norma_asme_v_year',
+    'norma_otra_chk', 'norma_otra',
+    'limpieza_previa',
+    // Condiciones de ensayo (13 campos)
+    'temperatura_ensayo', 'intensidad_luz_blanca', 'potencia_luz_uv',
+    'presion_aire', 'presion_agua', 'penetrante', 'revelador',
+    'tipo_emulsificador', 'tiempo_penetracion_tinta', 'tiempo_revelado',
+    'tiempo_emulsificacion', 'temperatura_agua', 'temperatura_secado',
+  ];
+
+  var _copyOpenLp = React.useState(false); var copyOpenLp = _copyOpenLp[0], setCopyOpenLp = _copyOpenLp[1];
+  var _copyDestLp = React.useState([]); var copyDestLp = _copyDestLp[0], setCopyDestLp = _copyDestLp[1];
+  function copiarTodoLpAOts(destinos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      CAMPOS_TODO_LP.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+    if (window._labToastOk) {
+      window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+    }
+  }
+  var barraCopiarTodoLp = otsHermanasLp.length > 0 ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, position: 'relative',
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (instrumentos + normas + condiciones) a otras OT en un solo click.'),
+    _r('button', {
+      type: 'button',
+      onClick: function () { setCopyDestLp([]); setCopyOpenLp(!copyOpenLp); },
+      style: {
+        border: '1px solid #0969da', background: '#fff', color: '#0969da',
+        padding: '3px 10px', fontSize: 11, cursor: 'pointer', borderRadius: 3,
+        fontWeight: 600, whiteSpace: 'nowrap',
+      },
+    }, '📋 Copiar todo a otras OT'),
+    copyOpenLp ? _r('div', {
+      style: {
+        position: 'absolute', zIndex: 30, top: '100%', right: 8, marginTop: 4,
+        background: '#fff', border: '1px solid var(--border)', borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 260, fontSize: 11, color: 'var(--text)',
+      },
+    },
+      _r('div', { style: { fontWeight: 700, marginBottom: 6 } }, 'Copiar todo a otras OT a:'),
+      _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } },
+        'Se aplica al guardar: se replica el ensayo completo en las OTs seleccionadas.'),
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+        otsHermanasLp.map(function (o) {
+          var nro = String(o.nro_ot);
+          var checked = copyDestLp.indexOf(nro) >= 0;
+          return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', checked: checked,
+              onChange: function () {
+                setCopyDestLp(checked ? copyDestLp.filter(function (n) { return n !== nro; }) : copyDestLp.concat([nro]));
+              } }),
+            _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+        })),
+      _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+        _r('button', { type: 'button', onClick: function () { setCopyOpenLp(false); },
+          style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', color: 'var(--text)' } }, 'Cancelar'),
+        _r('button', { type: 'button',
+          onClick: function () {
+            var destinos = copyDestLp.slice();
+            if (destinos.length === 0) destinos = otsHermanasLp.map(function (o) { return String(o.nro_ot); });
+            copiarTodoLpAOts(destinos);
+            setCopyOpenLp(false); setCopyDestLp([]);
+          },
+          style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+    ) : null
+  ) : null;
+
   // ── INSTRUMENTOS ──────────────────────────────────────────────────────
   var blockInstrumentos = _r('div', { style: { borderRight: '1px solid #333' } },
     _r('div', { style: S.head }, 'INSTRUMENTOS'),
@@ -151,6 +255,7 @@ function LiquidosPenetrantesForm(props) {
   );
 
   return _r('div', { style: S.sheet },
+    barraCopiarTodoLp,
     _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr' } }, blockInstrumentos, blockEnsayoSegun),
     blockCondiciones, blockResultados
   );

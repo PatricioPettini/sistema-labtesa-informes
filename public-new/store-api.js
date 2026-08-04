@@ -816,6 +816,80 @@
       });
     },
 
+    // Propagación multi-OT para líquidos penetrantes. Como el ensayo NO tiene
+    // filas/probetas por OT (todos los campos son globales), este saver solo
+    // REPLICA la configuración a los ensayos LP de las OTs hermanas listadas
+    // en `condiciones_por_ot`. Si la hermana no tenía ensayo LP, se crea con
+    // esas condiciones + instrumentos + resultado. Si ya lo tenía, se pisan
+    // esos campos.
+    saveEnsayoLiquidosPenetrantesMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var otActualStr = String(nro_ot_actual);
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      var OVERRIDE_RAIZ_KEYS_LP = [
+        'instrumentos', 'instrumentos_tags', 'otros_equipos',
+        'norma_astm_e165', 'norma_astm_e165_year',
+        'norma_asme_v', 'norma_asme_v_year',
+        'norma_otra_chk', 'norma_otra',
+        'limpieza_previa',
+        'temperatura_ensayo', 'intensidad_luz_blanca', 'potencia_luz_uv',
+        'presion_aire', 'presion_agua', 'penetrante', 'revelador',
+        'tipo_emulsificador', 'tiempo_penetracion_tinta', 'tiempo_revelado',
+        'tiempo_emulsificacion', 'temperatura_agua', 'temperatura_secado',
+      ];
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS_LP.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      var datosActual = Object.assign({}, datos);
+      delete datosActual.condiciones_por_ot;
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'liquidos-penetrantes', datosActual, existingId || null);
+      var hermanas = Object.keys(mapaCond).filter(function (n) { return n && n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var overrideRaiz = overridesRaizPara(nroY);
+        var existente = _db.ensayos.find(function (e) {
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'liquidos-penetrantes';
+        });
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          datosY = Object.assign({}, datosPrev, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          // Copiar el "resultado_texto" del origen también — al crear un
+          // ensayo LP hermano nuevo, arranca con el mismo texto (editable
+          // por el técnico después si difiere).
+          datosY = {};
+          if (datos.resultado_texto !== undefined) datosY.resultado_texto = datos.resultado_texto;
+          Object.assign(datosY, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'liquidos-penetrantes', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
     // Split multi-OT para nick-break: mismo patrón que plegado/impacto pero
     // dividiendo `probetas[]` (no `resultados[]`). Las probetas con
     // `nro_ot_override` apuntando a otra OT se transfieren al ensayo nick-break
