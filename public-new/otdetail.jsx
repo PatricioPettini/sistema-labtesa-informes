@@ -297,7 +297,21 @@ function OTDetail(props) {
       }
     });
   }
-  function togglePre() { window.LabStore.updateOt(ot.nro_ot, { es_preinforme: ot.es_preinforme ? 0 : 1 }); refresh(); }
+  // "Marcar como preinforme" es un atributo de la solicitud, no de la OT
+  // individual: si una OT es preinforme, TODAS las hermanas de la misma
+  // solicitud también lo son (comparten el estado de emisión). Cuando el
+  // usuario togglea, propagamos vía updateSolicitud para pisar el flag en
+  // todas las OTs de la solicitud. Si la OT no tiene solicitud, se aplica
+  // solo a ella.
+  function togglePre() {
+    var nuevo = ot.es_preinforme ? 0 : 1;
+    if (ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
+      window.LabStore.updateSolicitud(ot.nro_solicitud, { es_preinforme: nuevo });
+    } else {
+      window.LabStore.updateOt(ot.nro_ot, { es_preinforme: nuevo });
+    }
+    refresh();
+  }
 
   function _downloadBlob(blob, filename) {
     var url = URL.createObjectURL(blob);
