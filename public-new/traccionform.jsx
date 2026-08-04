@@ -1712,8 +1712,32 @@ function TraccionForm(props) {
         'este registro tiene probetas asignadas a otra(s) OT. Al generar el Word se emitirá un archivo por cada OT. Otras OTs: ',
         listaOtsExtra.map(function (n) { return n + ' (' + otsUnicas[n] + ' probeta' + (otsUnicas[n] === 1 ? '' : 's') + ')'; }).join(', '))
     : null;
+  // Botón GLOBAL "Copiar TODO" — combina 1.2 (condiciones) + 1.4 (equipamiento).
+  var CAMPOS_TODO_TR = [
+    'variante',
+    // 1.2 condiciones generales
+    'metodologia', 'temperatura', 'ecuacion_seccion',
+    'estado_superficial', 'verif_alineacion', 'prob_cliente', 'prob_soldada',
+    // 1.4 equipamiento
+    'equipamiento', 'equipamiento_tags', 'otros_equipos',
+  ];
+  var barraCopiarTodoTr = multiOtTr ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, marginBottom: 4,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (condiciones + equipamiento) a otras OT en un solo click.'),
+    botonCopiarSeccionTr('copiar_todo', 'Copiar todo a otras OT',
+      CAMPOS_TODO_TR,
+      'Copia condiciones (1.2) y equipamiento (1.4) juntos.')
+  ) : null;
+
   return _r('div', { style: S.sheet },
     bannerMultiOt,
+    barraCopiarTodoTr,
     blockCantidad, block16, block11, blockProbetas, block12, block13,
     selectorOtTextos,
     blockObservacion, blockEvaluacion, blockNota, blockNotasFijas

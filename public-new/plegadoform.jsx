@@ -180,6 +180,31 @@ function PlegadoForm(props) {
     num: { textAlign: 'center' },
   };
 
+  // Botón GLOBAL "Copiar TODO" — combina los subsets de 1.1 + 1.2 + 1.4 y los
+  // copia a las OTs seleccionadas en una sola operación.
+  var CAMPOS_TODO_PL = [
+    // 1.1 metodología
+    'metodologia',
+    // 1.2 condiciones
+    'temperatura', 'estado_superficial', 'diametro_mandril', 'diametro_mandril_unidad',
+    'espesor_probeta', 'ancho_probeta', 'distancia_apoyos', 'zona_plegado',
+    // 1.4 equipamiento
+    'equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos',
+  ];
+  var barraCopiarTodoPl = multiOtPl ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      borderTop: 'none', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (normas + condiciones + equipamiento) a otras OT en un solo click.'),
+    botonCopiarSeccionPl('copiar_todo', 'Copiar todo a otras OT',
+      CAMPOS_TODO_PL,
+      'Copia metodología (1.1), condiciones (1.2) y equipamiento (1.4) juntos.')
+  ) : null;
+
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
   // La norma de ensayo y el código de referencia se cargan ahora en la sección
   // 1.3 (por OT) con desplegables autopoblados del catálogo — misma UX que
@@ -876,6 +901,7 @@ function PlegadoForm(props) {
   );
 
   return _r('div', { style: S.sheet },
+    barraCopiarTodoPl,
     _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1.4fr' } }, block11, block12),
     // Selector de OT (tab bar) + 1.3 Condiciones específicas por OT: van
     // arriba de Equipamiento (1.4) para que el técnico primero vea/edite las

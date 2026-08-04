@@ -550,7 +550,31 @@ function AnexoMetalograficoForm(props) {
     )
   );
 
+  // Botón GLOBAL "Copiar TODO" — combina 1.1 + 1.2 + 1.2.1 + 1.3 en una sola operación.
+  var CAMPOS_TODO_ANX = [
+    'grano', 'inclu',
+    'temperatura', 'zona_ensayo', 'muestra_ensayada',
+    'sup_muestra', 'sup_equipo', 'sup_reactivo', 'aumentos',
+    'reactivos', 'reactivo_otro',
+    'equipamiento', 'equipamiento_tags', 'otros_equipos',
+  ];
+  var barraCopiarTodoAnx = multiOtAnx ? _r('div', {
+    style: {
+      padding: '8px 12px', background: 'var(--surface-2, #e7f0ff)',
+      border: '1px solid var(--accent, #0969da)',
+      display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, marginBottom: 4,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: 'var(--accent, #0550ae)' } },
+      'Copiar TODA la configuración (normas + condiciones + reactivo + equipamiento) a otras OT en un solo click.'),
+    botonCopiarSeccionAnx('copiar_todo', 'Copiar todo a otras OT',
+      CAMPOS_TODO_ANX,
+      'Copia todas las secciones 1.1 a 1.3 juntas.')
+  ) : null;
+
   return _r('div', { style: S.sheet },
+    barraCopiarTodoAnx,
     block11, block12, block13, block14, block15
   );
 }
