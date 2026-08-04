@@ -171,6 +171,44 @@ function PlegadoForm(props) {
   function addRow() { set('resultados', resultados.concat([{}])); }
   function delRow(i) { set('resultados', resultados.filter(function (_, idx) { return idx !== i; })); }
 
+  // Prefijos de etiqueta según tipo de plegado (patrón usado en el preinforme
+  // físico FM-*: PC1/PC2 para Cara, PR1/PR2 para Raíz, etc.). Permite cargar
+  // varias probetas del mismo tipo dentro de la misma OT y diferenciarlas.
+  var PREFIJOS_PROBETA = { 'Cara': 'PC', 'Raíz': 'PR', 'Lateral': 'PL', 'Longitudinal': 'PLg' };
+  // Setea el tipo de una fila y — si el label de probeta está vacío o fue
+  // autogenerado antes — asigna prefijoTipo + N (N es la posición dentro del
+  // mismo tipo). Renumera también los otros labels autogenerados para
+  // mantener la secuencia estable si se cambia el tipo de una fila.
+  function setTipoRow(i, tipoVal) {
+    var next = resultados.slice();
+    next[i] = Object.assign({}, next[i] || {}, { tipo: tipoVal });
+    // Si el label de la fila que cambió está vacío o autogenerado, marcarlo
+    // como auto para que la renumeración de abajo le asigne el número correcto.
+    var probI = String(next[i].probeta || '');
+    if (!probI || next[i]._probeta_auto) next[i]._probeta_auto = true;
+    // Renumerar todos los labels autogenerados por tipo. Formato con espacio
+    // ("PC 1") para matchear la convención del generator (agente-mapeo:
+    // /^PC\s*\d+$/ + reemplazarResultadosCeldas usa /\s+\d+$/ para separar
+    // prefijo del número).
+    var contadores = {};
+    next.forEach(function (row) {
+      if (!row) return;
+      var t = row.tipo;
+      var pref = PREFIJOS_PROBETA[t];
+      if (!pref) return;
+      contadores[t] = (contadores[t] || 0) + 1;
+      if (row._probeta_auto) row.probeta = pref + ' ' + contadores[t];
+    });
+    set('resultados', next);
+  }
+  // Edit manual del label: desmarca el flag auto para que no lo sobrescriba
+  // una futura renumeración.
+  function setProbetaManual(i, val) {
+    var next = resultados.slice();
+    next[i] = Object.assign({}, next[i] || {}, { probeta: val, _probeta_auto: false });
+    set('resultados', next);
+  }
+
   var S = {
     sheet: { width: '100%', maxWidth: 1123, background: '#fff', border: '1px solid #333', margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: '#111' },
     head: { fontSize: 11, fontWeight: 800, padding: '5px 8px', background: '#e6e6e6', borderTop: '1px solid #333', borderBottom: '1px solid #333', letterSpacing: '.3px' },
@@ -373,8 +411,13 @@ function PlegadoForm(props) {
             var esOtra = otOverride && otOverride !== otNroActual;
             return _r('tr', { key: i },
               _r('td', { style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' } },
-                _r('input', { style: Object.assign({}, inp, { textAlign: 'center', fontWeight: 700 }), value: r.probeta || String(i + 1),
-                  onChange: function (e) { setRow(i, 'probeta', e.target.value); } })),
+                _r('input', {
+                  style: Object.assign({}, inp, { textAlign: 'center', fontWeight: 700 }),
+                  value: r.probeta || '',
+                  placeholder: String(i + 1),
+                  title: 'Autocompleta al marcar tipo (PC/PR/PL/PLg). Editable a mano.',
+                  onChange: function (e) { setProbetaManual(i, e.target.value); }
+                })),
               // Selector de OT — solo aparece si hay OTs hermanas. Al cambiarlo,
               // esta probeta se transfiere al ensayo de plegado de la OT destino
               // al momento de guardar (via saveEnsayoPlegadoMultiOt).
@@ -400,15 +443,17 @@ function PlegadoForm(props) {
                         return _r('option', { key: o.nro_ot, value: o.nro_ot }, label);
                       })))
                 : null,
-              // Tipo (Cara/Raíz/Lat/Long)
+              // Tipo (Cara/Raíz/Lat/Long) — al marcar, autocompleta la etiqueta
+              // "PROBETA" con prefijo + N (PC1, PC2, PR1, ...) si estaba vacía
+              // o autogenerada. La edición manual del label rompe la auto.
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('CARA'), onChange: function () { setRow(i, 'tipo', 'Cara'); } })),
+                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('CARA'), onChange: function () { setTipoRow(i, 'Cara'); } })),
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('RAÍZ') || isTipo('RAIZ'), onChange: function () { setRow(i, 'tipo', 'Raíz'); } })),
+                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('RAÍZ') || isTipo('RAIZ'), onChange: function () { setTipoRow(i, 'Raíz'); } })),
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('LATERAL') || isTipo('LAT'), onChange: function () { setRow(i, 'tipo', 'Lateral'); } })),
+                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('LATERAL') || isTipo('LAT'), onChange: function () { setTipoRow(i, 'Lateral'); } })),
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
-                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('LONGITUDINAL') || isTipo('LONG'), onChange: function () { setRow(i, 'tipo', 'Longitudinal'); } })),
+                _r('input', { type: 'radio', name: 't' + i, checked: isTipo('LONGITUDINAL') || isTipo('LONG'), onChange: function () { setTipoRow(i, 'Longitudinal'); } })),
               // Dimensiones
               _r('td', { style: tdIn }, _r('input', { style: Object.assign({}, inp, S.num), value: r.largo || '', onChange: function (e) { setRow(i, 'largo', e.target.value); } })),
               _r('td', { style: tdIn }, _r('input', { style: Object.assign({}, inp, S.num), value: r.ancho || '', onChange: function (e) { setRow(i, 'ancho', e.target.value); } })),
