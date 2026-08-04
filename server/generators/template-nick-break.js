@@ -83,11 +83,39 @@ function esParrafoBlanco(para) {
 
 // ── Construcción dinámica de la tabla de resultados ───────────────────────────
 
-// Devuelve el XML de una fila de tabla (Probeta | Resultado) con el estilo de los reales.
-function filaTablaNB(probeta, resultadoTexto) {
+// Devuelve el XML de la celda "Muestra N° / OT N°" según info de merge.
+//   info = null                 → no se emite la celda (la tabla no tiene columna)
+//   info = { text }             → celda normal
+//   info = { text, vMergeStart } → primera celda de un grupo (con texto)
+//   info = { vMergeContinue }    → celda "continuación" (sin texto, mergeada)
+function celdaMuestraNB(info) {
+  if (!info) return '';
+  let vMergeXml = '';
+  if (info.vMergeStart) vMergeXml = '<w:vMerge w:val="restart"/>';
+  else if (info.vMergeContinue) vMergeXml = '<w:vMerge/>';
+  const texto = info.vMergeContinue ? '' : escapeXml(info.text || '');
+  return (
+    '<w:tc>' +
+      '<w:tcPr>' +
+        '<w:tcW w:w="0" w:type="auto"/>' +
+        vMergeXml +
+        '<w:vAlign w:val="center"/>' +
+      '</w:tcPr>' +
+      '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:line="276" w:lineRule="auto" w:after="0"/></w:pPr>' +
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr>' +
+      `<w:t xml:space="preserve">${texto}</w:t></w:r></w:p>` +
+    '</w:tc>'
+  );
+}
+
+// Devuelve el XML de una fila de tabla. Si `muestraInfo` está definido, la fila
+// arranca con una tercera celda "Muestra N°/OT N°" (con soporte de vMerge para
+// agrupar filas consecutivas con el mismo valor).
+function filaTablaNB(probeta, resultadoTexto, muestraInfo) {
   return (
     '<w:tr>' +
       '<w:trPr><w:jc w:val="center"/></w:trPr>' +
+      celdaMuestraNB(muestraInfo) +
       '<w:tc>' +
         '<w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>' +
         '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:line="276" w:lineRule="auto" w:after="0"/></w:pPr>' +
@@ -115,19 +143,52 @@ function escapeXml(s) {
 
 // Reemplaza la <w:tbl> existente en el XML por una construida con todas las probetas.
 function construirYReemplazarTabla(xml, probetas) {
+  // Si alguna probeta trae `muestra` no vacío, agregamos la columna
+  // "Muestra N° / OT N°" antes de "Probeta". Filas consecutivas con el mismo
+  // valor de muestra se fusionan por w:vMerge (mismo agrupamiento que en el
+  // form). Sin ninguna muestra cargada, la tabla mantiene solo 2 columnas.
+  const hayMuestra = probetas.some(p => String((p && p.muestra) || '').trim() !== '');
+  const muestraInfos = new Array(probetas.length).fill(null);
+  if (hayMuestra) {
+    let i = 0;
+    while (i < probetas.length) {
+      const val = String((probetas[i] && probetas[i].muestra) || '').trim();
+      let j = i + 1;
+      if (val) while (j < probetas.length && String((probetas[j] && probetas[j].muestra) || '').trim() === val) j++;
+      const size = j - i;
+      if (val && size > 1) {
+        muestraInfos[i] = { text: val, vMergeStart: true };
+        for (let k = 1; k < size; k++) muestraInfos[i + k] = { vMergeContinue: true };
+      } else {
+        muestraInfos[i] = { text: val };
+      }
+      i = j;
+    }
+  }
+
   // Para cada probeta, calcular el texto de resultado:
   //   - 'No presenta indicaciones relevantes' / 'Sin indicaciones' → el mismo texto
   //   - 'Presenta escoria' + detalle → 'Presenta escoria'  (las dimensiones van como obs aparte)
   //   - 'otro' → usar el detalle como texto del resultado
-  const filas = probetas.map(p => {
+  const filas = probetas.map((p, idx) => {
     let texto;
     if (p.tipo_resultado === 'otro') {
       texto = (p.detalle || '').trim() || 'Sin indicaciones';
     } else {
       texto = p.tipo_resultado || 'No presenta indicaciones relevantes';
     }
-    return filaTablaNB(p.id, texto);
+    return filaTablaNB(p.id, texto, muestraInfos[idx]);
   }).join('');
+
+  // Columnas del grid: si hay muestra, se agrega una columna angosta al principio.
+  const gridCols = hayMuestra
+    ? '<w:gridCol w:w="1800"/><w:gridCol w:w="2200"/><w:gridCol w:w="6500"/>'
+    : '<w:gridCol w:w="2200"/><w:gridCol w:w="6500"/>';
+  const headerMuestra = hayMuestra
+    ? '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/></w:tcPr>' +
+      '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:line="276" w:lineRule="auto" w:after="0"/></w:pPr>' +
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:b/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">Muestra N° / OT N°</w:t></w:r></w:p></w:tc>'
+    : '';
 
   // Tabla de resultados con AUTOAJUSTE al contenido (w:tblLayout autofit +
   // anchos de columna en auto). Word 2016+ colapsa columnas al ancho del texto.
@@ -148,11 +209,9 @@ function construirYReemplazarTabla(xml, probetas) {
         '</w:tblBorders>' +
         '<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>' +
       '</w:tblPr>' +
-      '<w:tblGrid>' +
-        '<w:gridCol w:w="2200"/>' +
-        '<w:gridCol w:w="6500"/>' +
-      '</w:tblGrid>' +
+      '<w:tblGrid>' + gridCols + '</w:tblGrid>' +
       '<w:tr><w:trPr><w:jc w:val="center"/></w:trPr>' +
+        headerMuestra +
         '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/></w:tcPr>' +
         '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:line="276" w:lineRule="auto" w:after="0"/></w:pPr>' +
         '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:b/><w:sz w:val="22"/></w:rPr><w:t>Probeta</w:t></w:r></w:p></w:tc>' +

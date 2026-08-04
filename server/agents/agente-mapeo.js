@@ -182,6 +182,7 @@ function traducirV2aV1(tipo, datos) {
           id:             r.id || r.probeta,
           tipo_resultado: r.tipo_resultado || r.resultado,
           detalle:        r.detalle || '',
+          muestra:        r.muestra || '',
         }));
       }
       // variante_resultado v2 → probetas[0] v1 (fallback legacy)
