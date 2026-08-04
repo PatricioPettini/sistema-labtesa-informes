@@ -334,6 +334,32 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Propagación multi-OT en brinell: no divide mediciones, solo replica
+    // normas / condiciones / equipamiento a las hermanas listadas en
+    // condiciones_por_ot.
+    if (tipo === 'dureza-brinell') {
+      var hayCondsOtrasBr = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if (hayCondsOtrasBr && typeof window.LabStore.saveEnsayoBrinellMultiOt === 'function') {
+        window.LabStore.saveEnsayoBrinellMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Brinell guardado en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
+        return;
+      }
+    }
     // Split multi-OT en impacto (mismo patrón que tracción/plegado).
     if (tipo === 'impacto' && Array.isArray(clean.resultados)) {
       var hayOverrideImp = clean.resultados.some(function (r) {
@@ -540,7 +566,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.QuimicosForm, { datos: datos, set: set })
         : null,
       tipo === 'dureza-brinell' && typeof window.BrinellForm === 'function'
-        ? React.createElement(window.BrinellForm, { datos: datos, set: set })
+        ? React.createElement(window.BrinellForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'varios' && typeof window.VariosForm === 'function'
         ? React.createElement(window.VariosForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })

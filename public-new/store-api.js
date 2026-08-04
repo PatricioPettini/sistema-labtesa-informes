@@ -682,6 +682,89 @@
       });
     },
 
+    // Propagación multi-OT para brinell: brinell NO divide `mediciones` por OT
+    // (esas filas quedan enteras en la OT actual — la columna "OT" es texto
+    // libre para el docx). Este saver solo replica normas / condiciones /
+    // equipamiento a los ensayos brinell de las OTs hermanas listadas en
+    // `datos.condiciones_por_ot`. Si la hermana no tiene un ensayo brinell,
+    // se crea con esos overrides + condiciones globales. Si ya lo tiene, se
+    // pisan los campos overrideados (no toca sus mediciones).
+    saveEnsayoBrinellMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var otActualStr = String(nro_ot_actual);
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      // Todo lo que puede propagarse a la raíz del hijo (unión de los 3 subsets
+      // del form: normas 1.1, condiciones 1.2, equipamiento 1.3).
+      var OVERRIDE_RAIZ_KEYS = [
+        'norma_itm059', 'norma_astm_e10', 'norma_astm_e10_year',
+        'norma_iso6506', 'norma_iso6506_year', 'norma_otra_chk', 'norma_otra',
+        'sup_muestra', 'sup_equipo', 'paralelismo', 'verif_patron',
+        'temperatura', 'tiempo_aplicacion', 'bolilla_diametro', 'carga_aplicada',
+        'espesor_probeta', 'diametro_impronta', 'dureza_hb', 'zona_ensayo',
+        'equipamiento', 'equipamiento_tags', 'otros_equipos',
+      ];
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      // OT actual: guardar tal cual (sin el mapa condiciones_por_ot).
+      var datosActual = Object.assign({}, datos);
+      delete datosActual.condiciones_por_ot;
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'dureza-brinell', datosActual, existingId || null);
+      var hermanas = Object.keys(mapaCond).filter(function (n) { return n && n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var overrideRaiz = overridesRaizPara(nroY);
+        var existente = _db.ensayos.find(function (e) {
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'dureza-brinell';
+        });
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          datosY = Object.assign({}, datosPrev, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          // Condiciones globales (variante / laboratorio / patrón) del ensayo
+          // fuente. Se copian intactas para que la hermana quede consistente.
+          var CONDICIONES_GLOBALES = [
+            'variante', 'laboratorio',
+            'patron_tag', 'patron', 'patron_valor',
+            'patron_diam_imp', 'patron_dureza_hb',
+            'mapa_microdurezas', 'evaluacion_texto',
+            'incluir_espesor', 'incluir_diametro_impronta',
+          ];
+          datosY = { mediciones: [] };
+          CONDICIONES_GLOBALES.forEach(function (k) {
+            if (datos[k] !== undefined) datosY[k] = datos[k];
+          });
+          Object.assign(datosY, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'dureza-brinell', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
     // Split multi-OT para impacto: mismo patrón que tracción/plegado. Las filas
     // de `resultados[]` con `nro_ot_override` apuntando a otra OT se transfieren
     // al ensayo de impacto de esa OT hermana. Aplana `textos_por_ot` y

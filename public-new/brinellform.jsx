@@ -43,6 +43,117 @@ function BrinellForm(props) {
   function upd(k, v) { set(k, v); }
   function updBool(k, checked) { set(k, !!checked); }
 
+  // ── Multi-OT: mismo patrón que plegado / tracción ──────────────────────────
+  // Permite copiar normas (1.1), condiciones (1.2) y equipamiento (1.3) a las
+  // OTs hermanas de la misma solicitud. Se escribe en datos.condiciones_por_ot
+  // y el saver (saveEnsayoBrinellMultiOt) crea o actualiza el ensayo brinell
+  // de la OT destino con esos overrides. Las mediciones NO se propagan — son
+  // propias de cada OT.
+  var otNroActual = props.otNro || '';
+  var otActualObj = otNroActual && window.LabStore && window.LabStore.getOt
+    ? window.LabStore.getOt(otNroActual) : null;
+  var solActual = otActualObj && otActualObj.nro_solicitud;
+  var otsDisponibles = (solActual && window.LabStore.listOtsBySolicitud)
+    ? window.LabStore.listOtsBySolicitud(solActual)
+    : (otActualObj ? [otActualObj] : []);
+  var multiOtBr = otsDisponibles.length > 1;
+  var otNroActualStrBr = String(otNroActual || '');
+  var _copyKeyBr = React.useState(''); var copyOpenKeyBr = _copyKeyBr[0], setCopyOpenKeyBr = _copyKeyBr[1];
+  var _copyDestBr = React.useState([]); var copyDestGenBr = _copyDestBr[0], setCopyDestGenBr = _copyDestBr[1];
+  function copiarCamposBrAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+    if (window._labToastOk) {
+      window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+    }
+  }
+  function botonCopiarSeccionBr(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtBr) return null;
+    var abierto = copyOpenKeyBr === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () { setCopyDestGenBr([]); setCopyOpenKeyBr(abierto ? '' : claveUnica); },
+        style: {
+          border: '1px solid #0969da', background: '#fff', color: '#0969da',
+          padding: '3px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: '#24292f' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: '#57606a', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrBr; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenBr.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenBr(checked ? copyDestGenBr.filter(function (n) { return n !== nro; }) : copyDestGenBr.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyBr(''); },
+            style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenBr.slice();
+              if (destinos.length === 0) {
+                destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrBr; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposBrAOts(destinos, camposList);
+              setCopyOpenKeyBr(''); setCopyDestGenBr([]);
+            },
+            style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
+  var CAMPOS_NORMAS_BR = [
+    'norma_itm059', 'norma_astm_e10', 'norma_astm_e10_year',
+    'norma_iso6506', 'norma_iso6506_year', 'norma_otra_chk', 'norma_otra',
+  ];
+  var CAMPOS_CONDICIONES_BR = [
+    'sup_muestra', 'sup_equipo', 'paralelismo', 'verif_patron',
+    'temperatura', 'tiempo_aplicacion', 'bolilla_diametro', 'carga_aplicada',
+    'espesor_probeta', 'diametro_impronta', 'dureza_hb', 'zona_ensayo',
+  ];
+  var CAMPOS_EQUIPAMIENTO_BR = ['equipamiento', 'equipamiento_tags', 'otros_equipos'];
+  var CAMPOS_TODO_BR = CAMPOS_NORMAS_BR.concat(CAMPOS_CONDICIONES_BR).concat(CAMPOS_EQUIPAMIENTO_BR);
+  var barraCopiarTodoBr = multiOtBr ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      borderTop: 'none', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (normas + condiciones + equipamiento) a otras OT en un solo click.'),
+    botonCopiarSeccionBr('copiar_todo', 'Copiar todo a otras OT',
+      CAMPOS_TODO_BR,
+      'Copia normas (1.1), condiciones (1.2) y equipamiento (1.3) juntos.')
+  ) : null;
+
   var mediciones = Array.isArray(datos.mediciones) ? datos.mediciones.slice() : [];
   if (mediciones.length === 0) {
     for (var _i = 0; _i < 5; _i++) mediciones.push({});
@@ -63,7 +174,12 @@ function BrinellForm(props) {
 
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
   var block11 = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: S.head }, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.1  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+      botonCopiarSeccionBr('normas_11', 'Copiar normas a otras OT',
+        CAMPOS_NORMAS_BR,
+        'Copia las normas ITM/ASTM/ISO y "Otro" a las OTs seleccionadas.')
+    ),
     _r('div', { style: S.box },
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.norma_itm059,
@@ -99,7 +215,12 @@ function BrinellForm(props) {
 
   // ── 1.2 VERIFICACIONES Y CONDICIONES ──────────────────────────────────
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+      botonCopiarSeccionBr('cond_12', 'Copiar condiciones a otras OT',
+        CAMPOS_CONDICIONES_BR,
+        'Copia estado sup, paralelismo, temp, tiempo, carga, bolilla, etc.')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 10.5 } },
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.sup_muestra,
@@ -191,7 +312,12 @@ function BrinellForm(props) {
 
   // ── 1.3 EQUIPAMIENTO ──────────────────────────────────────────────────
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.3  EQUIPAMIENTO UTILIZADO'),
+      botonCopiarSeccionBr('equip_13', 'Copiar equipamiento a otras OT',
+        CAMPOS_EQUIPAMIENTO_BR,
+        'Copia checkboxes de equipos + TAGs + otros equipos manuales.')
+    ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 20px', fontSize: 10.5 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -280,6 +406,7 @@ function BrinellForm(props) {
   );
 
   return _r('div', { style: S.sheet },
+    barraCopiarTodoBr,
     _r('div', { style: { display: 'grid', gridTemplateColumns: '0.85fr 1.4fr' } }, block11, block12),
     blockMem, block13, block14, block15
   );
