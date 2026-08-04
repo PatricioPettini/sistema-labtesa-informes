@@ -46,30 +46,13 @@ async function fetchTablero() {
   return cache.data;
 }
 
-// Extrae razón social + nro de solicitud del título. Soporta:
-//   "CLIENTE - 38079"
-//   "CLIENTE - 38079 (VER COMENTARIOS)"
-//   "CLIENTE - 38079 - PRELIMINAR"   ← el número NO está en la última posición
-//   "CLIENTE - SOL 38079"
-// Ojo: mantener alineado con `parsearTitulo` en trello-parser.js (misma regex).
+// Extrae razón social + nro de solicitud del título. Delega en el parser
+// compartido (trello-parser.js) para no duplicar lógica — el bot y este cache
+// del dashboard deben ver los mismos números para que "en_sistema" cuadre.
+const { parsearTitulo: _parsearTituloCompartido } = require('./trello-parser');
 function parseTitulo(titulo) {
-  const t = String(titulo || '').trim();
-  let cliente = t, nroSolicitud = '';
-  if (t.includes(' - ')) {
-    cliente = t.split(' - ')[0].trim();
-    // Todos los "\s-\s+<digits>" del título; nos quedamos con el ÚLTIMO match.
-    // Cubre "CLIENTE - 38079 - PRELIMINAR" (match único) y "CLIENTE - X - 38079"
-    // (dos matches → último). Tolera texto/paréntesis después del número.
-    const matches = [...t.matchAll(/\s-\s+(\d{3,})(?=\s|$|\()/g)];
-    if (matches.length > 0) nroSolicitud = matches[matches.length - 1][1];
-  } else {
-    const m = t.match(/(\d{3,})\s*$/);
-    if (m) {
-      nroSolicitud = m[1];
-      cliente = t.replace(m[0], '').trim();
-    }
-  }
-  return { cliente, nro_solicitud: nroSolicitud };
+  const r = _parsearTituloCompartido(titulo);
+  return { cliente: r.cliente_nombre, nro_solicitud: r.nro_solicitud };
 }
 
 // Normalización de nombres de etiqueta (misma que bot-trello.js). Duplicada
