@@ -192,9 +192,20 @@ function generarMacrografiaDesdeTemplate(ot, datos, fotosCaratula) {
   // Quitar SIEMPRE el caption residual del modelo F2 ("Imagen N°2 - Macrografía").
   // Si el usuario subió fotos, su caption real (con número e ID del prefix
   // "Imagen N°X – ...") reemplazará al del modelo; si no subió, no debe aparecer.
+  //
+  // Bug reportado: el conteo de "Imagen N°X" en insertarImagenesEnsayo cuenta
+  // el residual del template (ej. "N°2"), y arranca en N°3 la primera foto
+  // real. Cuando el texto del residual queda partido en varios párrafos
+  // ("Imagen N°2" en uno, "Macrografía" en otro), el patrón A no lo elimina.
+  // Se agregan patrones B/C para atajar esos casos particionados.
   outXml = outXml.replace(/<w:p\b[^>]*>(?:(?!<w:p\b)[\s\S])*?<\/w:p>/g, par => {
     const visible = [...par.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
+    // A: caption completo "Imagen N°X - Macrografía" en un solo párrafo.
     if (/imagen\s+n[°˚º]\s*\d*\s*[-–]\s*macrograf[íi]a/i.test(visible)) return '';
+    // B: solo "Imagen N°X" (residual partido, sin imagen adjunta en el <w:p>).
+    if (/^\s*imagen\s+n[°˚º]\s*\d+\s*[-–]?\s*$/i.test(visible) && !par.includes('<w:drawing')) return '';
+    // C: solo "Macrografía" como texto (la otra mitad del residual partido).
+    if (/^\s*macrograf[íi]a\s*$/i.test(visible)) return '';
     return par;
   });
   if (fotosEnsayo.length > 0) {

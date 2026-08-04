@@ -364,6 +364,14 @@ function generarNickBreakDesdeTemplate(ot, datos, fotosCaratula) {
       } else {
         lineasInd.push(`${label} – Se observa una indicación de ${detalle} mm de longitud.`);
       }
+    } else if (detalle && (
+        tipo === 'Presenta indicaciones no relevantes' ||
+        tipo === 'Presenta indicaciones que superan en conjunto el 2% de la superficie evaluada'
+      )) {
+      // Códigos B / C del form nuevo: el técnico marcó "presenta indicaciones"
+      // y agregó una descripción en el campo Detalle. Se emite como línea
+      // libre debajo de la tabla ("NB X – <detalle>").
+      lineasInd.push(`${label} – ${detalle}`);
     }
   });
   const indicaciones_linea = lineasInd.length ? lineasInd.join('\n') : '__SECTION_HIDE__';

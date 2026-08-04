@@ -326,6 +326,7 @@ function NickBreakForm(props) {
               : null,
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 70 } }, 'PROBETA'),
             _r('th', { style: { border: '1px solid #333', padding: 4 } }, 'RESULTADO'),
+            _r('th', { style: { border: '1px solid #333', padding: 4, width: 220 } }, 'DETALLE'),
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 30 } }, '')
           )
         ),
@@ -392,6 +393,25 @@ function NickBreakForm(props) {
                   _r('option', { value: 'B' }, 'B · ' + NB_RESULTADOS.B),
                   _r('option', { value: 'C' }, 'C · ' + NB_RESULTADOS.C)
                 )),
+              // Detalle: editable solo cuando el resultado es B o C (presenta
+              // indicaciones). Se guarda en probetas[i].detalle y el generator
+              // lo emite abajo de la tabla en "Indicaciones por probeta".
+              (function () {
+                var reqDetalle = p.resultado_cod === 'B' || p.resultado_cod === 'C';
+                return _r('td', { style: { border: '1px solid #333', padding: 0, background: reqDetalle ? '#fff' : '#f4f4f4' } },
+                  _r('input', {
+                    style: Object.assign({}, S.input, {
+                      border: 'none', width: '100%', fontSize: 10,
+                      background: 'transparent',
+                      color: reqDetalle ? '#111' : '#aaa',
+                    }),
+                    value: p.detalle || '',
+                    placeholder: reqDetalle ? 'Descripción de la indicación…' : '',
+                    disabled: !reqDetalle,
+                    title: reqDetalle ? 'Detalle de la indicación observada' : 'Solo aplica cuando el resultado es B o C',
+                    onChange: function (e) { setProb(i, 'detalle', e.target.value); },
+                  }));
+              })(),
               _r('td', { style: { border: '1px solid #333', textAlign: 'center' } },
                 _r('button', { onClick: function () { delProb(i); },
                   style: { border: 'none', background: 'transparent', color: '#c0392b', cursor: 'pointer', fontSize: 14 } }, '🗑'))
