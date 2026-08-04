@@ -63,8 +63,11 @@ router.post('/generate-with-qa/:nro_ot', upload.array('fotos'), async (req, res)
   if (ensayosDB.length === 0)
     return res.status(400).json({ error: 'La OT no tiene ensayos cargados' });
 
-  // ── Firma del realizador obligatoria ────────────────────────────────────
-  {
+  // ── Firma del realizador obligatoria (solo informe definitivo) ─────────
+  // En preinforme (ot.es_preinforme=1) se permite emitir con ensayos abiertos:
+  // el preinforme es un borrador que se manda al cliente antes de la firma
+  // final. El sufijo "_PRELIMINAR" del filename ya lo identifica.
+  if (!ot.es_preinforme) {
     const sinFirmar = ensayosDB.filter(e => (e.estado_firma || 'abierto') === 'abierto');
     if (sinFirmar.length > 0) {
       return res.status(422).json({

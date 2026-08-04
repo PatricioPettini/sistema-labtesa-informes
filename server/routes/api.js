@@ -1290,10 +1290,12 @@ router.post('/generate/:nro_ot', upload.array('fotos'), async (req, res) => {
 
   let ensayos = db.prepare('SELECT * FROM ensayos WHERE nro_ot = ? ORDER BY orden').all(nro_ot);
 
-  // ── Firma del realizador obligatoria ────────────────────────────────────
+  // ── Firma del realizador obligatoria (solo informe definitivo) ─────────
   // Cada ensayo debe estar FIRMADO (estado 'revisado' o 'autorizado') antes de
   // poder generar el informe. La aprobación adicional del evaluador es opcional.
-  {
+  // En preinforme (ot.es_preinforme=1) se permite emitir con ensayos abiertos:
+  // es un borrador que se manda al cliente antes de la firma final.
+  if (!ot.es_preinforme) {
     const sinFirmar = ensayos.filter(e => (e.estado_firma || 'abierto') === 'abierto');
     if (sinFirmar.length > 0) {
       return res.status(422).json({
