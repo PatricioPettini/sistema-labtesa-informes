@@ -1132,7 +1132,14 @@ function eliminarParrafosVacios(xml) {
   // Posición del page break — blanks de carátula (antes del PB, sin left=851) se preservan
   const pbPos = xml.indexOf('w:type="page"');
 
-  return xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (par, offset, str) => {
+  // La regex atrapa dos variantes de párrafo:
+  //   <w:p ... />                 (self-closing, párrafo vacío puro — es lo que
+  //                                Word inserta al hacer Enter sobre línea vacía)
+  //   <w:p ...>...</w:p>          (párrafo normal con contenido)
+  // Antes solo matcheábamos la segunda variante y los self-closing quedaban
+  // como espacios en blanco entre placeholders (bug: párrafo residual entre
+  // {{zona_plegado_linea}} y {{temperatura_ensayo_linea}} en plegado.docx).
+  return xml.replace(/<w:p\b[^>]*(?:\/>|>[\s\S]*?<\/w:p>)/g, (par, offset, str) => {
     if (par.includes('w:type="page"')) return par;  // preservar page breaks siempre
     if (par.includes('<w:drawing>'))   return par;  // preservar imágenes (no tienen <w:t>)
     const tTexts = [...par.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]);
