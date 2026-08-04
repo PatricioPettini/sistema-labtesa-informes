@@ -123,9 +123,21 @@ function clasificarPorBuckets(archivos) {
     .filter(x => x.fecha)
     .sort((a, b) => b.fecha - a.fecha);
 
-  // 1. Diarios: todos los que caen dentro de la ventana de N días recientes.
+  // 1. Diarios: uno por día dentro de la ventana de N días recientes.
+  //    Antes conservaba TODOS los backups del día (varios por reinicio del
+  //    server), lo que hacía crecer la carpeta a decenas de GB. Ahora se
+  //    dedupea por YYYY-MM-DD (el más reciente de cada día gana).
   const inicioDiarios = ahora - RETEN_DIARIOS * MS_DIA;
-  for (const it of items) if (it.fecha.getTime() >= inicioDiarios) conservar.add(it.name);
+  const yaVistoDia = new Set();
+  for (const it of items) {
+    if (it.fecha.getTime() < inicioDiarios) break;
+    const dia = it.fecha.getFullYear() + '-' +
+                String(it.fecha.getMonth() + 1).padStart(2, '0') + '-' +
+                String(it.fecha.getDate()).padStart(2, '0');
+    if (yaVistoDia.has(dia)) continue;
+    yaVistoDia.add(dia);
+    conservar.add(it.name);
+  }
 
   // 2. Semanales: 1 por semana (el más reciente de cada) para las próximas N semanas
   //    hacia atrás desde la ventana diaria.
@@ -172,10 +184,41 @@ function limpiarViejos(dir) {
   }
 }
 
+// Ventana mínima entre snapshots. Si ya hay un backup de hace < X ms, se
+// saltea. Evita que N reinicios seguidos del server generen N snapshots del
+// mismo día (con la DB pesando ~500MB → GB en minutos).
+const MIN_INTERVALO_ENTRE_SNAPSHOTS_MS = 12 * 60 * 60 * 1000; // 12hs
+
+function ultimoSnapshotEdadMs() {
+  if (!fs.existsSync(BACKUP_DIR)) return Infinity;
+  try {
+    const archivos = fs.readdirSync(BACKUP_DIR)
+      .map(name => ({ name, fecha: fechaDeNombre(name) }))
+      .filter(x => x.fecha)
+      .sort((a, b) => b.fecha - a.fecha);
+    if (archivos.length === 0) return Infinity;
+    return Date.now() - archivos[0].fecha.getTime();
+  } catch { return Infinity; }
+}
+
 function correrCiclo() {
   try {
+    // Siempre limpiamos primero (aunque no vayamos a crear uno nuevo). Así al
+    // arrancar el server con 200 backups viejos se dedupean de una.
+    limpiarViejos(BACKUP_DIR);
+    if (BACKUP_DIR_REMOTO && fs.existsSync(BACKUP_DIR_REMOTO)) {
+      limpiarViejos(BACKUP_DIR_REMOTO);
+    }
+    // Skip si ya hay un backup reciente. Evita duplicar el snapshot al reiniciar.
+    const edad = ultimoSnapshotEdadMs();
+    if (edad < MIN_INTERVALO_ENTRE_SNAPSHOTS_MS) {
+      const horas = (edad / 3600000).toFixed(1);
+      console.log('[backup] saltear ciclo — ya existe un snapshot de hace ' + horas + 'h');
+      return;
+    }
     const local = crearBackup();
     copiarOffsite(local);
+    // Limpieza post-creación (por si el nuevo snapshot desplazó a otro del día).
     limpiarViejos(BACKUP_DIR);
     if (BACKUP_DIR_REMOTO && fs.existsSync(BACKUP_DIR_REMOTO)) {
       limpiarViejos(BACKUP_DIR_REMOTO);
