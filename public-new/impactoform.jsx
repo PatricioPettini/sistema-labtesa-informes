@@ -226,15 +226,29 @@ function ImpactoForm(props) {
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.paralelismo, onChange: function (e) { updBool('paralelismo', e.target.checked); } }),
         _r('span', { style: { fontWeight: 600 } }, 'PARALELISMO'), ' OK'),
-      // Orientación
+      // Orientación — soporta desmarcar: haciendo click en el radio ya activo
+      // vuelve a '' (sin orientación). También hay un ícono ✕ al lado que limpia
+      // el valor sin necesidad de re-clickear.
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
         _r('span', { style: { fontWeight: 600 } }, 'ORIENTACIÓN DE PROBETA:'),
         _r('label', { style: S.label },
-          _r('input', { type: 'radio', name: 'orient', checked: datos.orientacion === 'Longitudinal',
-            onChange: function () { upd('orientacion', 'Longitudinal'); } }), 'LONG.'),
+          _r('input', {
+            type: 'radio', name: 'orient', checked: datos.orientacion === 'Longitudinal',
+            onChange: function () { upd('orientacion', 'Longitudinal'); },
+            onClick: function () { if (datos.orientacion === 'Longitudinal') upd('orientacion', ''); },
+          }), 'LONG.'),
         _r('label', { style: S.label },
-          _r('input', { type: 'radio', name: 'orient', checked: datos.orientacion === 'Transversal',
-            onChange: function () { upd('orientacion', 'Transversal'); } }), 'TRANSV.')),
+          _r('input', {
+            type: 'radio', name: 'orient', checked: datos.orientacion === 'Transversal',
+            onChange: function () { upd('orientacion', 'Transversal'); },
+            onClick: function () { if (datos.orientacion === 'Transversal') upd('orientacion', ''); },
+          }), 'TRANSV.'),
+        datos.orientacion ? _r('button', {
+          type: 'button',
+          onClick: function () { upd('orientacion', ''); },
+          title: 'Sacar orientación',
+          style: { border: 'none', background: 'transparent', color: '#c0392b', cursor: 'pointer', fontSize: 13, padding: '0 4px' },
+        }, '✕') : null),
       // Probetas
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.prob_cliente, onChange: function (e) { updBool('prob_cliente', e.target.checked); } }),
@@ -761,6 +775,7 @@ function ImpactoForm(props) {
     'metodologia',
     // 1.3 verificaciones y condiciones
     'temperatura', 'medida_probeta', 'entalla', 'tipo_probeta',
+    'paralelismo', 'orientacion', 'prob_cliente', 'prob_cupon_soldado',
     // 1.4 equipamiento
     'equipamiento', 'equipamiento_tags', 'otros_equipos',
     // Notas fijas (opcionales)

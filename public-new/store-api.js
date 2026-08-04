@@ -964,6 +964,7 @@
       var OVERRIDE_RAIZ_KEYS_IMP = [
         'variante', 'metodologia',
         'temperatura', 'medida_probeta', 'entalla', 'tipo_probeta',
+        'paralelismo', 'orientacion', 'prob_cliente', 'prob_cupon_soldado',
         'equipamiento', 'equipamiento_tags', 'otros_equipos',
         'nota1', 'nota_evaluaciones', 'nota_no_conforme',
         'nota_incertidumbre', 'nota_externo',
