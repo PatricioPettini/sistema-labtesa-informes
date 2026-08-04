@@ -416,6 +416,15 @@ function leerInforme(rutaXlsm) {
 }
 
 function _leerInformeInterno(buf, rutaOrNombre) {
+  // Validar que el buffer sea un ZIP válido antes de intentar parsearlo. Los
+  // .xlsm son archivos ZIP; si el buffer está vacío / corrupto / es un lockfile
+  // de Office ("~$..."), PizZip lanza "Can't find end of central directory".
+  // Damos un error más claro con el nombre del archivo problemático.
+  if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4B) {
+    const nom = require('path').basename(rutaOrNombre || 'archivo.xlsm');
+    throw new Error('El archivo "' + nom + '" no es un .xlsm válido (posible lockfile de Excel o archivo corrupto). ' +
+      'Cerrá el archivo en Excel y volvé a intentar.');
+  }
   const zip = new PizZip(buf);
   const workbookXml = zip.files['xl/workbook.xml'].asText();
   const ssEntry = zip.files['xl/sharedStrings.xml'];

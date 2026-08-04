@@ -1641,9 +1641,15 @@ function buscarInformesPorSolicitud(nroSolicitud) {
     .filter(d => d.isDirectory() && solRegex.test(d.name));
   if (!hijas.length) return [];
   const carpetaSol = pathMod.join(AS400_CARPETA_SOL_BASE, hijas[0].name);
-  // Listar todos los .xlsm dentro de la carpeta.
+  // Listar todos los .xlsm dentro de la carpeta. Excluye:
+  //   - Lockfiles de Office ("~$*.xlsm"): archivos temporales que Excel crea
+  //     mientras un usuario tiene el archivo abierto. NO son ZIPs válidos y
+  //     rompen PizZip con "Can't find end of central directory".
+  //   - Archivos ocultos ".DS_Store" u otros con "." al inicio.
   const xlsm = fsMod.readdirSync(carpetaSol)
     .filter(n => /\.xlsm$/i.test(n))
+    .filter(n => !n.startsWith('~$'))
+    .filter(n => !n.startsWith('.'))
     .sort()
     .map(n => pathMod.join(carpetaSol, n));
   return xlsm;
