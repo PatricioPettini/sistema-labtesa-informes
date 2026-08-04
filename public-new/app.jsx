@@ -77,6 +77,57 @@ function App() {
       .catch(function (e) { setReady(e.message || 'Error desconocido'); });
   }, []);
 
+  // Navegación Enter → celda de abajo en cualquier <table>. Se activa para
+  // inputs/textareas/selects dentro de una <td>. Enter → foca el mismo tipo
+  // de campo en la fila siguiente (mismo cellIndex). Shift+Enter va hacia
+  // arriba. En textarea, respetamos el multi-línea usando Ctrl+Enter para
+  // saltar de celda (Enter puro inserta \n).
+  React.useEffect(function () {
+    function onKey(e) {
+      if (e.key !== 'Enter') return;
+      var el = e.target;
+      if (!el) return;
+      var tag = String(el.tagName || '').toUpperCase();
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+      // Ignorar inputs tipo submit/button/checkbox/radio.
+      if (tag === 'INPUT' && /^(submit|button|checkbox|radio|file|reset)$/i.test(el.type)) return;
+      // Textarea: solo saltar con Ctrl+Enter (Enter puro escribe \n).
+      if (tag === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+      // Buscar la <td> contenedora.
+      var td = el.closest ? el.closest('td') : null;
+      if (!td) return;
+      var tr = td.parentElement;
+      if (!tr) return;
+      var table = tr.closest ? tr.closest('table') : null;
+      if (!table) return;
+      // Índice de la celda actual dentro de su tr.
+      var cellIdx = -1;
+      for (var i = 0; i < tr.cells.length; i++) { if (tr.cells[i] === td) { cellIdx = i; break; } }
+      if (cellIdx < 0) return;
+      // Todas las filas de la MISMA tbody que la actual (evita saltar al thead).
+      var tbody = tr.parentElement;
+      if (!tbody || tbody.tagName.toUpperCase() !== 'TBODY') return;
+      var rows = tbody.rows;
+      var trIdx = -1;
+      for (var j = 0; j < rows.length; j++) { if (rows[j] === tr) { trIdx = j; break; } }
+      if (trIdx < 0) return;
+      var delta = e.shiftKey ? -1 : 1;
+      var nextTr = rows[trIdx + delta];
+      if (!nextTr) return;
+      var nextTd = nextTr.cells[cellIdx];
+      if (!nextTd) return;
+      var focable = nextTd.querySelector('input, textarea, select');
+      if (!focable) return;
+      e.preventDefault();
+      focable.focus();
+      if (typeof focable.select === 'function' && (focable.tagName === 'INPUT' || focable.tagName === 'TEXTAREA')) {
+        try { focable.select(); } catch (_) {}
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return function () { document.removeEventListener('keydown', onKey); };
+  }, []);
+
   // Modo PRINT: agregar/quitar clase al body. Este useEffect DEBE ir antes
   // de los early returns para respetar el orden de hooks entre renders.
   var esPrint = route && route.name === 'ensayo' && route.print;

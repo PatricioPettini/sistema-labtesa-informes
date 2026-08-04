@@ -98,6 +98,9 @@ function OTDetail(props) {
   var _mdl = React.useState(null); var mdl = _mdl[0], setMdl = _mdl[1];
   // Modal "Motivo del cambio" para reemisión de informe OAA acreditado.
   var _motivoDlg = React.useState(null); var motivoDlg = _motivoDlg[0], setMotivoDlg = _motivoDlg[1];
+  // Modal "Confirmar razón social" antes de generar (single o batch).
+  //   { modo: 'single' | 'batch' }
+  var _razonDlg = React.useState(null); var razonDlg = _razonDlg[0], setRazonDlg = _razonDlg[1];
   // Modal específico para colisión de nombre de archivo con 3 opciones.
   // { filename, carpeta, opts }  → sobrescribir / -1 / renombrar.
   var _arch = React.useState(null); var archExiste = _arch[0], setArchExiste = _arch[1];
@@ -306,7 +309,10 @@ function OTDetail(props) {
   // Nuevo flujo: abre el modal de confirmación de carpeta. El modal detecta la
   // carpeta candidata y ofrece Confirmar o Elegir otra. Luego llama a
   // ejecutarGenerarWord con el path elegido.
-  function genWord() { setSaveDlg('word'); }
+  // Antes de abrir el modal de carpeta, pedir al técnico que confirme la
+  // razón social. La carpeta destino en el drive se detecta según esa razón
+  // social; si viene mal del bot, generar en la carpeta equivocada.
+  function genWord() { setRazonDlg({ modo: 'single' }); }
 
   function ejecutarGenerarWord(carpetaDestino, filename, opts) {
     opts = opts || {};
@@ -444,7 +450,8 @@ function OTDetail(props) {
       toast('Ninguna OT de la solicitud está lista (falta firma o datos)', 'warning');
       return;
     }
-    setSaveDlg('word-batch');
+    // Confirmar razón social antes (una sola vez, aplica a todo el batch).
+    setRazonDlg({ modo: 'batch' });
   }
 
   // Genera secuencialmente el informe de cada OT lista de la solicitud en la
@@ -1058,6 +1065,33 @@ function OTDetail(props) {
     }) : null,
     // Modal "Motivo del cambio" para reemisión OAA acreditada (versión > 1).
     motivoDlg ? React.createElement(MotivoCambioModal, motivoDlg) : null,
+    // Modal "Confirmar razón social" antes de generar informe (single o batch).
+    razonDlg ? React.createElement(ConfirmarRazonSocialModal, {
+      razonActual: ot.razon_social || '',
+      modo: razonDlg.modo,
+      cantidadOts: razonDlg.modo === 'batch' ? (otsHermanas.length) : 1,
+      cantHermanas: otsHermanas.length,
+      tieneSolicitud: !!ot.nro_solicitud,
+      onCancel: function () { setRazonDlg(null); },
+      onConfirm: function (razonFinal, aplicarSolicitud) {
+        var razonCambio = razonFinal.trim() !== (ot.razon_social || '').trim();
+        if (razonCambio) {
+          // Aplica a la actual + hermanas si aplicarSolicitud === true.
+          if (aplicarSolicitud && ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
+            window.LabStore.updateSolicitud(ot.nro_solicitud, { razon_social: razonFinal.trim() });
+          } else {
+            window.LabStore.updateOt(ot.nro_ot, { razon_social: razonFinal.trim() });
+          }
+          // Refrescar antes de continuar (para que la carpeta destino use el nuevo).
+          ot.razon_social = razonFinal.trim();
+        }
+        var modo = razonDlg.modo;
+        setRazonDlg(null);
+        // Continuar el flujo original.
+        if (modo === 'batch') setSaveDlg('word-batch');
+        else setSaveDlg('word');
+      },
+    }) : null,
     // Modal específico de colisión de nombre de archivo (radios + nombre editable).
     archExiste ? React.createElement(ArchivoExistenteModal, {
       filename: archExiste.filename,
@@ -1107,6 +1141,60 @@ function OTDetail(props) {
 // el backend detecta que ya hay un informe vigente (código CONFIRMAR_VERSION_NUEVA).
 // El motivo se emite en el Word entre la carátula y el primer ensayo. Es un
 // requisito OAA cuando la OT tiene ensayos acreditados.
+// Modal "Confirmar razón social" antes de generar informe. Muestra la razón
+// actual en un input editable. Si el técnico la modifica, se persiste en la
+// OT antes de continuar con la generación (la carpeta destino en el drive se
+// resuelve por razón social — evita informes en carpeta equivocada por typo
+// del bot). Opción para propagar el cambio a todas las OTs de la solicitud.
+function ConfirmarRazonSocialModal(props) {
+  var _r2 = React.useState(props.razonActual || ''); var razon = _r2[0], setRazon = _r2[1];
+  var _p = React.useState(true); var propagar = _p[0], setPropagar = _p[1];
+  var cambio = razon.trim() !== (props.razonActual || '').trim();
+  var puedeConfirmar = razon.trim().length >= 2;
+  var esBatch = props.modo === 'batch';
+  return React.createElement('div', {
+    style: {
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    },
+    onClick: function (e) { if (e.target === e.currentTarget) props.onCancel(); },
+  },
+    React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(92vw, 540px)', overflow: 'hidden' } },
+      React.createElement('div', { style: { background: '#e7f0ff', borderBottom: '1px solid #0969da', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement(Icon, { name: 'building', size: 20, style: { color: '#0550ae' } }),
+        React.createElement('div', null,
+          React.createElement('h3', { style: { margin: 0, color: '#0550ae', fontSize: 15 } }, 'Confirmar razón social'),
+          React.createElement('div', { style: { fontSize: 12, color: '#0550aec0', marginTop: 3 } },
+            esBatch ? 'Batch de ' + (props.cantidadOts || 1) + ' OT(s) — el cambio aplica a la solicitud entera' : 'La razón social define la carpeta destino en el drive')
+        )
+      ),
+      React.createElement('div', { style: { padding: 20 } },
+        React.createElement('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, 'Razón social:'),
+        React.createElement('input', {
+          type: 'text', autoFocus: true, value: razon,
+          onChange: function (e) { setRazon(e.target.value); },
+          style: { width: '100%', padding: '8px 10px', border: '1px solid ' + (cambio ? '#0969da' : '#d0d7de'), borderRadius: 4, fontSize: 13, fontFamily: 'inherit' },
+        }),
+        cambio && props.tieneSolicitud && !esBatch ? React.createElement('label', {
+          style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, cursor: 'pointer' },
+        },
+          React.createElement('input', { type: 'checkbox', checked: propagar, onChange: function (e) { setPropagar(e.target.checked); } }),
+          React.createElement('span', null, 'Aplicar el cambio a TODAS las OTs de la solicitud (' + (props.cantHermanas || 1) + ' OTs)')
+        ) : null,
+        cambio ? React.createElement('div', { style: { fontSize: 11, color: '#8a5a00', marginTop: 8 } },
+          '⚠ Vas a modificar la razón social. Este cambio impacta en la carpeta destino del drive y queda persistido.') : null
+      ),
+      React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid #d0d7de', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+        React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, 'Cancelar'),
+        React.createElement(Button, {
+          variant: 'primary', icon: 'check', disabled: !puedeConfirmar,
+          onClick: function () { if (puedeConfirmar) props.onConfirm(razon, esBatch ? true : propagar); },
+        }, cambio ? 'Confirmar y generar' : 'Generar')
+      )
+    )
+  );
+}
+
 function MotivoCambioModal(props) {
   var _m = React.useState(''); var motivo = _m[0], setMotivo = _m[1];
   var puedeConfirmar = motivo.trim().length >= 3;
