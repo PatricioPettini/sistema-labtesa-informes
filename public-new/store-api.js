@@ -958,23 +958,59 @@
         return out;
       }
       var mapaCond = (datos && datos.condiciones_por_ot) || {};
-      function condsPara(nroOt) {
+      // Campos que aplanan a la RAÍZ del hijo (subset del botón "Copiar TODO":
+      // metodología / verificaciones / equipamiento / notas). El resto de
+      // claves del mapa se preservan como override "por-OT" en el hijo.
+      var OVERRIDE_RAIZ_KEYS_IMP = [
+        'variante', 'metodologia',
+        'temperatura', 'medida_probeta', 'entalla', 'tipo_probeta',
+        'equipamiento', 'equipamiento_tags', 'otros_equipos',
+        'nota1', 'nota_evaluaciones', 'nota_no_conforme',
+        'nota_incertidumbre', 'nota_externo',
+      ];
+      function condsMapPara(nroOt) {
         var m = mapaCond[nroOt];
-        return m ? { condiciones_por_ot: { [nroOt]: Object.assign({}, m) } } : {};
+        if (!m) return {};
+        var soloMap = {};
+        Object.keys(m).forEach(function (k) {
+          if (OVERRIDE_RAIZ_KEYS_IMP.indexOf(k) < 0) soloMap[k] = m[k];
+        });
+        return Object.keys(soloMap).length > 0
+          ? { condiciones_por_ot: { [nroOt]: soloMap } }
+          : {};
       }
-      var otsDest = Object.keys(grupos);
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS_IMP.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      // Destinos: grupos de resultados + OTs mencionadas en condiciones_por_ot
+      // (para propagar aunque no haya split de resultados hacia esa hermana).
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
       var idxActual = grupos[otActualStr] || [];
-      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsPara(otActualStr));
+      var datosActual = Object.assign({}, datos, aplanarTextosPara(otActualStr), condsMapPara(otActualStr));
       delete datosActual.textos_por_ot;
       if (!datosActual.condiciones_por_ot) delete datosActual.condiciones_por_ot;
       datosActual.resultados = extraerGrupo(idxActual);
       var promActual = self.saveEnsayoAsync(nro_ot_actual, 'impacto', datosActual, existingId || null);
       var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
       var promsHermanas = hermanas.map(function (nroY) {
-        var subResultados = extraerGrupo(grupos[nroY]);
+        var subResultados = grupos[nroY] ? extraerGrupo(grupos[nroY]) : [];
         var existente = _db.ensayos.find(function (e) {
           return String(e.nro_ot) === String(nroY) && e.tipo === 'impacto';
         });
+        var overrideRaiz = overridesRaizPara(nroY);
         var accion, datosY, existingIdY;
         if (existente) {
           accion = 'actualizado';
@@ -991,9 +1027,10 @@
             });
             if (impVacia) resultadosPrev = [];
           }
-          datosY = Object.assign({}, datosPrev, aplanarTextosPara(nroY), condsPara(nroY), {
+          datosY = Object.assign({}, datosPrev, aplanarTextosPara(nroY), condsMapPara(nroY), {
             resultados: resultadosPrev.concat(subResultados),
           });
+          Object.assign(datosY, overrideRaiz);
           delete datosY.textos_por_ot;
           if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
         } else {
@@ -1013,12 +1050,13 @@
             'nota1', 'nota_evaluaciones', 'nota_no_conforme',
             'nota_incertidumbre', 'nota_externo',
           ];
-          datosY = Object.assign({}, aplanarTextosPara(nroY), condsPara(nroY), {
+          datosY = Object.assign({}, aplanarTextosPara(nroY), condsMapPara(nroY), {
             resultados: subResultados,
           });
           CONDICIONES_GLOBALES.forEach(function (k) {
             if (datos[k] !== undefined) datosY[k] = datos[k];
           });
+          Object.assign(datosY, overrideRaiz);
           if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
         }
         return self.saveEnsayoAsync(nroY, 'impacto', datosY, existingIdY).then(function (row) {

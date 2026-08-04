@@ -181,7 +181,7 @@ function ImpactoForm(props) {
   // Se removieron porque esos datos ahora se cargan por probeta en la sección
   // "CONDICIONES POR PROBETA" — solo queda el campo Metodología (ITM).
   var norm11 = _r('div', null,
-    _r('div', { style: S.headTitle }, '1.1  METODOLOGÍA DE ENSAYO'),
+    _r('div', { style: S.headTitle }, '1.2  METODOLOGÍA DE ENSAYO'),
     _r('div', { style: S.padBox },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
@@ -192,7 +192,7 @@ function ImpactoForm(props) {
 
   // ── 1.2 VERIFICACIONES Y CONDICIONES ───────────────────────────────────
   var verif = _r('div', null,
-    _r('div', { style: S.headTitle }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: S.headTitle }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: S.padBox },
       // Temperatura
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
@@ -489,7 +489,7 @@ function ImpactoForm(props) {
     set('resultados', curr);
   }
   var blockCondProbeta = _r('div', null,
-    _r('div', { style: S.headTitle }, '1.3  CONDICIONES POR PROBETA'),
+    _r('div', { style: S.headTitle }, '1.1  CONDICIONES POR PROBETA'),
     // Control +/- para modificar la cantidad de probetas. Al cambiar, se
     // refleja simultáneamente en la tabla de resultados obtenidos (1.5).
     _r('div', { style: { padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, borderBottom: '1px solid #ddd' } },
@@ -536,7 +536,38 @@ function ImpactoForm(props) {
             })
           )
         ),
-        _r('tbody', null, COND_PROB_FIELDS.map(function (f) {
+        _r('tbody', null,
+          // Fila OT — solo si hay hermanas. Permite reasignar cada probeta a
+          // una OT distinta sin necesidad de bajar a la tabla de resultados.
+          otsDisponibles.length > 1 ? _r('tr', { key: '_ot' },
+            _r('td', { style: { border: '1px solid #999', padding: '4px 8px', fontWeight: 700, background: '#fafafa' } }, 'OT destino'),
+            resultadosArr.map(function (r, iFis) {
+              var over = String((r && r.nro_ot_override) || '').trim();
+              var otEff = over || otNroActual;
+              var esOtra = over && over !== otNroActual;
+              return _r('td', { key: iFis, style: { border: '1px solid #999', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
+                _r('select', {
+                  value: otEff,
+                  onChange: function (e) {
+                    var v = String(e.target.value || '').trim();
+                    if (v === otNroActual) v = '';
+                    setRow(iFis, 'nro_ot_override', v);
+                  },
+                  title: 'OT destino de esta probeta (misma solicitud)',
+                  style: {
+                    border: 'none', outline: 'none', width: '100%',
+                    padding: '5px 6px', fontSize: 11, background: 'transparent',
+                    color: esOtra ? '#8a5a00' : '#24292f',
+                    fontWeight: esOtra ? 700 : 400,
+                  },
+                },
+                  otsDisponibles.map(function (o) {
+                    var label = o.nro_ot + (o.nro_ot === otNroActual ? ' (esta)' : '');
+                    return _r('option', { key: o.nro_ot, value: o.nro_ot }, label);
+                  })));
+            })
+          ) : null,
+          COND_PROB_FIELDS.map(function (f) {
           return _r('tr', { key: f.k },
             _r('td', { style: { border: '1px solid #999', padding: '4px 8px', fontWeight: 700, background: '#fafafa' } }, f.label),
             resultadosArr.map(function (r, iFis) {
@@ -596,15 +627,110 @@ function ImpactoForm(props) {
     ) : null
   );
 
+  // ── Barra "Copiar TODO a otras OT" (aparece si hay hermanas) ──────────
+  // Copia SOLO campos globales del ensayo (metodología, verif/condiciones,
+  // notas, equipamiento). NO incluye la sección 1.1 (norma / código de
+  // referencia) porque esos valores son propios de cada OT y viven en
+  // resultados[i][k] (sección personalizada por probeta).
+  var _copyTodoOpen = React.useState(false);
+  var copyTodoOpen = _copyTodoOpen[0], setCopyTodoOpen = _copyTodoOpen[1];
+  var _copyTodoDest = React.useState([]);
+  var copyTodoDest = _copyTodoDest[0], setCopyTodoDest = _copyTodoDest[1];
+  var CAMPOS_TODO_IMP = [
+    'variante',
+    // 1.2 metodología
+    'metodologia',
+    // 1.3 verificaciones y condiciones
+    'temperatura', 'medida_probeta', 'entalla', 'tipo_probeta',
+    // 1.4 equipamiento
+    'equipamiento', 'equipamiento_tags', 'otros_equipos',
+    // Notas fijas (opcionales)
+    'nota1', 'nota_evaluaciones', 'nota_no_conforme',
+    'nota_incertidumbre', 'nota_externo',
+  ];
+  function copiarTodoImpAOts(destinos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, condPorOt);
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      CAMPOS_TODO_IMP.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+    if (window._labToastOk) {
+      window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+    }
+  }
+  var otsHermanasImp = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== String(otNroActual); });
+  var barraCopiarTodoImp = otsHermanasImp.length > 0 ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      borderBottom: 'none', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, position: 'relative',
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (metodología + condiciones + equipamiento) a otras OT en un solo click.'),
+    _r('button', {
+      type: 'button',
+      onClick: function () { setCopyTodoDest([]); setCopyTodoOpen(!copyTodoOpen); },
+      style: {
+        border: '1px solid #0969da', background: '#fff', color: '#0969da',
+        padding: '3px 10px', fontSize: 11, cursor: 'pointer', borderRadius: 3,
+        fontWeight: 600, whiteSpace: 'nowrap',
+      },
+    }, '📋 Copiar todo a otras OT'),
+    copyTodoOpen ? _r('div', {
+      style: {
+        position: 'absolute', zIndex: 30, top: '100%', right: 8, marginTop: 4,
+        background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 260, fontSize: 11,
+      },
+    },
+      _r('div', { style: { fontWeight: 700, marginBottom: 6 } }, 'Copiar todo a otras OT a:'),
+      _r('div', { style: { fontSize: 10, color: '#57606a', marginBottom: 8 } },
+        'Copia metodología (1.2), verificaciones (1.3) y equipamiento (1.4). La sección 1.1 (norma / código) NO se copia — es específica por OT.'),
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+        otsHermanasImp.map(function (o) {
+          var nro = String(o.nro_ot);
+          var checked = copyTodoDest.indexOf(nro) >= 0;
+          return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', checked: checked,
+              onChange: function () {
+                setCopyTodoDest(checked ? copyTodoDest.filter(function (n) { return n !== nro; }) : copyTodoDest.concat([nro]));
+              } }),
+            _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+        })),
+      _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+        _r('button', { type: 'button', onClick: function () { setCopyTodoOpen(false); },
+          style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+        _r('button', { type: 'button',
+          onClick: function () {
+            var destinos = copyTodoDest.slice();
+            if (destinos.length === 0) destinos = otsHermanasImp.map(function (o) { return String(o.nro_ot); });
+            copiarTodoImpAOts(destinos);
+            setCopyTodoOpen(false); setCopyTodoDest([]);
+          },
+          style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+    ) : null
+  ) : null;
+
   // Orden final del form:
-  //   1.1 Metodología (solo ITM)  |  1.2 Verificaciones (en dos columnas)
-  //   1.3 Condiciones por probeta (tabla con control +/− de cantidad)
+  //   1.1 Condiciones por probeta (por-OT, con selector de OT por probeta)
+  //   1.2 Metodología (solo ITM)  |  1.3 Verificaciones (en dos columnas)
   //   1.4 Equipamiento utilizado
   //   1.5 Resultados obtenidos
   //   1.6 Observaciones / Evaluación
   return _r('div', { style: S.sheet },
-    _r('div', { style: S.twoCol }, norm11, verif),
+    barraCopiarTodoImp,
     blockCondProbeta,
+    _r('div', { style: S.twoCol }, norm11, verif),
     equipBlock,
     resSection,
     obs

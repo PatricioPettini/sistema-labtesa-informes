@@ -395,7 +395,14 @@ function EnsayoForm(props) {
         var over = String((r && r.nro_ot_override) || '').trim();
         return over && over !== String(ot.nro_ot);
       });
-      if (hayOverrideImp && typeof window.LabStore.saveEnsayoImpactoMultiOt === 'function') {
+      // También disparar el saver multi-OT si hay overrides en condiciones_por_ot
+      // hacia OTs hermanas (botón "Copiar TODO a otras OT").
+      var hayCondsOtrasImp = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if ((hayOverrideImp || hayCondsOtrasImp) && typeof window.LabStore.saveEnsayoImpactoMultiOt === 'function') {
         window.LabStore.saveEnsayoImpactoMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
           .then(function (resumen) {
             var msg = 'Impacto guardado · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;
