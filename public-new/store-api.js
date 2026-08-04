@@ -400,6 +400,23 @@
         var m = mapaCond[nroOt];
         return (m && Object.keys(m).length > 0) ? Object.assign({}, m) : null;
       }
+      // Sección 1.1 (CONDICIONES POR PROBETA) — vive en muestras[i][k], no
+      // en la raíz. El botón "Copiar TODO" guarda las keys de M1 (probeta
+      // física #0) en condiciones_por_ot[<hermana>].m1_cond. Este helper
+      // aplica esos valores a todas las probetas físicas del array `muestras`
+      // de la hermana (y también propaga zonas extra que hereden de M1).
+      function aplicarM1CondAMuestras(muestrasArr, m1Cond) {
+        if (!m1Cond || !Array.isArray(muestrasArr)) return muestrasArr;
+        var keys = Object.keys(m1Cond);
+        if (keys.length === 0) return muestrasArr;
+        return muestrasArr.map(function (m) {
+          // Solo probetas físicas (no zonas extra) toman los valores nuevos.
+          if (m && m._zona_extra) return m;
+          var out = Object.assign({}, m || {});
+          keys.forEach(function (k) { out[k] = m1Cond[k]; });
+          return out;
+        });
+      }
       // 1) Datos para la OT actual: solo su grupo + sus textos aplanados.
       // También incluimos como destinos las OTs que aparezcan en
       // condiciones_por_ot (permite propagar la 1.2 aunque no haya split de
@@ -467,7 +484,13 @@
           });
           // Aplicar overrides de la sección 1.2 al final (pisan lo previo)
           // para que la copia explícita del botón "Copiar condiciones" gane.
-          if (overrideY) Object.assign(datosY, overrideY);
+          if (overrideY) {
+            var m1CondY = overrideY.m1_cond;
+            var overrideRaiz = Object.assign({}, overrideY);
+            delete overrideRaiz.m1_cond;
+            Object.assign(datosY, overrideRaiz);
+            if (m1CondY) datosY.muestras = aplicarM1CondAMuestras(datosY.muestras, m1CondY);
+          }
           delete datosY.textos_por_ot;
           delete datosY.condiciones_por_ot;
         } else {
@@ -491,7 +514,23 @@
           CONDICIONES_GLOBALES.forEach(function (k) {
             if (datos[k] !== undefined) datosY[k] = datos[k];
           });
-          if (overrideY) Object.assign(datosY, overrideY);
+          if (overrideY) {
+            var m1CondY2 = overrideY.m1_cond;
+            var overrideRaiz2 = Object.assign({}, overrideY);
+            delete overrideRaiz2.m1_cond;
+            Object.assign(datosY, overrideRaiz2);
+            if (m1CondY2) {
+              // Si la hermana no tiene muestras propias (creación desde 0 y no
+              // hubo split), sembrar una M1 con las condiciones para que el
+              // ensayo hermano no arranque vacío en la sección 1.1.
+              if (!Array.isArray(datosY.muestras) || datosY.muestras.length === 0) {
+                datosY.muestras = [Object.assign({}, m1CondY2)];
+                datosY.seccion_calc = datosY.seccion_calc && datosY.seccion_calc.length > 0 ? datosY.seccion_calc : [{}];
+              } else {
+                datosY.muestras = aplicarM1CondAMuestras(datosY.muestras, m1CondY2);
+              }
+            }
+          }
         }
         return self.saveEnsayoAsync(nroY, 'traccion', datosY, existingIdY).then(function (row) {
           return { nro_ot: nroY, accion: accion, cantidad: sub.muestras.length, id: row && row.id };

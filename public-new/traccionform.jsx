@@ -235,9 +235,27 @@ function TraccionForm(props) {
   var otNroActualStrTr = String(otNroActual || '');
   var _copyKeyTr = React.useState(''); var copyOpenKeyTr = _copyKeyTr[0], setCopyOpenKeyTr = _copyKeyTr[1];
   var _copyDestTr = React.useState([]); var copyDestGenTr = _copyDestTr[0], setCopyDestGenTr = _copyDestTr[1];
-  function copiarCamposTrAOts(destinos, campos) {
+  // `campos` = keys de la RAÍZ (leen de datos[k]).
+  // `opts.muestraCondKeys` = keys de la sección 1.1 "CONDICIONES POR PROBETA"
+  // que viven en muestras[i][k] (no en la raíz). Se leen de la PRIMERA probeta
+  // física (M1) de la OT actual y se guardan en condiciones_por_ot[<dest>].m1_cond;
+  // el saver saveEnsayoTraccionMultiOt las aplica a todas las probetas físicas
+  // de la hermana. Usado por "Copiar TODO" para arrastrar norma/código/plano/
+  // orientación aunque no sean campos raíz.
+  function copiarCamposTrAOts(destinos, campos, opts) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    // Datos M1 (probeta física #0) para el subset condicional por-probeta.
+    var muestraCondKeys = (opts && opts.muestraCondKeys) || [];
+    var m1Cond = null;
+    if (muestraCondKeys.length > 0 && Array.isArray(datos.muestras) && idxFisicas.length > 0) {
+      var m1 = datos.muestras[idxFisicas[0]] || {};
+      m1Cond = {};
+      muestraCondKeys.forEach(function (k) {
+        if (m1[k] !== undefined) m1Cond[k] = m1[k];
+      });
+      if (Object.keys(m1Cond).length === 0) m1Cond = null;
+    }
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
       campos.forEach(function (k) {
@@ -247,6 +265,7 @@ function TraccionForm(props) {
             : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
         }
       });
+      if (m1Cond) entry.m1_cond = Object.assign({}, m1Cond);
       mapaCond[nroOt] = entry;
     });
     set('condiciones_por_ot', mapaCond);
@@ -254,7 +273,7 @@ function TraccionForm(props) {
       window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
     }
   }
-  function botonCopiarSeccionTr(claveUnica, etiqueta, camposList, descripcion) {
+  function botonCopiarSeccionTr(claveUnica, etiqueta, camposList, descripcion, muestraCondKeys) {
     if (!multiOtTr) return null;
     var abierto = copyOpenKeyTr === claveUnica;
     return _r('div', { style: { position: 'relative', display: 'inline-block' } },
@@ -299,7 +318,7 @@ function TraccionForm(props) {
               if (destinos.length === 0) {
                 destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrTr; }).map(function (o) { return String(o.nro_ot); });
               }
-              copiarCamposTrAOts(destinos, camposList);
+              copiarCamposTrAOts(destinos, camposList, { muestraCondKeys: muestraCondKeys });
               setCopyOpenKeyTr(''); setCopyDestGenTr([]);
             },
             style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
@@ -1732,7 +1751,11 @@ function TraccionForm(props) {
       'Copiar TODA la configuración (condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionTr('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_TR,
-      'Copia condiciones generales (1.3) y equipamiento (1.4) juntos.')
+      'Copia condiciones por probeta (1.1), condiciones generales (1.3) y equipamiento (1.4) juntos.',
+      // Keys de la sección 1.1 (CONDICIONES POR PROBETA) — viven en
+      // muestras[i][k], no en la raíz. Se leen de M1 (idxFisicas[0]) y el
+      // saver las aplica a todas las probetas físicas de la hermana.
+      ['norma', 'orientacion', 'plano_probeta', 'codigo_referencia', '_plano_auto'])
   ) : null;
 
   return _r('div', { style: S.sheet },
