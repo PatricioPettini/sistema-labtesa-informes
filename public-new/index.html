@@ -48,7 +48,11 @@ html[data-theme="dark"]{
   --banner-btn-bg:#1f242c; --banner-btn-border:#4a3520;
 }
 html[data-theme="dark"] img[src*=".svg"]{filter:brightness(.9);}
-html[data-theme="dark"] .brand-logo{filter:brightness(1.6) contrast(.9);}
+/* Logo LABTESA (PNG transparente con texto negro + ícono azul).
+   En dark mode: invertimos + rotamos 180° para que el texto negro pase a
+   blanco. hue-rotate preserva aprox el color del ícono azul (lo lleva a un
+   celeste claro, legible sobre el sidebar oscuro). */
+html[data-theme="dark"] .brand-logo{filter:invert(1) hue-rotate(180deg) brightness(1.05);}
 
 /* ============================================================================
  * DARK MODE — Overrides forzados para inline styles de los forms de ensayo.
@@ -93,10 +97,24 @@ html[data-theme="dark"] .main [style*="background:#f4f4f4"],
 html[data-theme="dark"] .main [style*="background: #f4f4f4"],
 html[data-theme="dark"] .main [style*="background: rgb(250, 250, 250)"],
 html[data-theme="dark"] .main [style*="background:#fafafa"],
-html[data-theme="dark"] .main [style*="background: #fafafa"]{
+html[data-theme="dark"] .main [style*="background: #fafafa"],
+html[data-theme="dark"] .main [style*="background: rgb(248, 249, 250)"],
+html[data-theme="dark"] .main [style*="background:#f8f9fa"],
+html[data-theme="dark"] .main [style*="background: #f8f9fa"]{
   background:var(--surface-3) !important;
   color:var(--text) !important;
 }
+/* Borders grises muy claros usados en headers/footers de tablas. */
+html[data-theme="dark"] .main [style*="border-top: 2px solid rgb(237, 240, 243)"],
+html[data-theme="dark"] .main [style*="borderTop: 2px solid #edf0f3"],
+html[data-theme="dark"] .main [style*="border-top:2px solid #edf0f3"],
+html[data-theme="dark"] .main [style*="border-top: 2px solid #edf0f3"]{
+  border-top-color:var(--border-strong) !important;
+}
+/* tfoot con background hardcoded — forzar color de texto default para que
+   los números heredados sean legibles (no solo los <th> con color explícito). */
+html[data-theme="dark"] .main tfoot{color:var(--text) !important;}
+html[data-theme="dark"] .main tfoot td{color:var(--text) !important;}
 
 /* Fondos blancos hardcoded (#fff / #ffffff / white) → superficie oscura. */
 html[data-theme="dark"] .main [style*="background:#fff"],

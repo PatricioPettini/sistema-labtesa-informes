@@ -462,7 +462,7 @@ function Sidebar(props) {
   ];
   return React.createElement('aside', { className: 'sidebar' },
     React.createElement('div', { className: 'sidebar-brand' },
-      React.createElement('img', { src: 'assets/labtesa-logo.jpg', alt: 'LABTESA', className: 'brand-logo' })
+      React.createElement('img', { src: 'assets/labtesa-logo.png', alt: 'LABTESA', className: 'brand-logo' })
     ),
     props.onSearchClick ? React.createElement('button', {
       onClick: props.onSearchClick,
