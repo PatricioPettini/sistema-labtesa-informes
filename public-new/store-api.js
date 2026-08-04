@@ -489,7 +489,19 @@
             var overrideRaiz = Object.assign({}, overrideY);
             delete overrideRaiz.m1_cond;
             Object.assign(datosY, overrideRaiz);
-            if (m1CondY) datosY.muestras = aplicarM1CondAMuestras(datosY.muestras, m1CondY);
+            if (m1CondY) {
+              // Si el ensayo hermano existía pero sin muestras (creado vacío
+              // por un save previo, o el split de esta pasada no le agregó
+              // ninguna), sembrar M1 con las condiciones. Sino, aplicar las
+              // keys a todas las probetas físicas ya presentes.
+              if (!Array.isArray(datosY.muestras) || datosY.muestras.length === 0) {
+                datosY.muestras = [Object.assign({}, m1CondY)];
+                datosY.seccion_calc = Array.isArray(datosY.seccion_calc) && datosY.seccion_calc.length > 0
+                  ? datosY.seccion_calc : [{}];
+              } else {
+                datosY.muestras = aplicarM1CondAMuestras(datosY.muestras, m1CondY);
+              }
+            }
           }
           delete datosY.textos_por_ot;
           delete datosY.condiciones_por_ot;
