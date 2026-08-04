@@ -948,17 +948,17 @@ function OTDetail(props) {
                 ? 'Todos los ensayos están firmados (' + firmados + '/' + totalEns + ')'
                 : 'Faltan firmar ' + (totalEns - firmados) + ' de ' + totalEns + ' ensayos'
             ) : null,
-            // El <label> ocupa SOLO el checkbox visual + los textos, no toda
-            // la card. Se envuelve en un div con display:flex sin cursor para
-            // que hacer click en el resto de la card no active el checkbox.
+            // Solo el CUADRADITO togglea el flag. Los textos van FUERA del
+            // <label> para que hacer click en "Marcar como preinforme…" no
+            // active el checkbox por accidente.
             React.createElement('div', { className: 'pre-toggle-wrap' },
-              React.createElement('label', { className: 'pre-toggle' },
+              React.createElement('label', { className: 'pre-toggle', style: { flex: 'none' } },
                 React.createElement('input', { type: 'checkbox', checked: !!ot.es_preinforme, onChange: togglePre }),
-                React.createElement('span', { className: 'pre-toggle-box' }, ot.es_preinforme ? React.createElement(Icon, { name: 'check', size: 13, strokeWidth: 3 }) : null),
-                React.createElement('span', { className: 'pre-toggle-texts' },
-                  React.createElement('span', { className: 'pre-toggle-label' }, 'Marcar como preinforme'),
-                  React.createElement('span', { className: 'pre-toggle-hint' }, 'Agrega la leyenda «PRELIMINAR» al documento')
-                )
+                React.createElement('span', { className: 'pre-toggle-box' }, ot.es_preinforme ? React.createElement(Icon, { name: 'check', size: 13, strokeWidth: 3 }) : null)
+              ),
+              React.createElement('span', { className: 'pre-toggle-texts', style: { cursor: 'default' } },
+                React.createElement('span', { className: 'pre-toggle-label' }, 'Marcar como preinforme'),
+                React.createElement('span', { className: 'pre-toggle-hint' }, 'Agrega la leyenda «PRELIMINAR» al documento')
               )
             ),
             React.createElement('div', { className: 'report-actions' },
