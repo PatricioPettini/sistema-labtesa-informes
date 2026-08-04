@@ -201,10 +201,10 @@ function QuimicosForm(props) {
   var S = window.FORM_STYLES;
 
   // ── 1.1 CONDICIONES DE ENSAYO (por-OT) ────────────────────────────────────
-  // Norma de ensayo + código de referencia — pueden diferir entre OTs de una
-  // misma solicitud. Se selecciona la OT activa con un tab bar y los inputs
-  // reflejan/setean condiciones_por_ot[<OT>].
-  var COND_KEYS_Q = ['norma_ensayo_ot', 'codigo_referencia_ot'];
+  // Solo Norma de ensayo — puede diferir entre OTs de una misma solicitud. En
+  // análisis químico no se emite "Código de referencia" en el informe (a
+  // diferencia de plegado / tracción); esa fila se saca del form.
+  var COND_KEYS_Q = ['norma_ensayo_ot'];
   var selectorOtCond = multiOtQ ? _r('div', { style: { padding: '6px 8px', display: 'flex', gap: 4, flexWrap: 'wrap', background: 'var(--surface-3)', borderBottom: '1px solid var(--border)' } },
     _r('span', { style: { fontSize: 10, color: 'var(--text-3)', alignSelf: 'center', marginRight: 4 } }, 'OT activa:'),
     otsDisponibles.map(function (o) {
@@ -244,19 +244,6 @@ function QuimicosForm(props) {
           : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
               value: getCondOt(otActivaCond, 'norma_ensayo_ot') || '',
               onChange: function (e) { setCondOt(otActivaCond, 'norma_ensayo_ot', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Código de referencia:'),
-        typeof window.NormaInput === 'function'
-          ? _r(window.NormaInput, {
-              tipo: 'quimicos', categoria: 'referencia',
-              style: Object.assign({}, S.input, { flex: 1 }),
-              value: getCondOt(otActivaCond, 'codigo_referencia_ot') || '',
-              placeholder: 'Ej: ASME BPVC · API 5L',
-              onChange: function (e) { setCondOt(otActivaCond, 'codigo_referencia_ot', e.target.value); },
-            })
-          : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
-              value: getCondOt(otActivaCond, 'codigo_referencia_ot') || '',
-              onChange: function (e) { setCondOt(otActivaCond, 'codigo_referencia_ot', e.target.value); } }))
     )
   );
 
@@ -357,12 +344,36 @@ function QuimicosForm(props) {
     ) : null
   ) : null;
 
-  // 1.2 VERIFICACIONES Y CONDICIONES DE ENSAYO — fusiona lo que antes era
+  // ── 1.2 METODOLOGÍA DE ENSAYO ─────────────────────────────────────────
+  // Checkboxes ITMs (metodologías internas Labtesa) + año. Se restauran
+  // porque el usuario aclaró que son METODOLOGÍAS, no normas — no se cubren
+  // con la sección 1.1 (norma_ensayo_ot es la norma pública del cliente).
+  var ITMS_METODOLOGIA = QUIMICOS_NORMAS.filter(function (n) { return n.corta === true; });
+  var blockMetodologia = _r('div', null,
+    _r('div', { style: S.head }, '1.2  METODOLOGÍA DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.box, { fontSize: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px' }) },
+      ITMS_METODOLOGIA.map(function (n) {
+        var yearKey = n.key + '_year';
+        return _r('div', { key: n.key, style: { display: 'flex', alignItems: 'center', gap: 7 } },
+          _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
+            _r('input', { type: 'checkbox', checked: !!datos[n.key], onChange: function (e) { updBool(n.key, e.target.checked); } }),
+            n.label),
+          _r('span', { style: { color: 'var(--text-3)', fontSize: 9 } }, 'Año:'),
+          _r('input', {
+            style: Object.assign({}, S.input, { width: 56, fontSize: 10 }),
+            placeholder: '-23', value: datos[yearKey] || '',
+            onChange: function (e) { upd(yearKey, e.target.value); },
+          }));
+      })
+    )
+  );
+
+  // 1.3 VERIFICACIONES Y CONDICIONES DE ENSAYO — fusiona lo que antes era
   // 1.2 NORMAS + 1.3 VERIFICACIONES. Las normas/códigos checkbox se sacaron
   // porque ya se cargan por-OT en la sección 1.1. Solo queda Temperatura al
   // principio (arriba de las verificaciones OK).
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: S.head }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: Object.assign({}, S.box, { fontSize: 10 }) },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 700 } }, 'TEMPERATURA DE ENSAYO:'),
@@ -409,7 +420,7 @@ function QuimicosForm(props) {
   var variante = datos.variante || (datos.laboratorio || '').toLowerCase();
   var equipos = variante === 'neuquen' ? QUIMICOS_EQUIPOS_NEUQUEN : QUIMICOS_EQUIPOS_CABA;
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO'),
+    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO'),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 20px', fontSize: 10.5 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -463,7 +474,7 @@ function QuimicosForm(props) {
   }
 
   var block14 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
+    _r('div', { style: S.head }, '1.5  RESULTADOS OBTENIDOS'),
     _r('div', { style: { padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, flexWrap: 'wrap' } },
       'Muestras a informar:',
       [0, 1, 2].map(function (i) {
@@ -473,40 +484,8 @@ function QuimicosForm(props) {
       }),
       _r('span', { style: { flex: 1 } }, '')
     ),
-    // Selector de OT por muestra — solo si hay hermanas. Al cambiar la OT de
-    // una muestra, al guardar el saver la transfiere al ensayo químicos de
-    // esa OT hermana (crea el ensayo hermano si no existe).
-    multiOtQ ? _r('div', { style: { padding: '4px 8px 6px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 10.5, flexWrap: 'wrap', background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' } },
-      _r('span', { style: { fontWeight: 700, color: 'var(--text-2)' } }, 'OT destino por muestra:'),
-      [0, 1, 2].map(function (i) {
-        var m = muestras[i] || {};
-        var over = String(m.nro_ot_override || '').trim();
-        var otEff = over || otNroActualStr;
-        var esOtra = over && over !== otNroActualStr;
-        return _r('label', { key: i, style: { display: 'flex', alignItems: 'center', gap: 4 } },
-          _r('span', { style: { fontWeight: 600 } }, 'M' + (i + 1) + ':'),
-          _r('select', {
-            value: otEff,
-            onChange: function (e) {
-              var v = String(e.target.value || '').trim();
-              if (v === otNroActualStr) v = '';
-              setMuestra(i, 'nro_ot_override', v);
-            },
-            style: {
-              border: '1px solid ' + (esOtra ? '#e0c060' : 'var(--border)'),
-              background: esOtra ? '#fff8e5' : 'var(--surface)',
-              color: esOtra ? '#8a5a00' : 'var(--text)',
-              fontFamily: 'ui-monospace, Consolas, monospace',
-              fontSize: 10, padding: '2px 6px', borderRadius: 3,
-              fontWeight: esOtra ? 700 : 400,
-            },
-          },
-            otsDisponibles.map(function (o) {
-              var lbl = o.nro_ot + (String(o.nro_ot) === otNroActualStr ? ' (esta)' : '');
-              return _r('option', { key: o.nro_ot, value: o.nro_ot }, lbl);
-            })));
-      })
-    ) : null,
+    // (El selector de OT por muestra se integró en el header de la tabla
+    // bajo M1/M2/M3 — mismo patrón que la fila "OT destino" de tracción.)
     _r('div', { style: { padding: '0 8px 8px', overflowX: 'auto' } },
       _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10 } },
         // ── Encabezados ──────────────────────────────────────────────────
@@ -519,9 +498,39 @@ function QuimicosForm(props) {
           ),
           _r('tr', { style: { background: 'var(--surface-3)' } },
             [0, 1, 2].map(function (i) {
-              return _r('th', { key: 'mh' + i, style: { border: '1px solid var(--border-strong)', padding: 2, minWidth: 70,
+              var m = muestras[i] || {};
+              var over = String(m.nro_ot_override || '').trim();
+              var otEff = over || otNroActualStr;
+              var esOtra = over && over !== otNroActualStr;
+              return _r('th', { key: 'mh' + i, style: { border: '1px solid var(--border-strong)', padding: 2, minWidth: 90,
                 background: mOn[i] ? 'var(--surface-3)' : 'var(--surface-2)' } },
-                _r('div', { style: { fontWeight: 800, fontSize: 10 } }, 'M' + (i + 1)));
+                _r('div', { style: { fontWeight: 800, fontSize: 10 } }, 'M' + (i + 1)),
+                // Selector de OT integrado en el header (mismo patrón que la
+                // fila "OT destino" de tracción). Solo aparece cuando hay
+                // hermanas. Al cambiar, la muestra se transfiere al ensayo
+                // químicos de la OT destino al guardar.
+                multiOtQ ? _r('select', {
+                  value: otEff,
+                  onChange: function (e) {
+                    var v = String(e.target.value || '').trim();
+                    if (v === otNroActualStr) v = '';
+                    setMuestra(i, 'nro_ot_override', v);
+                  },
+                  title: 'OT destino de esta muestra',
+                  style: {
+                    marginTop: 2, width: '100%',
+                    border: '1px solid ' + (esOtra ? '#e0c060' : 'var(--border)'),
+                    background: esOtra ? '#fff8e5' : 'var(--surface)',
+                    color: esOtra ? '#8a5a00' : 'var(--text)',
+                    fontFamily: 'ui-monospace, Consolas, monospace',
+                    fontSize: 9, padding: '1px 4px', borderRadius: 3,
+                    fontWeight: esOtra ? 700 : 400,
+                  },
+                },
+                  otsDisponibles.map(function (o) {
+                    var lbl = o.nro_ot + (String(o.nro_ot) === otNroActualStr ? ' (esta)' : '');
+                    return _r('option', { key: o.nro_ot, value: o.nro_ot }, lbl);
+                  })) : null);
             }),
             patrones.map(function (_, pi) {
               return [
@@ -677,7 +686,7 @@ function QuimicosForm(props) {
   // ── 1.5 OBSERVACIONES / EVALUACIÓN ────────────────────────────────────
   var evalActiva = datos.tiene_evaluacion !== false;
   var block15 = _r('div', null,
-    _r('div', { style: S.head }, '1.5  OBSERVACIONES / EVALUACION'),
+    _r('div', { style: S.head }, '1.6  OBSERVACIONES / EVALUACION'),
     _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 } },
       // Textarea de observaciones libres (línea de puntos de la planilla)
       _r('div', null,
@@ -712,6 +721,7 @@ function QuimicosForm(props) {
   return _r('div', { style: S.sheet },
     barraCopiarTodoQ,
     blockCondOt,
+    blockMetodologia,
     block12,
     block13, block14, block15
   );
