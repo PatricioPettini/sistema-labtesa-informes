@@ -137,13 +137,24 @@ function QuimicosForm(props) {
   }
 
   var muestras = Array.isArray(datos.muestras) ? datos.muestras.slice() : [];
-  while (muestras.length < N_MUESTRAS) muestras.push({});
-
-  var mOn = Array.isArray(datos.muestras_on) ? datos.muestras_on.slice() : [];
-  while (mOn.length < N_MUESTRAS) mOn.push(true);
+  // Aseguramos siempre al menos 1 muestra (para que la tabla no arranque
+  // vacía). El técnico puede agregar más con el botón "+ Agregar columna".
+  if (muestras.length === 0) muestras.push({});
+  var nMuestras = muestras.length;
 
   var otNumeros = Array.isArray(datos.ot_numeros) ? datos.ot_numeros.slice() : [];
-  while (otNumeros.length < N_MUESTRAS) otNumeros.push('');
+  while (otNumeros.length < nMuestras) otNumeros.push('');
+
+  function addMuestra() {
+    if (nMuestras >= 12) return; // tope razonable
+    var next = muestras.concat([{}]);
+    set('muestras', next);
+  }
+  function delMuestra(i) {
+    if (nMuestras <= 1) return; // siempre al menos una
+    var next = muestras.filter(function (_, idx) { return idx !== i; });
+    set('muestras', next);
+  }
 
   var patrones = Array.isArray(datos.patrones) ? datos.patrones.slice() : [];
   if (patrones.length === 0) patrones.push({});
@@ -153,11 +164,6 @@ function QuimicosForm(props) {
     next[i] = Object.assign({}, next[i] || {}, {});
     next[i][key] = val;
     set('muestras', next);
-  }
-  function toggleMuestra(i) {
-    var next = mOn.slice();
-    next[i] = !next[i];
-    set('muestras_on', next);
   }
   function setOtNumero(i, val) {
     var next = otNumeros.slice();
@@ -244,6 +250,44 @@ function QuimicosForm(props) {
           : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
               value: getCondOt(otActivaCond, 'norma_ensayo_ot') || '',
               onChange: function (e) { setCondOt(otActivaCond, 'norma_ensayo_ot', e.target.value); } })),
+      // Metodología de ensayo — chips multi-select con los ITMs. El técnico
+      // puede tildar varios (todos los que se aplicaron en el ensayo). Cada
+      // ITM tildado despliega un input de año al costado.
+      _r('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 6 } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160, paddingTop: 4 } }, 'Metodología de ensayo:'),
+        _r('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 } },
+          (function () {
+            var ITMS = QUIMICOS_NORMAS.filter(function (n) { return n.corta === true; });
+            return ITMS.map(function (n) {
+              var isChecked = !!datos[n.key];
+              var yearKey = n.key + '_year';
+              return _r('div', { key: n.key, style: { display: 'inline-flex', alignItems: 'center', gap: 3 } },
+                _r('label', {
+                  style: {
+                    display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+                    padding: '3px 9px', borderRadius: 12,
+                    border: '1px solid ' + (isChecked ? '#0969da' : 'var(--border)'),
+                    background: isChecked ? '#e7f0ff' : 'var(--surface)',
+                    color: isChecked ? '#0550ae' : 'var(--text-2)',
+                    fontSize: 10, fontWeight: isChecked ? 700 : 500, userSelect: 'none',
+                  },
+                },
+                  _r('input', { type: 'checkbox', style: { display: 'none' }, checked: isChecked,
+                    onChange: function (e) { updBool(n.key, e.target.checked); } }),
+                  n.label
+                ),
+                isChecked ? _r('input', {
+                  style: { border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 9,
+                    padding: '2px 4px', width: 42, borderRadius: 3, color: 'var(--text)' },
+                  placeholder: '-23', value: datos[yearKey] || '',
+                  title: 'Año',
+                  onChange: function (e) { upd(yearKey, e.target.value); },
+                }) : null
+              );
+            });
+          })()
+        )
+      )
     )
   );
 
@@ -344,36 +388,11 @@ function QuimicosForm(props) {
     ) : null
   ) : null;
 
-  // ── 1.2 METODOLOGÍA DE ENSAYO ─────────────────────────────────────────
-  // Checkboxes ITMs (metodologías internas Labtesa) + año. Se restauran
-  // porque el usuario aclaró que son METODOLOGÍAS, no normas — no se cubren
-  // con la sección 1.1 (norma_ensayo_ot es la norma pública del cliente).
-  var ITMS_METODOLOGIA = QUIMICOS_NORMAS.filter(function (n) { return n.corta === true; });
-  var blockMetodologia = _r('div', null,
-    _r('div', { style: S.head }, '1.2  METODOLOGÍA DE ENSAYO'),
-    _r('div', { style: Object.assign({}, S.box, { fontSize: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px' }) },
-      ITMS_METODOLOGIA.map(function (n) {
-        var yearKey = n.key + '_year';
-        return _r('div', { key: n.key, style: { display: 'flex', alignItems: 'center', gap: 7 } },
-          _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-            _r('input', { type: 'checkbox', checked: !!datos[n.key], onChange: function (e) { updBool(n.key, e.target.checked); } }),
-            n.label),
-          _r('span', { style: { color: 'var(--text-3)', fontSize: 9 } }, 'Año:'),
-          _r('input', {
-            style: Object.assign({}, S.input, { width: 56, fontSize: 10 }),
-            placeholder: '-23', value: datos[yearKey] || '',
-            onChange: function (e) { upd(yearKey, e.target.value); },
-          }));
-      })
-    )
-  );
-
-  // 1.3 VERIFICACIONES Y CONDICIONES DE ENSAYO — fusiona lo que antes era
-  // 1.2 NORMAS + 1.3 VERIFICACIONES. Las normas/códigos checkbox se sacaron
-  // porque ya se cargan por-OT en la sección 1.1. Solo queda Temperatura al
-  // principio (arriba de las verificaciones OK).
+  // 1.2 VERIFICACIONES Y CONDICIONES DE ENSAYO — Temperatura + checkboxes
+  // OK del estado del ensayo. Las metodologías ITMs se movieron a la sección
+  // 1.1 (junto con Norma de ensayo) como chips multi-select.
   var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: Object.assign({}, S.box, { fontSize: 10 }) },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 700 } }, 'TEMPERATURA DE ENSAYO:'),
@@ -420,7 +439,7 @@ function QuimicosForm(props) {
   var variante = datos.variante || (datos.laboratorio || '').toLowerCase();
   var equipos = variante === 'neuquen' ? QUIMICOS_EQUIPOS_NEUQUEN : QUIMICOS_EQUIPOS_CABA;
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO'),
+    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO'),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 20px', fontSize: 10.5 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -474,14 +493,18 @@ function QuimicosForm(props) {
   }
 
   var block14 = _r('div', null,
-    _r('div', { style: S.head }, '1.5  RESULTADOS OBTENIDOS'),
+    _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
+    // Controles arriba de la tabla: cantidad de muestras + botón agregar.
     _r('div', { style: { padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, flexWrap: 'wrap' } },
-      'Muestras a informar:',
-      [0, 1, 2].map(function (i) {
-        return _r('label', { key: i, style: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 400 } },
-          _r('input', { type: 'checkbox', checked: mOn[i], onChange: function () { toggleMuestra(i); } }),
-          'Muestra ' + (i + 1));
-      }),
+      _r('span', null, nMuestras + ' muestra' + (nMuestras === 1 ? '' : 's')),
+      _r('button', {
+        type: 'button', onClick: addMuestra, disabled: nMuestras >= 12,
+        style: {
+          border: '1px solid #0969da', background: '#fff', color: '#0969da',
+          padding: '3px 10px', fontSize: 11, cursor: nMuestras >= 12 ? 'not-allowed' : 'pointer',
+          borderRadius: 3, fontWeight: 600, opacity: nMuestras >= 12 ? 0.5 : 1,
+        },
+      }, '+ Agregar columna'),
       _r('span', { style: { flex: 1 } }, '')
     ),
     // (El selector de OT por muestra se integró en el header de la tabla
@@ -492,19 +515,27 @@ function QuimicosForm(props) {
         _r('thead', null,
           _r('tr', { style: { background: 'var(--surface-3)' } },
             _r('th', { rowSpan: 2, style: { border: '1px solid var(--border-strong)', padding: 3, textAlign: 'left', width: colElemW } }, ''),
-            _r('th', { colSpan: N_MUESTRAS, style: { border: '1px solid var(--border-strong)', padding: 3 } }, 'MUESTRAS*'),
+            _r('th', { colSpan: nMuestras, style: { border: '1px solid var(--border-strong)', padding: 3 } }, 'MUESTRAS*'),
             _r('th', { colSpan: nPatrones * 3, style: { border: '1px solid var(--border-strong)', padding: 3 } }, 'PATRONES*'),
             _r('th', { colSpan: 2, style: { border: '1px solid var(--border-strong)', padding: 3 } }, 'ESPECIFICACION*')
           ),
           _r('tr', { style: { background: 'var(--surface-3)' } },
-            [0, 1, 2].map(function (i) {
+            muestras.map(function (_m, i) {
               var m = muestras[i] || {};
               var over = String(m.nro_ot_override || '').trim();
               var otEff = over || otNroActualStr;
               var esOtra = over && over !== otNroActualStr;
               return _r('th', { key: 'mh' + i, style: { border: '1px solid var(--border-strong)', padding: 2, minWidth: 90,
-                background: mOn[i] ? 'var(--surface-3)' : 'var(--surface-2)' } },
+                background: 'var(--surface-3)', position: 'relative' } },
                 _r('div', { style: { fontWeight: 800, fontSize: 10 } }, 'M' + (i + 1)),
+                // Botón × para quitar la columna (solo si hay más de una).
+                nMuestras > 1 ? _r('button', {
+                  onClick: function () { delMuestra(i); },
+                  title: 'Quitar columna',
+                  style: { position: 'absolute', top: 0, right: 2, border: 'none',
+                    background: 'transparent', color: 'var(--danger)', cursor: 'pointer',
+                    fontSize: 12, padding: '0 3px', lineHeight: 1 },
+                }, '×') : null,
                 // Selector de OT integrado en el header (mismo patrón que la
                 // fila "OT destino" de tracción). Solo aparece cuando hay
                 // hermanas. Al cambiar, la muestra se transfiere al ensayo
@@ -593,11 +624,11 @@ function QuimicosForm(props) {
                         style: { position: 'absolute', top: 0, right: 2, border: 'none', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '0 3px', lineHeight: 1 },
                       }, '×')
                     : null),
-              [0, 1, 2].map(function (i) {
+              muestras.map(function (_m, i) {
                 var val = (muestras[i] && muestras[i][el.k]) || '';
                 return _r('td', { key: i, style: { border: '1px solid var(--border-strong)', padding: 0 } },
                   celdaInput(null, val,
-                    function (e) { setMuestra(i, el.k, e.target.value); }, !mOn[i]));
+                    function (e) { setMuestra(i, el.k, e.target.value); }));
               }),
               patrones.map(function (p, pi) {
                 var valObt   = (p.valores && p.valores[el.k]) || '';
@@ -634,7 +665,7 @@ function QuimicosForm(props) {
           // Fila "+ Agregar fila" — sólo la columna del label, spans todas.
           _r('tr', { key: '__add__' },
             _r('td', {
-              colSpan: 3 + (3 * (patrones.length || 1)) + 2,
+              colSpan: 1 + nMuestras + (3 * (patrones.length || 1)) + 2,
               style: { border: '1px solid var(--border-strong)', padding: 4, background: 'var(--surface-2)', textAlign: 'left' },
             },
               _r('button', {
@@ -652,10 +683,10 @@ function QuimicosForm(props) {
           // Fila TIPO
           _r('tr', null,
             _r('td', { style: { border: '1px solid var(--border-strong)', padding: '2px 6px', fontWeight: 800, background: 'var(--surface-2)' } }, 'TIPO'),
-            [0, 1, 2].map(function (i) {
+            muestras.map(function (_m, i) {
               return _r('td', { key: i, style: { border: '1px solid var(--border-strong)', padding: 0 } },
                 celdaInput({ textAlign: 'left' }, (muestras[i] && muestras[i].tipo) || '',
-                  function (e) { setMuestra(i, 'tipo', e.target.value); }, !mOn[i]));
+                  function (e) { setMuestra(i, 'tipo', e.target.value); }));
             }),
             patrones.map(function (p, pi) {
               var ex = p.extra || {};
@@ -686,7 +717,7 @@ function QuimicosForm(props) {
   // ── 1.5 OBSERVACIONES / EVALUACIÓN ────────────────────────────────────
   var evalActiva = datos.tiene_evaluacion !== false;
   var block15 = _r('div', null,
-    _r('div', { style: S.head }, '1.6  OBSERVACIONES / EVALUACION'),
+    _r('div', { style: S.head }, '1.5  OBSERVACIONES / EVALUACION'),
     _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 } },
       // Textarea de observaciones libres (línea de puntos de la planilla)
       _r('div', null,
@@ -721,7 +752,6 @@ function QuimicosForm(props) {
   return _r('div', { style: S.sheet },
     barraCopiarTodoQ,
     blockCondOt,
-    blockMetodologia,
     block12,
     block13, block14, block15
   );
