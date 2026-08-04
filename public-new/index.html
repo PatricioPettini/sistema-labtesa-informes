@@ -132,6 +132,44 @@ html[data-theme="dark"] .main [style*="color:#999"],
 html[data-theme="dark"] .main [style*="color: #999"]{
   color:var(--text-3) !important;
 }
+/* Colores extra hardcoded que aparecían apagados en dark (venc-card, stats,
+   solicitudes, banner de vencimientos). Se mapean por rango tonal: los "casi
+   negros" (#1a202c/#1f2328/#24292f/#2d3748) → var(--text); los grises 500 tipo
+   (#57606a/#4a5568) → var(--text-2); los "slate 400"/"grey 500" hacia claro
+   (#8a8a8a/#94a3b8/#a0aec0) → var(--text-3). Cubre venc-card, dashboard, stats. */
+html[data-theme="dark"] .main [style*="color: rgb(26, 32, 44)"],
+html[data-theme="dark"] .main [style*="color:#1a202c"],
+html[data-theme="dark"] .main [style*="color: #1a202c"],
+html[data-theme="dark"] .main [style*="color: rgb(31, 35, 40)"],
+html[data-theme="dark"] .main [style*="color:#1f2328"],
+html[data-theme="dark"] .main [style*="color: #1f2328"],
+html[data-theme="dark"] .main [style*="color: rgb(36, 41, 47)"],
+html[data-theme="dark"] .main [style*="color:#24292f"],
+html[data-theme="dark"] .main [style*="color: #24292f"],
+html[data-theme="dark"] .main [style*="color: rgb(45, 55, 72)"],
+html[data-theme="dark"] .main [style*="color:#2d3748"],
+html[data-theme="dark"] .main [style*="color: #2d3748"]{
+  color:var(--text) !important;
+}
+html[data-theme="dark"] .main [style*="color: rgb(87, 96, 106)"],
+html[data-theme="dark"] .main [style*="color:#57606a"],
+html[data-theme="dark"] .main [style*="color: #57606a"],
+html[data-theme="dark"] .main [style*="color: rgb(74, 85, 104)"],
+html[data-theme="dark"] .main [style*="color:#4a5568"],
+html[data-theme="dark"] .main [style*="color: #4a5568"]{
+  color:var(--text-2) !important;
+}
+html[data-theme="dark"] .main [style*="color: rgb(138, 138, 138)"],
+html[data-theme="dark"] .main [style*="color:#8a8a8a"],
+html[data-theme="dark"] .main [style*="color: #8a8a8a"],
+html[data-theme="dark"] .main [style*="color: rgb(148, 163, 184)"],
+html[data-theme="dark"] .main [style*="color:#94a3b8"],
+html[data-theme="dark"] .main [style*="color: #94a3b8"],
+html[data-theme="dark"] .main [style*="color: rgb(160, 174, 192)"],
+html[data-theme="dark"] .main [style*="color:#a0aec0"],
+html[data-theme="dark"] .main [style*="color: #a0aec0"]{
+  color:var(--text-3) !important;
+}
 
 /* Bordes de inputs / celdas de tabla con border:#333 / #999 / #bbb hardcoded. */
 html[data-theme="dark"] .main [style*="border: 1px solid rgb(51, 51, 51)"],
@@ -191,6 +229,33 @@ html[data-theme="dark"] [style*="background:#fffbe6"],
 html[data-theme="dark"] [style*="background: #fffbe6"]{
   background:var(--warning-soft) !important;
   color:var(--text) !important;
+}
+/* Cards de tono en venc-card / VencimientosBanner. Fondos y bordes claros
+   quedan ilegibles sobre el sidebar oscuro; se re-tinta a variantes soft. */
+html[data-theme="dark"] [style*="background: rgb(255, 228, 228)"],
+html[data-theme="dark"] [style*="background:#ffe4e4"],
+html[data-theme="dark"] [style*="background: #ffe4e4"]{
+  background:var(--danger-soft) !important; color:var(--text) !important;
+}
+html[data-theme="dark"] [style*="background: rgb(230, 236, 255)"],
+html[data-theme="dark"] [style*="background:#e6ecff"],
+html[data-theme="dark"] [style*="background: #e6ecff"]{
+  background:var(--accent-soft) !important; color:var(--text) !important;
+}
+html[data-theme="dark"] [style*="background: rgb(230, 249, 239)"],
+html[data-theme="dark"] [style*="background:#e6f9ef"],
+html[data-theme="dark"] [style*="background: #e6f9ef"]{
+  background:var(--success-soft) !important; color:var(--text) !important;
+}
+/* Banner grande "Vencimientos de solicitudes en Trello" (fondo cremita en
+   claro) → banner-bg oscuro que ya definimos en los tokens. */
+html[data-theme="dark"] [style*="background: rgb(255, 251, 235)"],
+html[data-theme="dark"] [style*="background:#fffbeb"],
+html[data-theme="dark"] [style*="background: #fffbeb"],
+html[data-theme="dark"] [style*="background:#fff7ed"],
+html[data-theme="dark"] [style*="background: #fff7ed"]{
+  background:var(--banner-bg) !important; color:var(--text) !important;
+  border-color:var(--banner-border) !important;
 }
 /* Bordes de badges/chips en tonos claros → oscurecer. */
 html[data-theme="dark"] [style*="border:1px solid #fed7d7"],

@@ -71,6 +71,21 @@ function _cardTieneEtiquetaPreliminar(card) {
   return labels.some(l => _PRELIMINAR_LABELS.has(_normLabel(l && l.name)));
 }
 
+// Solo mostramos tarjetas en columnas "activas" (previas al informe emitido).
+// Después de "Carga de informes" las etapas son revisión / firma / archivo —
+// no aparecen en el panel de vencimientos del dashboard. Se puede sobrescribir
+// vía TRELLO_BOT_COLUMNAS (mismo env que usa el bot para importar).
+const _COLUMNAS_MOSTRAR_DEFAULT = ['Ingreso de muestras', 'Mecanizado de probetas', 'Ensayos', 'Evaluación Técnica', 'Carga de informes'];
+function _normCol(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+function esColumnaActiva(nombreLista) {
+  const configuradas = (process.env.TRELLO_BOT_COLUMNAS || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const lista = (configuradas.length ? configuradas : _COLUMNAS_MOSTRAR_DEFAULT).map(_normCol);
+  return lista.indexOf(_normCol(nombreLista)) >= 0;
+}
+
 function clasificar(cards, listaPorId) {
   const pad = n => String(n).padStart(2, '0');
   // Fecha "hoy" en la zona horaria local del server.
@@ -95,6 +110,10 @@ function clasificar(cards, listaPorId) {
   const clas = { hoy: [], mañana: [], vencidas: [], proximas: [] };
   for (const c of cards) {
     if (!c.due || c.dueComplete || c.closed) continue;
+    // Ignorar tarjetas en columnas post-carga (Revisión, Informe Preliminar,
+    // Para firma electrónica, ...plazo, etc.) — solo mostramos etapas previas
+    // a la emisión del informe.
+    if (!esColumnaActiva(listaPorId[c.idList])) continue;
     const p = parseDueLocal(c.due);
     if (!p) continue;
     const dueISO = p.iso;
