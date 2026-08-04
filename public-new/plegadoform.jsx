@@ -92,9 +92,16 @@ function PlegadoForm(props) {
   var otNroActualStrPl = String(otNroActual || '');
   var _copyKeyPl = React.useState(''); var copyOpenKeyPl = _copyKeyPl[0], setCopyOpenKeyPl = _copyKeyPl[1];
   var _copyDestPl = React.useState([]); var copyDestGenPl = _copyDestPl[0], setCopyDestGenPl = _copyDestPl[1];
-  function copiarCamposPlAOts(destinos, campos) {
+  // `campos` = keys de la RAÍZ de datos (se leen de datos[k]).
+  // `opts.condOtKeys` = keys del mapa por-OT (se leen del mapa origen
+  // `condiciones_por_ot[otNroActual][k]`). Usado en "Copiar TODO" para
+  // arrastrar también la sección 1.1 CONDICIONES DE ENSAYO por-OT
+  // (norma_ensayo_ot, codigo_referencia_ot, orientacion_ot, probeta_mec_ot).
+  function copiarCamposPlAOts(destinos, campos, opts) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    var condOtOrigen = mapaCond[otNroActualStrPl] || {};
+    var condOtKeys = (opts && opts.condOtKeys) || [];
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
       campos.forEach(function (k) {
@@ -104,6 +111,11 @@ function PlegadoForm(props) {
             : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
         }
       });
+      condOtKeys.forEach(function (k) {
+        if (condOtOrigen[k] !== undefined && condOtOrigen[k] !== '') {
+          entry[k] = condOtOrigen[k];
+        }
+      });
       mapaCond[nroOt] = entry;
     });
     set('condiciones_por_ot', mapaCond);
@@ -111,7 +123,7 @@ function PlegadoForm(props) {
       window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
     }
   }
-  function botonCopiarSeccionPl(claveUnica, etiqueta, camposList, descripcion) {
+  function botonCopiarSeccionPl(claveUnica, etiqueta, camposList, descripcion, condOtKeys) {
     if (!multiOtPl) return null;
     var abierto = copyOpenKeyPl === claveUnica;
     return _r('div', { style: { position: 'relative', display: 'inline-block' } },
@@ -153,7 +165,7 @@ function PlegadoForm(props) {
               if (destinos.length === 0) {
                 destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrPl; }).map(function (o) { return String(o.nro_ot); });
               }
-              copiarCamposPlAOts(destinos, camposList);
+              copiarCamposPlAOts(destinos, camposList, { condOtKeys: condOtKeys });
               setCopyOpenKeyPl(''); setCopyDestGenPl([]);
             },
             style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
@@ -264,7 +276,11 @@ function PlegadoForm(props) {
       'Copiar TODA la configuración (normas + condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionPl('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_PL,
-      'Copia metodología (1.2), verificaciones y condiciones (1.3) y equipamiento (1.4) juntos.')
+      'Copia condiciones de ensayo por-OT (1.1), metodología (1.2), verificaciones y condiciones (1.3) y equipamiento (1.4) juntos.',
+      // Keys del mapa por-OT (sección 1.1): norma_ensayo_ot / codigo_referencia_ot
+      // / orientacion_ot / probeta_mec_ot + su flag auto. Se leen del mapa
+      // condiciones_por_ot[<OT actual>] y se copian a los destinos.
+      ['norma_ensayo_ot', 'codigo_referencia_ot', 'orientacion_ot', 'probeta_mec_ot', '_probeta_mec_auto'])
   ) : null;
 
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
