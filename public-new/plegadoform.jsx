@@ -202,7 +202,7 @@ function PlegadoForm(props) {
       'Copiar TODA la configuración (normas + condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionPl('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_PL,
-      'Copia metodología (1.1), condiciones (1.2) y equipamiento (1.4) juntos.')
+      'Copia metodología (1.2), verificaciones y condiciones (1.3) y equipamiento (1.4) juntos.')
   ) : null;
 
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ function PlegadoForm(props) {
   // tracción. Acá solo queda la metodología (ITM).
   var block11 = _r('div', { style: { borderRight: '1px solid #333' } },
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.1  METODOLOGÍA DE ENSAYO'),
+      _r('span', null, '1.2  METODOLOGÍA DE ENSAYO'),
       botonCopiarSeccionPl('metodo_11', 'Copiar metodología a otras OT',
         ['metodologia'],
         'Copia el ITM a las OTs seleccionadas.')
@@ -227,7 +227,7 @@ function PlegadoForm(props) {
   // ── 1.2 CONDICIONES ────────────────────────────────────────────────────
   var block12 = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
+      _r('span', null, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
       botonCopiarSeccionPl('cond_12', 'Copiar condiciones a otras OT',
         ['temperatura', 'estado_superficial', 'diametro_mandril',
          'espesor_probeta', 'ancho_probeta', 'distancia_apoyos', 'zona_plegado'],
@@ -752,7 +752,7 @@ function PlegadoForm(props) {
   var multiOt = otsEnEnsayo.length > 1;
   var blockCondPorOt = _r('div', null,
     _r('div', { style: S.head },
-      _r('span', null, '1.3  CONDICIONES DE ENSAYO'),
+      _r('span', null, '1.1  CONDICIONES DE ENSAYO'),
       multiOt
         ? _r('span', { style: { fontSize: 10, color: '#8a5a00', fontWeight: 600, marginLeft: 6 } }, '· OT ' + otActivaTextos)
         : null
@@ -902,12 +902,13 @@ function PlegadoForm(props) {
 
   return _r('div', { style: S.sheet },
     barraCopiarTodoPl,
-    _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1.4fr' } }, block11, block12),
-    // Selector de OT (tab bar) + 1.3 Condiciones específicas por OT: van
-    // arriba de Equipamiento (1.4) para que el técnico primero vea/edite las
-    // condiciones específicas de cada OT y después el equipamiento común.
+    // 1.1 CONDICIONES DE ENSAYO (por-OT: norma, código de referencia,
+    // orientación, "probeta mec. según") va PRIMERO para que el técnico defina
+    // la config específica de la OT antes que el resto.
     selectorOtTextos,
     blockCondPorOt,
+    // 1.2 metodología + 1.3 verificaciones y condiciones (fila de 2 columnas).
+    _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1.4fr' } }, block11, block12),
     block13, block14, block15, block16, block17,
     blockObservacion, blockEvaluacion, blockNota
   );

@@ -524,7 +524,7 @@ function TraccionForm(props) {
   // ── 1.2 CONDICIONES GENERALES (globales al ensayo, iguales para todas las probetas)
   var block11 = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.2  CONDICIONES GENERALES DEL ENSAYO'),
+      _r('span', null, '1.3  CONDICIONES GENERALES DEL ENSAYO'),
       botonCopiarSeccionTr('cond_12', 'Copiar condiciones a otras OT',
         ['metodologia', 'temperatura', 'ecuacion_seccion',
          'estado_superficial', 'verif_alineacion', 'prob_cliente', 'prob_soldada'],
@@ -570,7 +570,7 @@ function TraccionForm(props) {
     { k: 'codigo_referencia',  label: 'Código de referencia', placeholder: 'Ej: ASME BPVC Sección IX Ed.2025' },
   ];
   var blockProbetas = _r('div', null,
-    _r('div', { style: S.head }, '1.3  CONDICIONES POR PROBETA'),
+    _r('div', { style: S.head }, '1.1  CONDICIONES POR PROBETA'),
     _r('div', { style: { padding: 8, overflowX: 'auto' } },
       _r('div', { style: { fontSize: 10, color: '#555', marginBottom: 6 } },
         'Editar la columna M1 propaga automáticamente el valor a las demás probetas que tenían el mismo valor o estaban vacías. Si cambiás M2 (u otra) manualmente, esa queda "fija" y ya no se sobrescribe desde M1.'),
@@ -1669,7 +1669,7 @@ function TraccionForm(props) {
   // Los cálculos de cada card se auto-populan en la columna correspondiente.
   var scBlocks = muestras.map(function (_m, idxM) { return scBlock(idxM); });
   var block16 = _r('div', null,
-    _r('div', { style: S.head }, '1.1  CÁLCULO DE SECCIÓN'),
+    _r('div', { style: S.head }, '1.2  CÁLCULO DE SECCIÓN'),
     _r('div', { style: { padding: 8 } },
       _r('div', { style: { fontSize: 10, color: '#555', marginBottom: 8 } },
         'Cada card corresponde a una columna de la tabla de resultados (probeta o zona). Los promedios, S₀, tensiones y alargamiento se calculan automáticamente según el FM-044.'),
@@ -1689,12 +1689,12 @@ function TraccionForm(props) {
   // digital compartido (FirmaEnsayoPanel) lo renderiza ensayoform.jsx al pie,
   // cuando el ensayo ya está guardado. No agregamos pie propio acá.
   // Orden final:
-  //   CANTIDAD DE PROBETAS      (blockCantidad — arriba de todo)
-  //   1.1 Cálculo de sección    (block16)
-  //   1.2 Condiciones generales (block11)
-  //   1.3 Condiciones por probeta (blockProbetas)
-  //   1.4 Equipamiento          (block12)
-  //   1.5 Resultados obtenidos  (block13)
+  //   CANTIDAD DE PROBETAS       (blockCantidad — arriba de todo)
+  //   1.1 Condiciones por probeta (blockProbetas — arriba, define norma/código/orientación por-OT)
+  //   1.2 Cálculo de sección     (block16)
+  //   1.3 Condiciones generales  (block11)
+  //   1.4 Equipamiento           (block12)
+  //   1.5 Resultados obtenidos   (block13)
   //   1.6 Observación           (blockObservacion, opcional)
   //   1.7 Evaluación            (blockEvaluacion, opcional)
   //   1.8 Nota                  (blockNota, opcional)
@@ -1732,13 +1732,13 @@ function TraccionForm(props) {
       'Copiar TODA la configuración (condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionTr('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_TR,
-      'Copia condiciones (1.2) y equipamiento (1.4) juntos.')
+      'Copia condiciones generales (1.3) y equipamiento (1.4) juntos.')
   ) : null;
 
   return _r('div', { style: S.sheet },
     bannerMultiOt,
     barraCopiarTodoTr,
-    blockCantidad, block16, block11, blockProbetas, block12, block13,
+    blockCantidad, blockProbetas, block16, block11, block12, block13,
     selectorOtTextos,
     blockObservacion, blockEvaluacion, blockNota, blockNotasFijas
   );
