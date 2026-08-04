@@ -470,38 +470,114 @@ function ImpactoForm(props) {
     { k: 'norma',              label: 'Norma de ensayo',      placeholder: 'Ej: ISO 148-1:2016' },
     { k: 'codigo_referencia',  label: 'Código de referencia', placeholder: 'Ej: ASME BPVC Sección IX Ed.2025' },
   ];
-  var resultadosArr = Array.isArray(datos.resultados) ? datos.resultados : [];
+  // probetas_meta[] = definición de las N probetas conceptuales que muestra
+  // 1.1 (M1, M2, ...). Cada una tiene su nombre, norma, código de referencia
+  // y nro_ot_override. El "+/-" ajusta la CANTIDAD DE PROBETAS acá, sin sumar
+  // las filas extras de la tabla 1.5 (una muestra suele tener 3 probetas
+  // ensayadas — el set típico son 3 filas por probeta).
+  //
+  // Migración: si datos.probetas_meta no existe pero sí datos.resultados, se
+  // deriva de las filas de resultados (dedup por nombre, y las primeras que
+  // tengan norma/codigo se toman como probetas conceptuales).
+  var FILAS_POR_PROBETA_DEFAULT = 3;
+  var probetasMeta = Array.isArray(datos.probetas_meta) ? datos.probetas_meta.slice() : null;
+  if (!probetasMeta) {
+    var srcResultados = Array.isArray(datos.resultados) ? datos.resultados : [];
+    if (srcResultados.length > 0) {
+      // Dedup por nombre — el mismo nombre puede repetirse en varias filas.
+      var seen = {};
+      probetasMeta = [];
+      srcResultados.forEach(function (r) {
+        var nombre = String((r && r.nombre) || '').trim() || null;
+        var key = nombre || ('idx' + probetasMeta.length);
+        if (seen[key]) return;
+        seen[key] = true;
+        probetasMeta.push({
+          nombre: nombre,
+          norma: (r && r.norma) || '',
+          codigo_referencia: (r && r.codigo_referencia) || '',
+          nro_ot_override: (r && r.nro_ot_override) || '',
+        });
+      });
+      // Si la migración quedó vacía (nada dedupeaba), tomar los primeros N como
+      // probetas conceptuales (una fila = una probeta).
+      if (probetasMeta.length === 0) {
+        probetasMeta = srcResultados.slice(0, srcResultados.length).map(function (r) {
+          return {
+            nombre: (r && r.nombre) || null,
+            norma: (r && r.norma) || '',
+            codigo_referencia: (r && r.codigo_referencia) || '',
+            nro_ot_override: (r && r.nro_ot_override) || '',
+          };
+        });
+      }
+    } else {
+      probetasMeta = [{}];
+    }
+  }
+  if (probetasMeta.length === 0) probetasMeta = [{}];
+
+  function setProbetaMeta(i, key, val) {
+    var next = probetasMeta.slice();
+    next[i] = Object.assign({}, next[i] || {}, {});
+    next[i][key] = val;
+    set('probetas_meta', next);
+  }
+
+  // Ajustar cantidad de probetas: modifica probetas_meta[] Y agrega/quita el
+  // set típico de filas en resultados[] (FILAS_POR_PROBETA_DEFAULT filas por
+  // probeta nueva; al quitar, elimina las filas que tengan el nombre de la
+  // probeta quitada).
   function ajustarCantidadProbetas(nueva) {
     var n = Math.max(1, Math.min(20, nueva | 0));
-    var curr = resultadosArr.slice();
-    if (curr.length === n) return;
-    if (curr.length > n) {
-      curr = curr.slice(0, n);
+    var meta = probetasMeta.slice();
+    var resultadosCurr = Array.isArray(datos.resultados) ? datos.resultados.slice() : [];
+    if (meta.length === n) return;
+    if (meta.length > n) {
+      // Quitar las probetas del final + las filas de resultados asociadas
+      // (matcheando por el `nombre` de la probeta si tiene, sino todas las
+      // filas con nombre coincidente al índice implícito M<idx+1>).
+      var removidas = meta.slice(n);
+      meta = meta.slice(0, n);
+      var nombresRemovidos = removidas.map(function (m, k) {
+        return (m && m.nombre) || ('M' + (n + k + 1));
+      });
+      resultadosCurr = resultadosCurr.filter(function (r) {
+        var nom = String((r && r.nombre) || '').trim();
+        // Solo quitar filas cuyo nombre coincida con las probetas removidas.
+        // Filas sin nombre o con nombre distinto (extra manuales) se mantienen.
+        return nombresRemovidos.indexOf(nom) < 0;
+      });
     } else {
-      // Filas nuevas: N° probeta auto-numerado (editable), sin propagar
-      // norma/código de M1 — la propagación solo ocurre cuando el técnico
-      // EDITA la columna M1 explícitamente (mismo patrón que tracción).
-      while (curr.length < n) {
-        var idx = curr.length; // 0-based del nuevo
-        curr.push({ probeta: String(idx + 1) });
+      // Agregar probetas nuevas al final + FILAS_POR_PROBETA_DEFAULT filas por
+      // cada una en resultados[].
+      while (meta.length < n) {
+        var idx = meta.length; // 0-based del nuevo
+        var nombreNuevo = 'M' + (idx + 1);
+        meta.push({ nombre: nombreNuevo });
+        for (var k = 0; k < FILAS_POR_PROBETA_DEFAULT; k++) {
+          resultadosCurr.push({ nombre: nombreNuevo, probeta: String(k + 1) });
+        }
       }
     }
-    set('resultados', curr);
+    set({ probetas_meta: meta, resultados: resultadosCurr });
   }
   var blockCondProbeta = _r('div', null,
     _r('div', { style: S.headTitle }, '1.1  CONDICIONES POR PROBETA'),
-    // Control +/- para modificar la cantidad de probetas. Al cambiar, se
-    // refleja simultáneamente en la tabla de resultados obtenidos (1.5).
+    // Control +/- para la cantidad de probetas CONCEPTUALES (M1..MN). Al
+    // aumentar, se agregan FILAS_POR_PROBETA_DEFAULT filas en 1.5 asociadas
+    // a la nueva probeta (set típico de 3 por muestra). Al reducir, se quitan
+    // esas filas también. El "+ Agregar fila" de 1.5 no toca este contador.
     _r('div', { style: { padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, borderBottom: '1px solid #ddd' } },
       _r('span', { style: { fontWeight: 700 } }, 'Cantidad de probetas:'),
       _r('button', {
         type: 'button',
-        disabled: resultadosArr.length <= 1,
-        onClick: function () { ajustarCantidadProbetas(resultadosArr.length - 1); },
-        style: { width: 30, height: 30, border: '1px solid #999', background: resultadosArr.length <= 1 ? '#eee' : '#f4f4f4', cursor: resultadosArr.length <= 1 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
+        disabled: probetasMeta.length <= 1,
+        onClick: function () { ajustarCantidadProbetas(probetasMeta.length - 1); },
+        style: { width: 30, height: 30, border: '1px solid #999', background: probetasMeta.length <= 1 ? '#eee' : '#f4f4f4', cursor: probetasMeta.length <= 1 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
       }, '−'),
       _r('input', {
-        type: 'number', min: 1, max: 20, value: resultadosArr.length,
+        type: 'number', min: 1, max: 20, value: probetasMeta.length,
         onChange: function (e) {
           var v = parseInt(e.target.value, 10);
           if (!isNaN(v)) ajustarCantidadProbetas(v);
@@ -510,28 +586,43 @@ function ImpactoForm(props) {
       }),
       _r('button', {
         type: 'button',
-        disabled: resultadosArr.length >= 20,
-        onClick: function () { ajustarCantidadProbetas(resultadosArr.length + 1); },
-        style: { width: 30, height: 30, border: '1px solid #999', background: resultadosArr.length >= 20 ? '#eee' : '#f4f4f4', cursor: resultadosArr.length >= 20 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
+        disabled: probetasMeta.length >= 20,
+        onClick: function () { ajustarCantidadProbetas(probetasMeta.length + 1); },
+        style: { width: 30, height: 30, border: '1px solid #999', background: probetasMeta.length >= 20 ? '#eee' : '#f4f4f4', cursor: probetasMeta.length >= 20 ? 'not-allowed' : 'pointer', borderRadius: 4, fontSize: 16, fontWeight: 700 },
       }, '+'),
       _r('span', { style: { color: '#555', fontSize: 11, marginLeft: 8 } },
-        'Impacta esta tabla y la de resultados obtenidos.')
+        'Cada probeta agrega ' + FILAS_POR_PROBETA_DEFAULT + ' filas en resultados (editable después).')
     ),
-    resultadosArr.length > 0 ? _r('div', { style: { padding: 8, overflowX: 'auto' } },
+    probetasMeta.length > 0 ? _r('div', { style: { padding: 8, overflowX: 'auto' } },
       _r('div', { style: { fontSize: 10, color: '#555', marginBottom: 6 } },
         'Editar la columna M1 propaga automáticamente el valor a las demás probetas que tenían el mismo valor o estaban vacías. Si cambiás M2 (u otra) manualmente, esa queda "fija" y ya no se sobrescribe desde M1.'),
       _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 11, minWidth: 640 } },
         _r('thead', null,
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { style: { border: '1px solid #999', padding: 4, width: 170, textAlign: 'left' } }, 'Campo'),
-            resultadosArr.map(function (r, iFis) {
-              var nombreValor = (r && r.nombre != null) ? r.nombre : ('M' + (iFis + 1));
+            probetasMeta.map(function (m, iFis) {
+              var nombreValor = (m && m.nombre != null && m.nombre !== '') ? m.nombre : ('M' + (iFis + 1));
               return _r('th', { key: iFis, style: { border: '1px solid #999', padding: 3, minWidth: 120 } },
                 _r('div', { style: { fontWeight: 800, marginBottom: 2 } }, 'Probeta ' + (iFis + 1)),
                 _r('input', {
                   style: { border: '1px solid #bbb', background: 'transparent', fontSize: 10, padding: '3px 5px', outline: 'none', width: '100%', textAlign: 'center', fontWeight: 700 },
                   value: nombreValor,
-                  onChange: function (e) { setRow(iFis, 'nombre', e.target.value); },
+                  onChange: function (e) {
+                    // Renombrar la probeta: actualiza el meta + sincroniza las
+                    // filas de resultados que tenían el nombre anterior.
+                    var viejoNombre = (m && m.nombre) || ('M' + (iFis + 1));
+                    var nuevoNombre = e.target.value;
+                    var metaNext = probetasMeta.slice();
+                    metaNext[iFis] = Object.assign({}, metaNext[iFis] || {}, { nombre: nuevoNombre });
+                    var resArr = Array.isArray(datos.resultados) ? datos.resultados.slice() : [];
+                    resArr = resArr.map(function (r) {
+                      if (r && String(r.nombre || '').trim() === String(viejoNombre).trim()) {
+                        return Object.assign({}, r, { nombre: nuevoNombre });
+                      }
+                      return r;
+                    });
+                    set({ probetas_meta: metaNext, resultados: resArr });
+                  },
                 }));
             })
           )
@@ -541,8 +632,8 @@ function ImpactoForm(props) {
           // una OT distinta sin necesidad de bajar a la tabla de resultados.
           otsDisponibles.length > 1 ? _r('tr', { key: '_ot' },
             _r('td', { style: { border: '1px solid #999', padding: '4px 8px', fontWeight: 700, background: '#fafafa' } }, 'OT destino'),
-            resultadosArr.map(function (r, iFis) {
-              var over = String((r && r.nro_ot_override) || '').trim();
+            probetasMeta.map(function (m, iFis) {
+              var over = String((m && m.nro_ot_override) || '').trim();
               var otEff = over || otNroActual;
               var esOtra = over && over !== otNroActual;
               return _r('td', { key: iFis, style: { border: '1px solid #999', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
@@ -551,7 +642,19 @@ function ImpactoForm(props) {
                   onChange: function (e) {
                     var v = String(e.target.value || '').trim();
                     if (v === otNroActual) v = '';
-                    setRow(iFis, 'nro_ot_override', v);
+                    // Setear en probeta meta + propagar a las filas de resultados
+                    // que tienen su nombre (para que el saver splitee bien).
+                    var nombreMeta = (m && m.nombre) || ('M' + (iFis + 1));
+                    var metaNext = probetasMeta.slice();
+                    metaNext[iFis] = Object.assign({}, metaNext[iFis] || {}, { nro_ot_override: v });
+                    var resArr = Array.isArray(datos.resultados) ? datos.resultados.slice() : [];
+                    resArr = resArr.map(function (r) {
+                      if (r && String(r.nombre || '').trim() === String(nombreMeta).trim()) {
+                        return Object.assign({}, r, { nro_ot_override: v });
+                      }
+                      return r;
+                    });
+                    set({ probetas_meta: metaNext, resultados: resArr });
                   },
                   title: 'OT destino de esta probeta (misma solicitud)',
                   style: {
@@ -570,16 +673,19 @@ function ImpactoForm(props) {
           COND_PROB_FIELDS.map(function (f) {
           return _r('tr', { key: f.k },
             _r('td', { style: { border: '1px solid #999', padding: '4px 8px', fontWeight: 700, background: '#fafafa' } }, f.label),
-            resultadosArr.map(function (r, iFis) {
-              var val = (r && r[f.k]) || '';
+            probetasMeta.map(function (m, iFis) {
+              var val = (m && m[f.k]) || '';
               var cellStyle = { border: '1px solid #999', padding: 0 };
               var inputStyle = { border: 'none', width: '100%', padding: '5px 6px', background: 'transparent', fontSize: 11 };
 
               // Handler: al cambiar M1 (iFis===0), propagar a las probetas que
               // estaban vacías o tenían exactamente el valor previo de M1.
+              // Sincroniza también los valores a las filas de resultados que
+              // matcheen por nombre — el saver y el generator usan resultados[i]
+              // para norma/código, así que hay que espejar cada cambio.
               function aplicarCambio(nuevoVal) {
-                var arr = resultadosArr.slice();
-                var viejoValM1 = String((resultadosArr[0] || {})[f.k] || '');
+                var arr = probetasMeta.slice();
+                var viejoValM1 = String((probetasMeta[0] || {})[f.k] || '');
                 arr[iFis] = Object.assign({}, arr[iFis] || {}, {});
                 arr[iFis][f.k] = nuevoVal;
                 if (iFis === 0) {
@@ -592,7 +698,20 @@ function ImpactoForm(props) {
                     }
                   }
                 }
-                set('resultados', arr);
+                var resArr = Array.isArray(datos.resultados) ? datos.resultados.slice() : [];
+                resArr = resArr.map(function (r) {
+                  var rNombre = String((r && r.nombre) || '').trim();
+                  for (var k = 0; k < arr.length; k++) {
+                    var mNombre = String((arr[k] && arr[k].nombre) || ('M' + (k + 1))).trim();
+                    if (rNombre === mNombre) {
+                      var patch = {};
+                      patch[f.k] = arr[k][f.k];
+                      return Object.assign({}, r, patch);
+                    }
+                  }
+                  return r;
+                });
+                set({ probetas_meta: arr, resultados: resArr });
               }
 
               // Combos editables con datalist (sugerencias del catálogo local).
