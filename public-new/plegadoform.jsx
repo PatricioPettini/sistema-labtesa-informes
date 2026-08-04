@@ -202,12 +202,36 @@ function PlegadoForm(props) {
     set('resultados', next);
   }
   // Edit manual del label: desmarca el flag auto para que no lo sobrescriba
-  // una futura renumeración.
-  function setProbetaManual(i, val) {
+  // una futura renumeración. `groupSize` (default 1) propaga el cambio a las
+  // filas siguientes del grupo cuando la celda está mergeada por rowSpan —
+  // así el input único de la celda fusionada re-etiqueta las N filas juntas.
+  function setProbetaManual(i, val, groupSize) {
+    var n = groupSize && groupSize > 1 ? groupSize : 1;
     var next = resultados.slice();
-    next[i] = Object.assign({}, next[i] || {}, { probeta: val, _probeta_auto: false });
+    for (var k = 0; k < n; k++) {
+      next[i + k] = Object.assign({}, next[i + k] || {}, { probeta: val, _probeta_auto: false });
+    }
     set('resultados', next);
   }
+
+  // Agrupamiento visual de la columna PROBETA: filas consecutivas con el mismo
+  // valor de `probeta` se fusionan por rowSpan (patrón usado en vickersform
+  // para el mapa de microdurezas). Ej: si hay 4 filas con etiqueta "PC 1", se
+  // renderiza UNA celda que ocupa 4 filas; el input de esa celda edita las 4
+  // en paralelo (via setProbetaManual con groupSize). Grupo vacío no se merge.
+  var probetaCellMap = {};
+  (function buildProbetaGroups() {
+    var i = 0;
+    while (i < resultados.length) {
+      var lbl = String((resultados[i] || {}).probeta || '').trim();
+      var j = i + 1;
+      if (lbl) while (j < resultados.length && String((resultados[j] || {}).probeta || '').trim() === lbl) j++;
+      var size = j - i;
+      probetaCellMap[i] = { firstOfGroup: true, groupSize: size };
+      for (var k = 1; k < size; k++) probetaCellMap[i + k] = { firstOfGroup: false };
+      i = j;
+    }
+  })();
 
   var S = {
     sheet: { width: '100%', maxWidth: 1123, background: '#fff', border: '1px solid #333', margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: '#111' },
@@ -409,15 +433,22 @@ function PlegadoForm(props) {
             var otOverride = String(r.nro_ot_override || '').trim();
             var otEffective = otOverride || otNroActual;
             var esOtra = otOverride && otOverride !== otNroActual;
+            var cellInfo = probetaCellMap[i] || { firstOfGroup: true, groupSize: 1 };
             return _r('tr', { key: i },
-              _r('td', { style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' } },
+              // Columna PROBETA con merge por rowSpan: solo la primera fila del
+              // grupo renderiza el td. Las siguientes lo omiten y quedan
+              // absorbidas por el rowSpan de arriba.
+              cellInfo.firstOfGroup ? _r('td', {
+                rowSpan: cellInfo.groupSize > 1 ? cellInfo.groupSize : undefined,
+                style: { border: '1px solid #333', textAlign: 'center', fontWeight: 700, background: '#fafafa' },
+              },
                 _r('input', {
                   style: Object.assign({}, inp, { textAlign: 'center', fontWeight: 700 }),
                   value: r.probeta || '',
                   placeholder: String(i + 1),
-                  title: 'Autocompleta al marcar tipo (PC/PR/PL/PLg). Editable a mano.',
-                  onChange: function (e) { setProbetaManual(i, e.target.value); }
-                })),
+                  title: 'Autocompleta al marcar tipo (PC/PR/PL/PLg). Editable a mano. Filas consecutivas con el mismo nombre se combinan.',
+                  onChange: function (e) { setProbetaManual(i, e.target.value, cellInfo.groupSize); }
+                })) : null,
               // Selector de OT — solo aparece si hay OTs hermanas. Al cambiarlo,
               // esta probeta se transfiere al ensayo de plegado de la OT destino
               // al momento de guardar (via saveEnsayoPlegadoMultiOt).
