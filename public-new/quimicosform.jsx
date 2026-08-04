@@ -357,46 +357,19 @@ function QuimicosForm(props) {
     ) : null
   ) : null;
 
-  // ── 1.2 NORMAS ─────────────────────────────────────────────────────────
-  var block11 = _r('div', { style: { borderRight: '1px solid var(--border-strong)' } },
-    _r('div', { style: S.head }, '1.2  NORMAS / PROCEDIMIENTOS DE ENSAYO'),
+  // 1.2 VERIFICACIONES Y CONDICIONES DE ENSAYO — fusiona lo que antes era
+  // 1.2 NORMAS + 1.3 VERIFICACIONES. Las normas/códigos checkbox se sacaron
+  // porque ya se cargan por-OT en la sección 1.1. Solo queda Temperatura al
+  // principio (arriba de las verificaciones OK).
+  var block12 = _r('div', null,
+    _r('div', { style: S.head }, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: Object.assign({}, S.box, { fontSize: 10 }) },
-      QUIMICOS_NORMAS.map(function (n) {
-        var yearKey = n.key + '_year';
-        return _r('div', { key: n.key, style: { display: 'flex', alignItems: 'center', gap: 7 } },
-          _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
-            _r('input', { type: 'checkbox', checked: !!datos[n.key], onChange: function (e) { updBool(n.key, e.target.checked); } }),
-            n.label),
-          _r('span', { style: { color: 'var(--text-3)', fontSize: 9 } }, 'Año:'),
-          _r('input', {
-            style: Object.assign({}, S.input, { width: 56, fontSize: 10 }),
-            placeholder: '-23', value: datos[yearKey] || '',
-            onChange: function (e) { upd(yearKey, e.target.value); },
-          }));
-      }),
-      // Norma "otra" (línea de puntos en el papel).
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        _r('input', { type: 'checkbox', checked: !!datos.norma_otra_chk, onChange: function (e) { updBool('norma_otra_chk', e.target.checked); } }),
-        _r('span', { style: { fontSize: 10 } }, 'Otra:'),
-        _r(window.NormaInput, { tipo: 'quimicos', categoria: 'ensayo',
-          style: Object.assign({}, S.input, { flex: 1 }),
-          value: datos.norma_otra || '', placeholder: 'Empezá a escribir (ej: ASTM…)',
-          onChange: function (e) { upd('norma_otra', e.target.value); } })),
-      // Temperatura como parte de 1.1 (así está en la planilla FM-033).
-      // El "Patrón utilizado" se movió a la sección 1.3 EQUIPAMIENTO UTILIZADO.
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
-        _r('span', { style: { fontWeight: 700, fontSize: 10 } }, 'Temperatura de ensayo:'),
-        _r('input', { style: Object.assign({}, S.input, S.num, { width: 60, fontSize: 10 }),
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 700 } }, 'TEMPERATURA DE ENSAYO:'),
+        _r('input', { style: Object.assign({}, S.input, S.num, { width: 60 }),
           value: datos.temperatura || '',
           onChange: function (e) { upd('temperatura', e.target.value); } }),
-        _r('span', { style: { fontSize: 10 } }, '°C'))
-    )
-  );
-
-  // ── 1.2 VERIFICACIONES Y CONDICIONES ──────────────────────────────────
-  var block12 = _r('div', null,
-    _r('div', { style: S.head }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
-    _r('div', { style: Object.assign({}, S.box, { fontSize: 10 }) },
+        _r('span', null, '°C')),
       _r('label', { style: S.label },
         _r('input', { type: 'checkbox', checked: !!datos.estado_electrodo, onChange: function (e) { updBool('estado_electrodo', e.target.checked); } }),
         _r('span', { style: { fontWeight: 700 } }, 'ESTADO DEL ELECTRODO:'), ' OK'),
@@ -436,7 +409,7 @@ function QuimicosForm(props) {
   var variante = datos.variante || (datos.laboratorio || '').toLowerCase();
   var equipos = variante === 'neuquen' ? QUIMICOS_EQUIPOS_NEUQUEN : QUIMICOS_EQUIPOS_CABA;
   var block13 = _r('div', null,
-    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO'),
+    _r('div', { style: S.head }, '1.3  EQUIPAMIENTO UTILIZADO'),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 20px', fontSize: 10.5 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -490,7 +463,7 @@ function QuimicosForm(props) {
   }
 
   var block14 = _r('div', null,
-    _r('div', { style: S.head }, '1.5  RESULTADOS OBTENIDOS'),
+    _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
     _r('div', { style: { padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, flexWrap: 'wrap' } },
       'Muestras a informar:',
       [0, 1, 2].map(function (i) {
@@ -704,7 +677,7 @@ function QuimicosForm(props) {
   // ── 1.5 OBSERVACIONES / EVALUACIÓN ────────────────────────────────────
   var evalActiva = datos.tiene_evaluacion !== false;
   var block15 = _r('div', null,
-    _r('div', { style: S.head }, '1.6  OBSERVACIONES / EVALUACION'),
+    _r('div', { style: S.head }, '1.5  OBSERVACIONES / EVALUACION'),
     _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 } },
       // Textarea de observaciones libres (línea de puntos de la planilla)
       _r('div', null,
@@ -739,7 +712,7 @@ function QuimicosForm(props) {
   return _r('div', { style: S.sheet },
     barraCopiarTodoQ,
     blockCondOt,
-    _r('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr' } }, block11, block12),
+    block12,
     block13, block14, block15
   );
 }
