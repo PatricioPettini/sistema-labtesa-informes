@@ -254,34 +254,52 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
     normasASM.push(datos.norma_otra.trim());
   }
 
-  // ITMs internos e ITQB (procedimientos internos, no ASTM). Se emiten como
-  // líneas separadas con el prefijo "Metodología de ensayo:".
+  // ITMs internos e ITQB (procedimientos internos Labtesa). No llevan año en
+  // el docx. Se juntan con "otra metodología" libre (metodologia_otra) y con
+  // el itm_numero legacy en un solo array y se emiten como UNA sola línea
+  // "Metodología de ensayo: X, Y y Z".
   const itmsInternos = [];
-  if (datos.norma_itm054)  itmsInternos.push(`Metodología de ensayo: ITM-054${suf('norma_itm054', '')}`);
-  if (datos.norma_itm057)  itmsInternos.push(`Metodología de ensayo: ITM-057${suf('norma_itm057', '')}`);
-  if (datos.norma_itm058)  itmsInternos.push(`Metodología de ensayo: ITM-058${suf('norma_itm058', '')}`);
-  if (datos.norma_itm091)  itmsInternos.push(`Metodología de ensayo: ITM-091${suf('norma_itm091', '')}`);
-  if (datos.norma_itqb068) itmsInternos.push(`Metodología de ensayo: ITQB N°068${suf('norma_itqb068', '')}`);
-
-  // Cuando hay 2+ normas seleccionadas, se unen en una sola línea con "y"
-  // (ej. "Norma de ensayo: ASTM E415-21 y ASTM E3047-20").
-  if (normasASM.length === 1) {
-    lineasNorma.push(`Norma de ensayo: ${normasASM[0]}`);
-  } else if (normasASM.length === 2) {
-    lineasNorma.push(`Norma de ensayo: ${normasASM[0]} y ${normasASM[1]}`);
-  } else if (normasASM.length > 2) {
-    const last = normasASM[normasASM.length - 1];
-    const rest = normasASM.slice(0, -1).join(', ');
-    lineasNorma.push(`Norma de ensayo: ${rest} y ${last}`);
+  if (datos.norma_itm054)  itmsInternos.push('ITM-054');
+  if (datos.norma_itm057)  itmsInternos.push('ITM-057');
+  if (datos.norma_itm058)  itmsInternos.push('ITM-058');
+  if (datos.norma_itm091)  itmsInternos.push('ITM-091');
+  if (datos.norma_itqb068) itmsInternos.push('ITQB N°068');
+  // "Otra metodología" — texto libre del form nuevo.
+  if (datos.metodologia_otra_chk && datos.metodologia_otra && String(datos.metodologia_otra).trim()) {
+    itmsInternos.push(String(datos.metodologia_otra).trim());
   }
-  // ITMs internos e ITQB — se emiten como líneas separadas (con prefijo
-  // "Metodología de ensayo:" ya incluido en cada string).
-  itmsInternos.forEach(function (l) { lineasNorma.push(l); });
-  // itm_numero legacy (input libre). Se omite si el usuario ya seleccionó un
-  // ITM interno vía checkbox — evita duplicar la metodología.
+  // itm_numero legacy (input libre viejo). Solo si no hay nada más.
   const itm = (datos.itm_numero || '').trim();
-  if (itm && itmsInternos.length === 0) {
-    lineasNorma.push(`Metodología de ensayo: ITM N˚${itm}`);
+  if (itm && itmsInternos.length === 0) itmsInternos.push('ITM N˚' + itm);
+
+  // Norma de ensayo por-OT — el form nuevo la guarda en condiciones_por_ot
+  // (sección 1.1). Se agrega al array de normas junto con las globales ASTM.
+  if (datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
+    const nroOtActualCond = String(ot.nro_ot || '');
+    const condOt = datos.condiciones_por_ot[nroOtActualCond];
+    if (condOt && condOt.norma_ensayo_ot && String(condOt.norma_ensayo_ot).trim()) {
+      normasASM.push(String(condOt.norma_ensayo_ot).trim());
+    }
+  }
+
+  // Formato natural para unir múltiples items ("X, Y y Z" · "X y Y" · "X").
+  function unirNatural(arr) {
+    if (arr.length === 0) return '';
+    if (arr.length === 1) return arr[0];
+    if (arr.length === 2) return arr[0] + ' y ' + arr[1];
+    const last = arr[arr.length - 1];
+    const rest = arr.slice(0, -1).join(', ');
+    return rest + ' y ' + last;
+  }
+  // Línea "Norma de ensayo: ..." (dedupear por si venía repetida).
+  const normasDedup = Array.from(new Set(normasASM));
+  if (normasDedup.length > 0) {
+    lineasNorma.push('Norma de ensayo: ' + unirNatural(normasDedup));
+  }
+  // Línea "Metodología de ensayo: ..." (unificada, dedupeada).
+  const itmsDedup = Array.from(new Set(itmsInternos));
+  if (itmsDedup.length > 0) {
+    lineasNorma.push('Metodología de ensayo: ' + unirNatural(itmsDedup));
   }
 
   const normas_seleccionadas = lineasNorma.length ? lineasNorma.join('\n') : '__SECTION_HIDE__';
