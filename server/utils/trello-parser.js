@@ -18,25 +18,40 @@ const INVIS_TRIM_L   = new RegExp('^[\\s' + INVIS_CHARS + ']+');
 const INVIS_TRIM_R   = new RegExp('[\\s' + INVIS_CHARS + ']+$');
 
 // ── Parser de TÍTULO ─────────────────────────────────────────────────────
+// Cubre los formatos reales del laboratorio detectados en la auditoría:
+//   "CLIENTE - 38269 (VER COMENTARIOS)"    ← guion con espacios + paréntesis
+//   "CONUAR S.A. -38338"                    ← guion pegado (sin espacio antes)
+//   "SEPARATION PROCESSES -38339"           ← idem
+//   "CINTOLO  38342- URGENTE 72h (AS400)"   ← sin guion antes del número
+//   "GALVANOPLASTIA CAROLO - SOLICITUD 38325" ← palabra "SOLICITUD" antes del nro
 function parsearTitulo(titulo) {
   const t = String(titulo || '').trim();
   let clienteNombre = t;
   let nroSolicitudRaw = '';
 
-  if (t.includes(' - ')) {
-    clienteNombre = t.split(' - ')[0].trim();
-    // Buscar TODOS los "- <numero>" y quedarnos con el último. Tolera texto
-    // o paréntesis DESPUÉS del número (fix del hallazgo de la auditoría).
-    const matches = [...t.matchAll(/\s-\s+(\d{3,})(?=\s|$|\()/g)];
+  // 1) Patrón explícito "SOLICITUD <n>" / "SOL <n>" / "S/N <n>" en el título.
+  const mSolic = t.match(/\b(?:solicitud|sol\.?)\s*(?:n[°º]?)?\s*[:#\-]?\s*(\d{3,})\b/i);
+  if (mSolic) {
+    nroSolicitudRaw = mSolic[1];
+    clienteNombre = t.slice(0, mSolic.index).replace(/\s*-\s*$/, '').trim();
+  }
+  // 2) Patrón "-<numero>" con o sin espacios antes del guion. Tolera texto o
+  //    paréntesis DESPUÉS del número.
+  if (!nroSolicitudRaw) {
+    const matches = [...t.matchAll(/\s*-\s*(\d{3,})(?=\s|$|\(|-)/g)];
     if (matches.length > 0) {
-      nroSolicitudRaw = matches[matches.length - 1][1];
+      const last = matches[matches.length - 1];
+      nroSolicitudRaw = last[1];
+      clienteNombre = t.slice(0, last.index).trim();
     }
-  } else {
-    const lastSpace = t.lastIndexOf(' ');
-    if (lastSpace >= 0) {
-      clienteNombre = t.slice(0, lastSpace).trim();
-      const cand = t.slice(lastSpace + 1).trim();
-      if (/^\d+$/.test(cand)) nroSolicitudRaw = cand;
+  }
+  // 3) Fallback: número al final o después de espacios (ej. "CINTOLO 38342-...").
+  //    Se detiene ante caracteres de puntuación que no formen parte del número.
+  if (!nroSolicitudRaw) {
+    const mNum = t.match(/^(.+?)\s+(\d{3,})(?=[\s\-.(]|$)/);
+    if (mNum) {
+      clienteNombre = mNum[1].trim();
+      nroSolicitudRaw = mNum[2];
     }
   }
   const nro_solicitud = String(parseInt(nroSolicitudRaw, 10) || nroSolicitudRaw);
