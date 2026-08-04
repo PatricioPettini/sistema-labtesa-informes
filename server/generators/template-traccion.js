@@ -494,10 +494,21 @@ function generarTraccionDesdeTemplate(ot, datos, fotosCaratula) {
       return lineas.join('\n');
     })(),
     probeta_mecanizada_segun: (() => {
-      // Combina líneas globales del bloque probeta (prob_cliente, prob_soldada,
-      // probeta_segun) + la línea agrupada de "Plano de probeta" por probeta.
+      // Combina líneas globales del bloque probeta + la línea agrupada de
+      // "Plano de probeta" por probeta. Orden pedido por el laboratorio:
+      //   1) Probeta mecanizada según ...
+      //   2) Plano de probeta según ... (global y por-probeta)
+      //   3) Probeta soldada / Probeta mecanizada por el cliente (booleanos)
+      // "Probeta soldada" siempre queda ABAJO de "Plano de probeta", pegado
+      // arriba de "Orientación de la probeta".
       const planoLineas = agruparPorProbeta('Plano de probeta', 'plano_probeta', ' según ');
-      return [...probetaLineas, ...planoLineas].join('\n');
+      const segunLineas = [];
+      const boolLineas = [];
+      probetaLineas.forEach(l => {
+        if (l === 'Probeta soldada' || l === 'Probeta mecanizada por el cliente') boolLineas.push(l);
+        else segunLineas.push(l);
+      });
+      return [...segunLineas, ...planoLineas, ...boolLineas].join('\n');
     })(),
     probeta_mecanizada_por_cliente:   '',
     probeta_soldada:                  '',
