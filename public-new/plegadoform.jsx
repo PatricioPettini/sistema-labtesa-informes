@@ -273,14 +273,10 @@ function PlegadoForm(props) {
   },
     _r('span', { style: { fontSize: 16 } }, '📋'),
     _r('span', { style: { flex: 1, color: '#0550ae' } },
-      'Copiar TODA la configuración (normas + condiciones + equipamiento) a otras OT en un solo click.'),
+      'Copiar TODA la configuración (metodología + condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionPl('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_PL,
-      'Copia condiciones de ensayo por-OT (1.1), metodología (1.2), verificaciones y condiciones (1.3) y equipamiento (1.4) juntos.',
-      // Keys del mapa por-OT (sección 1.1): norma_ensayo_ot / codigo_referencia_ot
-      // / orientacion_ot / probeta_mec_ot + su flag auto. Se leen del mapa
-      // condiciones_por_ot[<OT actual>] y se copian a los destinos.
-      ['norma_ensayo_ot', 'codigo_referencia_ot', 'orientacion_ot', 'probeta_mec_ot', '_probeta_mec_auto'])
+      'Copia metodología (1.2), verificaciones y condiciones (1.3) y equipamiento (1.4). La sección 1.1 (norma / código / plano / orientación / probeta mec.) NO se copia — es específica de cada OT.')
   ) : null;
 
   // ── 1.1 NORMAS ─────────────────────────────────────────────────────────
@@ -288,12 +284,7 @@ function PlegadoForm(props) {
   // 1.3 (por OT) con desplegables autopoblados del catálogo — misma UX que
   // tracción. Acá solo queda la metodología (ITM).
   var block11 = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.2  METODOLOGÍA DE ENSAYO'),
-      botonCopiarSeccionPl('metodo_11', 'Copiar metodología a otras OT',
-        ['metodologia'],
-        'Copia el ITM a las OTs seleccionadas.')
-    ),
+    _r('div', { style: S.head }, '1.2  METODOLOGÍA DE ENSAYO'),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
@@ -304,13 +295,7 @@ function PlegadoForm(props) {
 
   // ── 1.2 CONDICIONES ────────────────────────────────────────────────────
   var block12 = _r('div', null,
-    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
-      botonCopiarSeccionPl('cond_12', 'Copiar condiciones a otras OT',
-        ['temperatura', 'estado_superficial', 'diametro_mandril',
-         'espesor_probeta', 'ancho_probeta', 'distancia_apoyos', 'zona_plegado'],
-        'Copia temperatura, estado superficial, mandril, espesores/ancho, distancia y zona.')
-    ),
+    _r('div', { style: S.head }, '1.3  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA:'),
@@ -363,15 +348,7 @@ function PlegadoForm(props) {
               : PLEGADO_EQ_EMIC;
   var eqLabel = datos.equipo === 'torne' ? '— Set TORNE' : datos.equipo === 'shimadzu' ? '— Set Shimadzu' : '— Set EMIC';
   var block13 = _r('div', null,
-    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.4  EQUIPAMIENTO UTILIZADO ' + eqLabel),
-      // "equipo" determina qué SET se muestra (EMIC/TORNE/Shimadzu). Si no
-      // lo copiamos, la hermana queda con equipos del set opuesto y los
-      // checkboxes no aparecen (mismo bug que en tracción).
-      botonCopiarSeccionPl('equip_14', 'Copiar equipamiento a otras OT',
-        ['equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos'],
-        'Copia set (EMIC/TORNE/Shimadzu), equipos tildados, sus TAGs y "otros equipos".')
-    ),
+    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO ' + eqLabel),
     _r('div', { style: { padding: 8, display: 'flex', gap: 12, alignItems: 'center' } },
       _r('span', { style: { fontWeight: 600, fontSize: 11 } }, 'Máquina:'),
       _r('label', { style: S.label },
