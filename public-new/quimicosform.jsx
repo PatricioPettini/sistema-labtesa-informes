@@ -251,8 +251,8 @@ function QuimicosForm(props) {
               value: getCondOt(otActivaCond, 'norma_ensayo_ot') || '',
               onChange: function (e) { setCondOt(otActivaCond, 'norma_ensayo_ot', e.target.value); } })),
       // Metodología de ensayo — chips multi-select con los ITMs. El técnico
-      // puede tildar varios (todos los que se aplicaron en el ensayo). Cada
-      // ITM tildado despliega un input de año al costado.
+      // puede tildar varios (todos los que se aplicaron en el ensayo). Los
+      // ITMs son metodologías internas Labtesa y NO llevan año.
       _r('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 6 } },
         _r('span', { style: { fontWeight: 600, minWidth: 160, paddingTop: 4 } }, 'Metodología de ensayo:'),
         _r('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: 1 } },
@@ -260,33 +260,46 @@ function QuimicosForm(props) {
             var ITMS = QUIMICOS_NORMAS.filter(function (n) { return n.corta === true; });
             return ITMS.map(function (n) {
               var isChecked = !!datos[n.key];
-              var yearKey = n.key + '_year';
-              return _r('div', { key: n.key, style: { display: 'inline-flex', alignItems: 'center', gap: 3 } },
-                _r('label', {
-                  style: {
-                    display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer',
-                    padding: '3px 9px', borderRadius: 12,
-                    border: '1px solid ' + (isChecked ? '#0969da' : 'var(--border)'),
-                    background: isChecked ? '#e7f0ff' : 'var(--surface)',
-                    color: isChecked ? '#0550ae' : 'var(--text-2)',
-                    fontSize: 10, fontWeight: isChecked ? 700 : 500, userSelect: 'none',
-                  },
+              return _r('label', {
+                key: n.key,
+                style: {
+                  display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+                  padding: '3px 9px', borderRadius: 12,
+                  border: '1px solid ' + (isChecked ? '#0969da' : 'var(--border)'),
+                  background: isChecked ? '#e7f0ff' : 'var(--surface)',
+                  color: isChecked ? '#0550ae' : 'var(--text-2)',
+                  fontSize: 10, fontWeight: isChecked ? 700 : 500, userSelect: 'none',
                 },
-                  _r('input', { type: 'checkbox', style: { display: 'none' }, checked: isChecked,
-                    onChange: function (e) { updBool(n.key, e.target.checked); } }),
-                  n.label
-                ),
-                isChecked ? _r('input', {
-                  style: { border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 9,
-                    padding: '2px 4px', width: 42, borderRadius: 3, color: 'var(--text)' },
-                  placeholder: '-23', value: datos[yearKey] || '',
-                  title: 'Año',
-                  onChange: function (e) { upd(yearKey, e.target.value); },
-                }) : null
+              },
+                _r('input', { type: 'checkbox', style: { display: 'none' }, checked: isChecked,
+                  onChange: function (e) { updBool(n.key, e.target.checked); } }),
+                n.label
               );
             });
           })()
         )
+      ),
+      // Otra metodología — texto libre para casos que no están en el catálogo
+      // de chips (ITMs). Se guarda en datos.metodologia_otra + flag chk.
+      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Otra metodología:'),
+        _r('label', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 10 } },
+          _r('input', { type: 'checkbox', checked: !!datos.metodologia_otra_chk,
+            onChange: function (e) { updBool('metodologia_otra_chk', e.target.checked); } }),
+          _r('span', { style: { color: 'var(--text-3)' } }, 'incluir')),
+        _r('input', {
+          style: Object.assign({}, S.input, { flex: 1 }),
+          value: datos.metodologia_otra || '',
+          placeholder: 'Empezá a escribir (ej: ITM-XXX u otra referencia)',
+          onChange: function (e) {
+            var val = e.target.value;
+            // Auto-tildar el chk al escribir; si el usuario borra el texto,
+            // destildar automáticamente para no dejar la línea vacía en el docx.
+            if (val && !datos.metodologia_otra_chk) upd({ metodologia_otra: val, metodologia_otra_chk: true });
+            else if (!val && datos.metodologia_otra_chk) upd({ metodologia_otra: val, metodologia_otra_chk: false });
+            else upd('metodologia_otra', val);
+          },
+        })
       )
     )
   );
@@ -297,8 +310,10 @@ function QuimicosForm(props) {
   // puede tener su propia norma/código.
   var CAMPOS_TODO_Q = [
     'variante', 'temperatura', 'patron', 'patron_chk',
-    // Normas checkbox + años
+    // Metodologías (ITMs, chips) + otra metodología libre
     'norma_itm054', 'norma_itm057', 'norma_itm058', 'norma_itm091', 'norma_itqb068',
+    'metodologia_otra_chk', 'metodologia_otra',
+    // Normas checkbox (legacy — quedan por retrocompat)
     'norma_e663', 'norma_e415', 'norma_e634', 'norma_e1086', 'norma_e1251',
     'norma_e1999', 'norma_e2209', 'norma_e2994', 'norma_e3047', 'norma_e1019',
     'norma_a751', 'norma_e1024', 'norma_otra_chk', 'norma_otra',

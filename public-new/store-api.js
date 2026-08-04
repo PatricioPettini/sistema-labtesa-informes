@@ -1109,6 +1109,7 @@
       var OVERRIDE_RAIZ_KEYS_Q = [
         'variante', 'temperatura', 'patron', 'patron_chk',
         'norma_itm054', 'norma_itm057', 'norma_itm058', 'norma_itm091', 'norma_itqb068',
+        'metodologia_otra_chk', 'metodologia_otra',
         'norma_e663', 'norma_e415', 'norma_e634', 'norma_e1086', 'norma_e1251',
         'norma_e1999', 'norma_e2209', 'norma_e2994', 'norma_e3047', 'norma_e1019',
         'norma_a751', 'norma_e1024', 'norma_otra_chk', 'norma_otra',
