@@ -129,6 +129,11 @@ function traducirV2aV1(tipo, datos) {
       // Cara → "PC N", Raíz → "PR N", Lateral → "PL N". La N se auto-numera
       // por tipo (restart cada vez que cambia el tipo), salvo que el usuario
       // haya escrito explícitamente el ID completo (ej. "PC 5").
+      //
+      // Si el usuario escribió una etiqueta LIBRE (ej. "10115", el número de
+      // muestra/OT) — que no matchea PC/PR/PL — se preserva en el campo
+      // `muestra` para que el template la emita en una columna nueva
+      // "Muestra N° / OT N°" antes de "Probeta".
       if (!d.probetas && Array.isArray(d.resultados) && d.resultados.length > 0) {
         const PREFIX = { cara: 'PC', 'raíz': 'PR', raiz: 'PR', lateral: 'PL' };
         const counter = { PC: 0, PR: 0, PL: 0 };
@@ -137,20 +142,27 @@ function traducirV2aV1(tipo, datos) {
           const tipoKey = String(r.tipo || '').toLowerCase().trim();
           const prefix = PREFIX[tipoKey] || '';
           let id = raw;
+          let esFormatoAuto = false;
           if (prefix) {
             const upper = raw.toUpperCase();
             const reFull = new RegExp('^' + prefix + '\\s*\\d+$', 'i');
             if (reFull.test(upper)) {
               // Usuario tipeó "PC 5" explícitamente → respetar
               id = upper.replace(/\s+/, ' ');
+              esFormatoAuto = true;
             } else {
               // Sin prefijo (ej. "1", "2", "") → auto-incrementar por tipo
               counter[prefix]++;
               id = `${prefix} ${counter[prefix]}`;
+              esFormatoAuto = true;
             }
           }
+          // muestra = valor libre del usuario (no auto). Si el label matchea
+          // PC/PR/PL o está vacío, no hay muestra que emitir.
+          const muestra = (raw && !esFormatoAuto) ? raw : '';
           return {
             id,
+            muestra,
             tipo:               r.tipo,
             resultado:          r.resultado,
             cant_indicaciones:  r.cant_indicaciones,

@@ -804,6 +804,9 @@ function reemplazarResultadosCeldas(xml, probetas) {
     const allRows = [...tbl.matchAll(trRe)];
     const dataRows = allRows.filter(m => m[0].includes('Con / Sin indicaciones'));
     if (dataRows.length === 0) return tbl;
+    // Header row: la fila con texto "Probeta" (label en negrita, fondo gris).
+    // La usamos como plantilla para construir la celda extra "Muestra N°/OT N°".
+    const headerRow = allRows.find(m => />\s*Probeta\s*</.test(m[0]));
 
     // La primera fila de datos del template es nuestra plantilla
     const rowTemplate = dataRows[0][0];
@@ -851,6 +854,32 @@ function reemplazarResultadosCeldas(xml, probetas) {
       return out;
     }
 
+    // ── Columna extra "Muestra N° / OT N°" ────────────────────────────────
+    // Si alguna probeta trae `muestra` (valor libre que el técnico escribió en
+    // la columna PROBETA del form, distinto de la auto-etiqueta PC/PR/PL), se
+    // inserta al principio de la tabla una columna "Muestra N°/OT N°". Filas
+    // consecutivas con el mismo valor se fusionan por w:vMerge (mismo
+    // agrupamiento visual que en el form con rowSpan).
+    const hayMuestra = probetasFiltradas.some(p => String(p.muestra || '').trim() !== '');
+    const muestraCells = hayMuestra ? probetasFiltradas.map((p, idx) => {
+      const val = String(p.muestra || '').trim();
+      const anterior = idx > 0 ? String(probetasFiltradas[idx - 1].muestra || '').trim() : '';
+      const siguiente = idx + 1 < probetasFiltradas.length ? String(probetasFiltradas[idx + 1].muestra || '').trim() : '';
+      if (!val) return { text: '', vMerge: null };
+      if (anterior === val) return { text: '', vMerge: 'continue' };
+      return { text: val, vMerge: siguiente === val ? 'restart' : null };
+    }) : null;
+
+    // Helper: insertar una <w:tc> al inicio de una fila, respetando <w:trPr>.
+    function insertarCeldaAlInicio(rowXml, tcXml) {
+      const trPrEnd = rowXml.match(/<w:trPr\b[^>]*>[\s\S]*?<\/w:trPr>/);
+      if (trPrEnd) {
+        const idx = trPrEnd.index + trPrEnd[0].length;
+        return rowXml.slice(0, idx) + tcXml + rowXml.slice(idx);
+      }
+      return rowXml.replace(/(<w:tr\b[^>]*>)/, (m) => m + tcXml);
+    }
+
     // Construir N nuevas filas, una por probeta. Mergea verticalmente la
     // columna "Tipo de plegado" cuando hay filas consecutivas del mismo tipo.
     const newRows = probetasFiltradas.map((p, idx) => {
@@ -883,6 +912,16 @@ function reemplazarResultadosCeldas(xml, probetas) {
           + row.slice(c0.index + c0[0].length, c1.index) + newC1
           + row.slice(c1.index + c1[0].length, c2.index) + newC2
           + row.slice(c2.index + c2[0].length);
+
+      // Si esta tabla lleva columna "Muestra N°/OT N°", insertar la celda al
+      // inicio (clonada de c0/Probeta para preservar el estilo del template).
+      if (hayMuestra && muestraCells) {
+        const info = muestraCells[idx];
+        let celdaMuestra = reemplazarTextoCelda(c0[0], info.vMerge === 'continue' ? '' : info.text);
+        if (info.vMerge === 'restart') celdaMuestra = injectVMerge(celdaMuestra, 'restart');
+        else if (info.vMerge === 'continue') celdaMuestra = injectVMerge(celdaMuestra, 'continue');
+        row = insertarCeldaAlInicio(row, celdaMuestra);
+      }
       return row;
     });
 
@@ -890,7 +929,21 @@ function reemplazarResultadosCeldas(xml, probetas) {
     const firstStart = dataRows[0].index;
     const lastDataRow = dataRows[dataRows.length - 1];
     const lastEnd = lastDataRow.index + lastDataRow[0].length;
-    return tbl.slice(0, firstStart) + newRows.join('') + tbl.slice(lastEnd);
+    let tblOut = tbl.slice(0, firstStart) + newRows.join('') + tbl.slice(lastEnd);
+
+    // Header + gridCol: agregar celda "Muestra N° / OT N°" al principio del
+    // header row y un <w:gridCol> al <w:tblGrid> para el ancho.
+    if (hayMuestra && headerRow) {
+      const headerFirstTc = headerRow[0].match(/<w:tc\b[^>]*>[\s\S]*?<\/w:tc>/);
+      const headerMuestraTc = headerFirstTc
+        ? reemplazarTextoCelda(headerFirstTc[0], 'Muestra N° / OT N°')
+        : '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:r><w:t xml:space="preserve">Muestra N° / OT N°</w:t></w:r></w:p></w:tc>';
+      const headerModificado = insertarCeldaAlInicio(headerRow[0], headerMuestraTc);
+      tblOut = tblOut.replace(headerRow[0], headerModificado);
+      tblOut = tblOut.replace(/<w:tblGrid\b[^>]*>/, m => m + '<w:gridCol w:w="1800"/>');
+    }
+
+    return tblOut;
   });
 }
 
