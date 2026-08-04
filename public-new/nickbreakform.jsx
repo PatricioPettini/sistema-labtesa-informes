@@ -204,8 +204,36 @@ function NickBreakForm(props) {
     }
     set('probetas', next);
   }
+  // Edit del label "MUESTRA N° / OT N°" cuando la celda está fusionada por
+  // rowSpan: propaga el cambio a las N filas del grupo (mismo patrón que
+  // plegadoform con la columna PROBETA).
+  function setMuestraGroup(i, val, groupSize) {
+    var n = groupSize && groupSize > 1 ? groupSize : 1;
+    var next = probetas.slice();
+    for (var k = 0; k < n; k++) {
+      next[i + k] = Object.assign({}, next[i + k] || {}, { muestra: val });
+    }
+    set('probetas', next);
+  }
   function addProb() { set('probetas', probetas.concat([{}])); }
   function delProb(i) { set('probetas', probetas.filter(function (_, idx) { return idx !== i; })); }
+
+  // Agrupamiento visual de la columna MUESTRA N°/OT N°: filas consecutivas con
+  // el mismo valor de `muestra` se fusionan por rowSpan (mismo patrón que
+  // plegadoform en la columna PROBETA). Grupo vacío no se merge.
+  var muestraCellMap = {};
+  (function buildMuestraGroups() {
+    var i = 0;
+    while (i < probetas.length) {
+      var lbl = String((probetas[i] || {}).muestra || '').trim();
+      var j = i + 1;
+      if (lbl) while (j < probetas.length && String((probetas[j] || {}).muestra || '').trim() === lbl) j++;
+      var size = j - i;
+      muestraCellMap[i] = { firstOfGroup: true, groupSize: size };
+      for (var k = 1; k < size; k++) muestraCellMap[i + k] = { firstOfGroup: false };
+      i = j;
+    }
+  })();
 
   var variante = datos.variante || datos.equipo || '';
   var equipos = variante === 'torne' ? NB_EQ_TORNE : NB_EQ_EMIC;
@@ -307,10 +335,22 @@ function NickBreakForm(props) {
             var otOverride = String(p.nro_ot_override || '').trim();
             var otEffective = otOverride || otNroActual;
             var esOtra = otOverride && otOverride !== otNroActual;
+            var muestraCell = muestraCellMap[i] || { firstOfGroup: true, groupSize: 1 };
             return _r('tr', { key: i },
-              _r('td', { style: { border: '1px solid #333', padding: 0 } },
-                _r('input', { style: Object.assign({}, S.input, { border: 'none', width: '100%' }),
-                  value: p.muestra || '', onChange: function (e) { setProb(i, 'muestra', e.target.value); } })),
+              // Columna MUESTRA N° / OT N°: solo renderiza el td en la primera
+              // fila del grupo. Las filas subsiguientes con el mismo label lo
+              // omiten y quedan absorbidas por el rowSpan. Editar el input
+              // fusionado propaga el cambio a todas las filas del grupo.
+              muestraCell.firstOfGroup ? _r('td', {
+                rowSpan: muestraCell.groupSize > 1 ? muestraCell.groupSize : undefined,
+                style: { border: '1px solid #333', padding: 0 },
+              },
+                _r('input', {
+                  style: Object.assign({}, S.input, { border: 'none', width: '100%' }),
+                  value: p.muestra || '',
+                  title: 'Filas consecutivas con el mismo nombre se combinan.',
+                  onChange: function (e) { setMuestraGroup(i, e.target.value, muestraCell.groupSize); }
+                })) : null,
               // Selector de OT — solo si hay OTs hermanas. Al cambiar, esta
               // probeta se transfiere al ensayo nick-break de la OT destino
               // al guardar (via saveEnsayoNickBreakMultiOt).
