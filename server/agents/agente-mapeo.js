@@ -147,18 +147,22 @@ function traducirV2aV1(tipo, datos) {
             const upper = raw.toUpperCase();
             const reFull = new RegExp('^' + prefix + '\\s*\\d+$', 'i');
             if (reFull.test(upper)) {
-              // Usuario tipeó "PC 5" explícitamente → respetar
+              // Usuario tipeó "PC 5" explícitamente → respetar. Este raw es
+              // formato auto (no se emite en la columna Muestra).
               id = upper.replace(/\s+/, ' ');
               esFormatoAuto = true;
             } else {
-              // Sin prefijo (ej. "1", "2", "") → auto-incrementar por tipo
+              // raw no matchea PC/PR/PL: puede estar vacío o ser un valor libre
+              // del técnico (ej. "10115" = nro de muestra/OT). Auto-numeramos el
+              // `id` para la columna Probeta y preservamos el valor libre en
+              // `muestra`. Si raw está vacío, no hay muestra que emitir.
               counter[prefix]++;
               id = `${prefix} ${counter[prefix]}`;
-              esFormatoAuto = true;
+              // esFormatoAuto queda false → raw se preserva como `muestra`.
             }
           }
-          // muestra = valor libre del usuario (no auto). Si el label matchea
-          // PC/PR/PL o está vacío, no hay muestra que emitir.
+          // muestra = valor libre del usuario (no formato auto). Si el label
+          // matchea PC/PR/PL o está vacío, no hay muestra que emitir.
           const muestra = (raw && !esFormatoAuto) ? raw : '';
           return {
             id,
