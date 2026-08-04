@@ -574,6 +574,10 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
       if (ensayo.tipo === 'impacto' && Array.isArray(datos.resultados)) {
         datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
       }
+      // Multi-OT en nick-break: filtra `probetas` por nro_ot_override.
+      if (ensayo.tipo === 'nick-break' && (Array.isArray(datos.probetas) || Array.isArray(datos.resultados))) {
+        datos = Object.assign({}, datos, { _filtro_ot: String(ot.nro_ot || '') });
+      }
       // Multi-OT en metalografía general y anexo metalográfico: filtra las
       // IMÁGENES por nro_ot_override + aplica textos_por_ot y condiciones_por_ot.
       if ((ensayo.tipo === 'metalografia-general' || ensayo.tipo === 'anexo-metalografico')) {

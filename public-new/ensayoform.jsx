@@ -334,6 +334,35 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en nick-break (mismo patrón que plegado/impacto pero con
+    // datos.probetas en vez de datos.resultados).
+    if (tipo === 'nick-break' && Array.isArray(clean.probetas)) {
+      var hayOverrideNb = clean.probetas.some(function (p) {
+        var over = String((p && p.nro_ot_override) || '').trim();
+        return over && over !== String(ot.nro_ot);
+      });
+      var hayCondsOtrasNb = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if ((hayOverrideNb || hayCondsOtrasNb) && typeof window.LabStore.saveEnsayoNickBreakMultiOt === 'function') {
+        window.LabStore.saveEnsayoNickBreakMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Nick-break guardado · ' + resumen.otActual.cantidad + ' en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
+        return;
+      }
+    }
     // Propagación multi-OT en brinell: no divide mediciones, solo replica
     // normas / condiciones / equipamiento a las hermanas listadas en
     // condiciones_por_ot.
@@ -578,7 +607,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.RockwellForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
       tipo === 'nick-break' && typeof window.NickBreakForm === 'function'
-        ? React.createElement(window.NickBreakForm, { datos: datos, set: set })
+        ? React.createElement(window.NickBreakForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       (tipo === 'ferrita-delta' && (datos.variante || 'fischer') !== 'microscopio' && typeof window.FerritaForm === 'function')
         ? React.createElement(window.FerritaForm, { datos: datos, set: set })

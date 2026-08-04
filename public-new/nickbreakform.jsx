@@ -47,6 +47,113 @@ function NickBreakForm(props) {
   function upd(k, v) { set(k, v); }
   function updBool(k, checked) { set(k, !!checked); }
 
+  // ── Multi-OT: mismo patrón que plegado / tracción / brinell ────────────────
+  // otsDisponibles = todas las OTs hermanas de la misma solicitud. Permite:
+  //  - Copiar condiciones + equipamiento a otras OTs
+  //  - Asignar cada probeta a una OT distinta (columna "OT" en la tabla)
+  // Los overrides raíz + el split de probetas por nro_ot_override se aplican
+  // vía saveEnsayoNickBreakMultiOt (en store-api.js).
+  var otNroActual = props.otNro || '';
+  var otActualObj = otNroActual && window.LabStore && window.LabStore.getOt
+    ? window.LabStore.getOt(otNroActual) : null;
+  var solActual = otActualObj && otActualObj.nro_solicitud;
+  var otsDisponibles = (solActual && window.LabStore.listOtsBySolicitud)
+    ? window.LabStore.listOtsBySolicitud(solActual)
+    : (otActualObj ? [otActualObj] : []);
+  var multiOtNb = otsDisponibles.length > 1;
+  var otNroActualStrNb = String(otNroActual || '');
+  var _copyKeyNb = React.useState(''); var copyOpenKeyNb = _copyKeyNb[0], setCopyOpenKeyNb = _copyKeyNb[1];
+  var _copyDestNb = React.useState([]); var copyDestGenNb = _copyDestNb[0], setCopyDestGenNb = _copyDestNb[1];
+  function copiarCamposNbAOts(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapaCond[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) {
+          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        }
+      });
+      mapaCond[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapaCond);
+    if (window._labToastOk) {
+      window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+    }
+  }
+  function botonCopiarSeccionNb(claveUnica, etiqueta, camposList, descripcion) {
+    if (!multiOtNb) return null;
+    var abierto = copyOpenKeyNb === claveUnica;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () { setCopyDestGenNb([]); setCopyOpenKeyNb(abierto ? '' : claveUnica); },
+        style: {
+          border: '1px solid #0969da', background: '#fff', color: '#0969da',
+          padding: '3px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: '#fff', border: '1px solid #d0d7de', borderRadius: 6,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 240, fontSize: 11,
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6, color: '#24292f' } }, etiqueta + ' a:'),
+        descripcion ? _r('div', { style: { fontSize: 10, color: '#57606a', marginBottom: 8 } }, descripcion) : null,
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrNb; }).map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestGenNb.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestGenNb(checked ? copyDestGenNb.filter(function (n) { return n !== nro; }) : copyDestGenNb.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenKeyNb(''); },
+            style: { border: '1px solid #d0d7de', background: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestGenNb.slice();
+              if (destinos.length === 0) {
+                destinos = otsDisponibles.filter(function (o) { return String(o.nro_ot) !== otNroActualStrNb; }).map(function (o) { return String(o.nro_ot); });
+              }
+              copiarCamposNbAOts(destinos, camposList);
+              setCopyOpenKeyNb(''); setCopyDestGenNb([]);
+            },
+            style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
+  var CAMPOS_CONDICIONES_NB = [
+    'metodologia', 'metodo_ensayo', 'mecanizado_segun', 'temperatura', '_mecAuto',
+    'cod_asme', 'ed_asme', 'cod_api1104', 'cod_aws_d11', 'cod_api5l',
+    'cod_asme_pcc2', 'cod_api1104_fig', 'cod_aws_b40', 'cod_otro_chk', 'cod_otro',
+  ];
+  var CAMPOS_EQUIPAMIENTO_NB = ['variante', 'equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos'];
+  var CAMPOS_TODO_NB = CAMPOS_CONDICIONES_NB.concat(CAMPOS_EQUIPAMIENTO_NB);
+  var barraCopiarTodoNb = multiOtNb ? _r('div', {
+    style: {
+      padding: '8px 12px', background: '#e7f0ff', border: '1px solid #0969da',
+      borderTop: 'none', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11,
+    },
+  },
+    _r('span', { style: { fontSize: 16 } }, '📋'),
+    _r('span', { style: { flex: 1, color: '#0550ae' } },
+      'Copiar TODA la configuración (condiciones + equipamiento) a otras OT en un solo click.'),
+    botonCopiarSeccionNb('copiar_todo', 'Copiar todo a otras OT',
+      CAMPOS_TODO_NB,
+      'Copia condiciones (metodología, código, temperatura, probeta mec.) y equipamiento juntos.')
+  ) : null;
+
   // Bug 7: al marcar un código de referencia, autocompletar "Probeta mecanizada
   // según" con el texto del código (editable). Sólo pisa el campo si está vacío
   // o si fue autocompletado antes (`_mecAuto`); si el usuario lo editó, se respeta.
@@ -107,7 +214,12 @@ function NickBreakForm(props) {
 
   // ── CONDICIONES DE ENSAYO ──────────────────────────────────────────────
   var blockCond = _r('div', { style: { borderRight: '1px solid #333' } },
-    _r('div', { style: S.head }, 'CONDICIONES DE ENSAYO'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, 'CONDICIONES DE ENSAYO'),
+      botonCopiarSeccionNb('cond_nb', 'Copiar condiciones a otras OT',
+        CAMPOS_CONDICIONES_NB,
+        'Copia metodología, código de referencia, temperatura y probeta mecanizada según.')
+    ),
     _r('div', { style: S.box },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'METODOLOGÍA DE ENSAYO:'),
@@ -143,7 +255,12 @@ function NickBreakForm(props) {
 
   // ── EQUIPOS UTILIZADOS ──────────────────────────────────────────────────
   var blockEquipos = _r('div', null,
-    _r('div', { style: S.head }, 'EQUIPOS UTILIZADOS'),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, 'EQUIPOS UTILIZADOS'),
+      botonCopiarSeccionNb('equip_nb', 'Copiar equipamiento a otras OT',
+        CAMPOS_EQUIPAMIENTO_NB,
+        'Copia variante (EMIC/TORNE), equipos tildados + TAGs, y otros equipos manuales.')
+    ),
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 10.5 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -175,6 +292,10 @@ function NickBreakForm(props) {
         _r('thead', null,
           _r('tr', { style: { background: '#e6e6e6' } },
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 90 } }, 'MUESTRA N° / OT N°'),
+            // Columna OT: solo aparece si hay OTs hermanas (solicitud multi-OT).
+            multiOtNb
+              ? _r('th', { style: { border: '1px solid #333', padding: 4, width: 90 } }, 'OT')
+              : null,
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 70 } }, 'PROBETA'),
             _r('th', { style: { border: '1px solid #333', padding: 4 } }, 'RESULTADO'),
             _r('th', { style: { border: '1px solid #333', padding: 4, width: 30 } }, '')
@@ -183,10 +304,38 @@ function NickBreakForm(props) {
         _r('tbody', null,
           probetas.map(function (p, i) {
             p = p || {};
+            var otOverride = String(p.nro_ot_override || '').trim();
+            var otEffective = otOverride || otNroActual;
+            var esOtra = otOverride && otOverride !== otNroActual;
             return _r('tr', { key: i },
               _r('td', { style: { border: '1px solid #333', padding: 0 } },
                 _r('input', { style: Object.assign({}, S.input, { border: 'none', width: '100%' }),
                   value: p.muestra || '', onChange: function (e) { setProb(i, 'muestra', e.target.value); } })),
+              // Selector de OT — solo si hay OTs hermanas. Al cambiar, esta
+              // probeta se transfiere al ensayo nick-break de la OT destino
+              // al guardar (via saveEnsayoNickBreakMultiOt).
+              multiOtNb
+                ? _r('td', { style: { border: '1px solid #333', textAlign: 'center', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
+                    _r('select', {
+                      value: otEffective,
+                      onChange: function (e) {
+                        var v = String(e.target.value || '').trim();
+                        if (v === otNroActual) v = '';
+                        setProb(i, 'nro_ot_override', v);
+                      },
+                      title: 'OT destino de esta probeta (misma solicitud)',
+                      style: {
+                        border: 'none', outline: 'none', width: '100%',
+                        padding: '3px 4px', fontSize: 10, background: 'transparent',
+                        color: esOtra ? '#8a5a00' : '#24292f',
+                        fontWeight: esOtra ? 700 : 400,
+                      },
+                    },
+                      otsDisponibles.map(function (o) {
+                        var label = o.nro_ot + (o.nro_ot === otNroActual ? ' (esta)' : '');
+                        return _r('option', { key: o.nro_ot, value: o.nro_ot }, label);
+                      })))
+                : null,
               // PROBETA: numeración automática 1, 2, 3… (read-only, se rellena
               // por índice al momento de emitir/mostrar). Guardamos también en
               // p.id para que el generator y la exportación sigan viendo el
@@ -238,6 +387,7 @@ function NickBreakForm(props) {
   );
 
   return _r('div', { style: S.sheet },
+    barraCopiarTodoNb,
     _r('div', { style: { display: 'grid', gridTemplateColumns: '1.3fr 1fr' } }, blockCond, blockEquipos),
     blockResultados, blockMemoriaNotas
   );

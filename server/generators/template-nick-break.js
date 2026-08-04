@@ -172,6 +172,22 @@ function generarNickBreakDesdeTemplate(ot, datos, fotosCaratula) {
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
 
+  // Filtro multi-OT: cuando word-generator emite un docx por cada OT del
+  // registro, `datos._filtro_ot` indica qué OT toca ahora — solo se dejan las
+  // probetas con nro_ot_override igual (o vacío, si es la OT del ensayo).
+  if (datos._filtro_ot != null) {
+    const otFiltro = String(datos._filtro_ot);
+    const esOtDelEnsayo = otFiltro === String(ot.nro_ot || '');
+    const filtrarArr = (arr) => (Array.isArray(arr) ? arr : []).filter(p => {
+      const ov = String((p && p.nro_ot_override) || '').trim();
+      const perteneceA = ov || String(ot.nro_ot || '');
+      return perteneceA === otFiltro || (esOtDelEnsayo && !ov);
+    });
+    datos = Object.assign({}, datos);
+    if (Array.isArray(datos.probetas))   datos.probetas   = filtrarArr(datos.probetas);
+    if (Array.isArray(datos.resultados)) datos.resultados = filtrarArr(datos.resultados);
+  }
+
   const equipo   = datos.equipamiento || {};
   // Normalizar p.tipo_resultado: legado "Sin indicaciones" -> "No presenta indicaciones relevantes"
   // (el form ya no lo ofrece, pero puede venir del agente-mapeo)

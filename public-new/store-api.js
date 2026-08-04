@@ -765,6 +765,110 @@
       });
     },
 
+    // Split multi-OT para nick-break: mismo patrón que plegado/impacto pero
+    // dividiendo `probetas[]` (no `resultados[]`). Las probetas con
+    // `nro_ot_override` apuntando a otra OT se transfieren al ensayo nick-break
+    // de esa OT hermana. Aplana `condiciones_por_ot` por hijo (override raíz
+    // desde el botón Copiar).
+    saveEnsayoNickBreakMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var probetas = Array.isArray(datos.probetas) ? datos.probetas : [];
+      var otActualStr = String(nro_ot_actual);
+      var grupos = {};
+      probetas.forEach(function (p, i) {
+        var over = String((p && p.nro_ot_override) || '').trim();
+        var dest = over || otActualStr;
+        (grupos[dest] = grupos[dest] || []).push(i);
+      });
+      function extraerGrupo(idxs) {
+        return idxs.map(function (oldIdx) {
+          var p = Object.assign({}, probetas[oldIdx] || {});
+          delete p.nro_ot_override;
+          return p;
+        });
+      }
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      var OVERRIDE_RAIZ_KEYS = [
+        'metodologia', 'metodo_ensayo', 'mecanizado_segun', 'temperatura', '_mecAuto',
+        'cod_asme', 'ed_asme', 'cod_api1104', 'cod_aws_d11', 'cod_api5l',
+        'cod_asme_pcc2', 'cod_api1104_fig', 'cod_aws_b40', 'cod_otro_chk', 'cod_otro',
+        'variante', 'equipo', 'equipamiento', 'equipamiento_tags', 'otros_equipos',
+      ];
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      // Destinos: los grupos de probetas + los definidos en condiciones_por_ot.
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
+      var idxActual = grupos[otActualStr] || [];
+      var datosActual = Object.assign({}, datos);
+      delete datosActual.condiciones_por_ot;
+      datosActual.probetas = extraerGrupo(idxActual);
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'nick-break', datosActual, existingId || null);
+      var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var subProbetas = grupos[nroY] ? extraerGrupo(grupos[nroY]) : [];
+        var existente = _db.ensayos.find(function (e) {
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'nick-break';
+        });
+        var overrideRaiz = overridesRaizPara(nroY);
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          var probetasPrev = Array.isArray(datosPrev.probetas) ? datosPrev.probetas : [];
+          // Descartar filas iniciales en blanco que el form inserta al crear.
+          probetasPrev = probetasPrev.filter(function (p) {
+            var vals = Object.keys(p || {}).filter(function (k) { return k !== 'id'; });
+            return vals.some(function (k) { var v = p[k]; return v != null && v !== '' && v !== false; });
+          });
+          datosY = Object.assign({}, datosPrev, { probetas: probetasPrev.concat(subProbetas) });
+          Object.assign(datosY, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          var CONDICIONES_GLOBALES = [
+            'variante', 'equipo', 'metodologia', 'metodo_ensayo',
+            'mecanizado_segun', '_mecAuto', 'temperatura',
+            'cod_asme', 'ed_asme', 'cod_api1104', 'cod_aws_d11', 'cod_api5l',
+            'cod_asme_pcc2', 'cod_api1104_fig', 'cod_aws_b40', 'cod_otro_chk', 'cod_otro',
+            'equipamiento', 'equipamiento_tags', 'otros_equipos',
+            'memoria_texto', 'observaciones_extra',
+          ];
+          datosY = { probetas: subProbetas };
+          CONDICIONES_GLOBALES.forEach(function (k) {
+            if (datos[k] !== undefined) datosY[k] = datos[k];
+          });
+          Object.assign(datosY, overrideRaiz);
+          delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'nick-break', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, cantidad: subProbetas.length, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: idxActual.length },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
     // Split multi-OT para impacto: mismo patrón que tracción/plegado. Las filas
     // de `resultados[]` con `nro_ot_override` apuntando a otra OT se transfieren
     // al ensayo de impacto de esa OT hermana. Aplana `textos_por_ot` y
