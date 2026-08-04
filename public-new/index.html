@@ -457,11 +457,11 @@ a{color:inherit;text-decoration:none;}
 
 /* report card */
 .report-card{background:var(--surface-2);}
-.pre-toggle-wrap{padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);margin-bottom:14px;}
+.pre-toggle-wrap{display:flex;align-items:flex-start;gap:11px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);margin-bottom:14px;}
 .pre-toggle{display:inline-flex;align-items:flex-start;gap:11px;cursor:pointer;}
-.pre-toggle-texts{display:flex;flex-direction:column;}
+.pre-toggle-texts{display:flex;flex-direction:column;cursor:default;}
 .pre-toggle input{display:none;}
-.pre-toggle-box{width:19px;height:19px;border-radius:5px;border:1.5px solid var(--border-strong);background:var(--surface);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;margin-top:1px;transition:.14s;}
+.pre-toggle-box{width:19px;height:19px;border-radius:5px;border:1.5px solid var(--border-strong);background:var(--surface);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;margin-top:1px;transition:.14s;cursor:pointer;}
 .pre-toggle input:checked + .pre-toggle-box{background:var(--warning);border-color:var(--warning);}
 .pre-toggle-label{display:block;font-weight:600;font-size:13px;}
 .pre-toggle-hint{display:block;font-size:11.5px;color:var(--text-3);}
