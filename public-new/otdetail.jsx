@@ -1073,16 +1073,16 @@ function OTDetail(props) {
       cantHermanas: otsHermanas.length,
       tieneSolicitud: !!ot.nro_solicitud,
       onCancel: function () { setRazonDlg(null); },
-      onConfirm: function (razonFinal, aplicarSolicitud) {
+      onConfirm: function (razonFinal) {
         var razonCambio = razonFinal.trim() !== (ot.razon_social || '').trim();
         if (razonCambio) {
-          // Aplica a la actual + hermanas si aplicarSolicitud === true.
-          if (aplicarSolicitud && ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
+          // La razón social es un dato de la solicitud, no de la OT: siempre
+          // propaga a todas las hermanas para mantenerlas consistentes.
+          if (ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
             window.LabStore.updateSolicitud(ot.nro_solicitud, { razon_social: razonFinal.trim() });
           } else {
             window.LabStore.updateOt(ot.nro_ot, { razon_social: razonFinal.trim() });
           }
-          // Refrescar antes de continuar (para que la carpeta destino use el nuevo).
           ot.razon_social = razonFinal.trim();
         }
         var modo = razonDlg.modo;
@@ -1148,10 +1148,12 @@ function OTDetail(props) {
 // del bot). Opción para propagar el cambio a todas las OTs de la solicitud.
 function ConfirmarRazonSocialModal(props) {
   var _r2 = React.useState(props.razonActual || ''); var razon = _r2[0], setRazon = _r2[1];
-  var _p = React.useState(true); var propagar = _p[0], setPropagar = _p[1];
   var cambio = razon.trim() !== (props.razonActual || '').trim();
   var puedeConfirmar = razon.trim().length >= 2;
   var esBatch = props.modo === 'batch';
+  // La razón social es dato de la solicitud: cualquier cambio propaga a todas
+  // las hermanas. No hay checkbox: siempre se aplica al lote entero.
+  var totalOts = props.tieneSolicitud ? (props.cantHermanas || 1) : 1;
   return React.createElement('div', {
     style: {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
@@ -1165,7 +1167,11 @@ function ConfirmarRazonSocialModal(props) {
         React.createElement('div', null,
           React.createElement('h3', { style: { margin: 0, color: '#0550ae', fontSize: 15 } }, 'Confirmar razón social'),
           React.createElement('div', { style: { fontSize: 12, color: '#0550aec0', marginTop: 3 } },
-            esBatch ? 'Batch de ' + (props.cantidadOts || 1) + ' OT(s) — el cambio aplica a la solicitud entera' : 'La razón social define la carpeta destino en el drive')
+            esBatch
+              ? 'Batch de ' + (props.cantidadOts || 1) + ' OT(s) — el cambio aplica a la solicitud entera'
+              : (props.tieneSolicitud
+                  ? 'La razón social es de la solicitud (aplica a las ' + totalOts + ' OTs hermanas)'
+                  : 'La razón social define la carpeta destino en el drive'))
         )
       ),
       React.createElement('div', { style: { padding: 20 } },
@@ -1175,20 +1181,16 @@ function ConfirmarRazonSocialModal(props) {
           onChange: function (e) { setRazon(e.target.value); },
           style: { width: '100%', padding: '8px 10px', border: '1px solid ' + (cambio ? '#0969da' : '#d0d7de'), borderRadius: 4, fontSize: 13, fontFamily: 'inherit' },
         }),
-        cambio && props.tieneSolicitud && !esBatch ? React.createElement('label', {
-          style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, cursor: 'pointer' },
-        },
-          React.createElement('input', { type: 'checkbox', checked: propagar, onChange: function (e) { setPropagar(e.target.checked); } }),
-          React.createElement('span', null, 'Aplicar el cambio a TODAS las OTs de la solicitud (' + (props.cantHermanas || 1) + ' OTs)')
-        ) : null,
         cambio ? React.createElement('div', { style: { fontSize: 11, color: '#8a5a00', marginTop: 8 } },
-          '⚠ Vas a modificar la razón social. Este cambio impacta en la carpeta destino del drive y queda persistido.') : null
+          props.tieneSolicitud
+            ? '⚠ El cambio se propaga a las ' + totalOts + ' OTs de la solicitud y afecta la carpeta destino en el drive.'
+            : '⚠ Vas a modificar la razón social. Impacta en la carpeta destino del drive.') : null
       ),
       React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid #d0d7de', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
         React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, 'Cancelar'),
         React.createElement(Button, {
           variant: 'primary', icon: 'check', disabled: !puedeConfirmar,
-          onClick: function () { if (puedeConfirmar) props.onConfirm(razon, esBatch ? true : propagar); },
+          onClick: function () { if (puedeConfirmar) props.onConfirm(razon); },
         }, cambio ? 'Confirmar y generar' : 'Generar')
       )
     )
