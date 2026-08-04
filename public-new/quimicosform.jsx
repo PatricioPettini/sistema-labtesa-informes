@@ -315,11 +315,22 @@ function QuimicosForm(props) {
 
   var _copyOpenQ = React.useState(false); var copyOpenQ = _copyOpenQ[0], setCopyOpenQ = _copyOpenQ[1];
   var _copyDestQ = React.useState([]); var copyDestQ = _copyDestQ[0], setCopyDestQ = _copyDestQ[1];
+  // Keys por-OT (viven en condiciones_por_ot[<OT>], no en la raíz). Se leen
+  // del mapa de la OT ACTIVA en 1.1 y se copian a los destinos. Actualmente
+  // solo `norma_ensayo_ot` porque código de referencia no aplica a químicos.
+  var COND_OT_KEYS_COPY = ['norma_ensayo_ot'];
   function copiarTodoQAOts(destinos) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, condPorOt);
+    // Fuente de las keys por-OT: la OT activa del selector de 1.1 (o la actual).
+    var condOtOrigen = mapaCond[otActivaCond] || mapaCond[otNroActualStr] || {};
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
+      COND_OT_KEYS_COPY.forEach(function (k) {
+        if (condOtOrigen[k] !== undefined && condOtOrigen[k] !== '') {
+          entry[k] = condOtOrigen[k];
+        }
+      });
       CAMPOS_TODO_Q.forEach(function (k) {
         if (datos[k] !== undefined) {
           entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
@@ -362,7 +373,7 @@ function QuimicosForm(props) {
     },
       _r('div', { style: { fontWeight: 700, marginBottom: 6 } }, 'Copiar todo a otras OT a:'),
       _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 8 } },
-        'Copia normas, verificaciones y equipamiento. La sección 1.1 (norma / código de referencia) NO se copia — es específica por OT.'),
+        'Copia norma de ensayo (1.1), metodología, verificaciones y equipamiento a las OTs seleccionadas.'),
       _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
         otsHermanasQ.map(function (o) {
           var nro = String(o.nro_ot);
