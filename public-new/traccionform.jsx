@@ -542,13 +542,7 @@ function TraccionForm(props) {
 
   // ── 1.2 CONDICIONES GENERALES (globales al ensayo, iguales para todas las probetas)
   var block11 = _r('div', null,
-    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.3  CONDICIONES GENERALES DEL ENSAYO'),
-      botonCopiarSeccionTr('cond_12', 'Copiar condiciones a otras OT',
-        ['metodologia', 'temperatura', 'ecuacion_seccion',
-         'estado_superficial', 'verif_alineacion', 'prob_cliente', 'prob_soldada'],
-        'Copia ITM, temperatura, ecuación de sección y checkboxes.')
-    ),
+    _r('div', { style: S.head }, '1.3  CONDICIONES GENERALES DEL ENSAYO'),
     _r('div', { style: Object.assign({}, S.box, { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }) },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
         _r('span', { style: { fontWeight: 600 } }, 'ITM:'),
@@ -734,15 +728,7 @@ function TraccionForm(props) {
   // ── EQUIPAMIENTO ──────────────────────────────────────────────────
   var equipos = datos.variante === 'neuquen' ? TRACCION_EQ_NEUQUEN : TRACCION_EQ_ESTANDAR;
   var block12 = _r('div', null,
-    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
-      _r('span', null, '1.4  EQUIPAMIENTO UTILIZADO ' + (datos.variante === 'neuquen' ? '— Set Shimadzu (Neuquén)' : '— Set EMIC (CABA)')),
-      botonCopiarSeccionTr('equip_14', 'Copiar equipamiento a otras OT',
-        // variante determina qué SET de equipos se muestra en el form (EMIC vs
-        // Shimadzu). Si no la copiamos, la hermana queda con equipos del set
-        // opuesto y no aparecen los checkboxes.
-        ['variante', 'equipamiento', 'equipamiento_tags', 'otros_equipos'],
-        'Copia set (EMIC/Shimadzu), equipos tildados, sus TAGs y "otros equipos".')
-    ),
+    _r('div', { style: S.head }, '1.4  EQUIPAMIENTO UTILIZADO ' + (datos.variante === 'neuquen' ? '— Set Shimadzu (Neuquén)' : '— Set EMIC (CABA)')),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 24px', fontSize: 11 } },
       equipos.map(function (e) {
         var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
@@ -1751,11 +1737,7 @@ function TraccionForm(props) {
       'Copiar TODA la configuración (condiciones + equipamiento) a otras OT en un solo click.'),
     botonCopiarSeccionTr('copiar_todo', 'Copiar todo a otras OT',
       CAMPOS_TODO_TR,
-      'Copia condiciones por probeta (1.1), condiciones generales (1.3) y equipamiento (1.4) juntos.',
-      // Keys de la sección 1.1 (CONDICIONES POR PROBETA) — viven en
-      // muestras[i][k], no en la raíz. Se leen de M1 (idxFisicas[0]) y el
-      // saver las aplica a todas las probetas físicas de la hermana.
-      ['norma', 'orientacion', 'plano_probeta', 'codigo_referencia', '_plano_auto'])
+      'Copia condiciones generales (1.3) y equipamiento (1.4). La sección 1.1 (norma / código / plano / orientación / probeta mec.) NO se copia — es específica de cada OT.')
   ) : null;
 
   return _r('div', { style: S.sheet },
