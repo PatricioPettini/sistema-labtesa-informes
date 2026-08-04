@@ -363,6 +363,36 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en químicos: divide muestras[] por nro_ot_override.
+    // También se dispara si hay condiciones_por_ot con datos para hermanas
+    // (botón "Copiar TODO" o edición de la sección 1.1 por-OT).
+    if (tipo === 'quimicos' && Array.isArray(clean.muestras)) {
+      var hayOverrideQ = clean.muestras.some(function (m) {
+        var over = String((m && m.nro_ot_override) || '').trim();
+        return over && over !== String(ot.nro_ot);
+      });
+      var hayCondsOtrasQ = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        if (n === String(ot.nro_ot)) return false;
+        var m = clean.condiciones_por_ot[n] || {};
+        return Object.keys(m).length > 0;
+      });
+      if ((hayOverrideQ || hayCondsOtrasQ) && typeof window.LabStore.saveEnsayoQuimicosMultiOt === 'function') {
+        window.LabStore.saveEnsayoQuimicosMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Químicos guardado · ' + resumen.otActual.cantidad + ' muestra(s) en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
+        return;
+      }
+    }
     // Propagación multi-OT en brinell: no divide mediciones, solo replica
     // normas / condiciones / equipamiento a las hermanas listadas en
     // condiciones_por_ot.
@@ -599,7 +629,7 @@ function EnsayoForm(props) {
         ? React.createElement(window.PlegadoForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'quimicos' && typeof window.QuimicosForm === 'function'
-        ? React.createElement(window.QuimicosForm, { datos: datos, set: set })
+        ? React.createElement(window.QuimicosForm, { datos: datos, set: set, otNro: props.nro_ot })
         : null,
       tipo === 'dureza-brinell' && typeof window.BrinellForm === 'function'
         ? React.createElement(window.BrinellForm, { datos: datos, set: set, otNro: props.nro_ot })

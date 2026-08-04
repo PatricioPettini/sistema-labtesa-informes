@@ -1073,6 +1073,147 @@
       });
     },
 
+    // Split multi-OT para análisis químico. Divide `muestras[]` por
+    // nro_ot_override — cada OT destino recibe SUS muestras + condiciones
+    // globales (normas checkbox, verificaciones, equipamiento). Además,
+    // `condiciones_por_ot[<OT>]` guarda la sección 1.1 (norma / código de
+    // referencia) por-OT — se preserva en el mapa del ensayo hijo.
+    saveEnsayoQuimicosMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var muestras = Array.isArray(datos.muestras) ? datos.muestras : [];
+      var muestrasOn = Array.isArray(datos.muestras_on) ? datos.muestras_on : [];
+      var otNumeros = Array.isArray(datos.ot_numeros) ? datos.ot_numeros : [];
+      var otActualStr = String(nro_ot_actual);
+      var grupos = {}; // nro_ot -> [idxOriginal, ...]
+      muestras.forEach(function (m, i) {
+        var over = String((m && m.nro_ot_override) || '').trim();
+        var dest = over || otActualStr;
+        (grupos[dest] = grupos[dest] || []).push(i);
+      });
+      function extraerGrupo(idxs) {
+        return {
+          muestras: idxs.map(function (oi) {
+            var m = Object.assign({}, muestras[oi] || {});
+            delete m.nro_ot_override;
+            return m;
+          }),
+          muestras_on: idxs.map(function (oi) {
+            return muestrasOn[oi] !== undefined ? muestrasOn[oi] : true;
+          }),
+          ot_numeros: idxs.map(function (oi) { return otNumeros[oi] || ''; }),
+        };
+      }
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      // Campos del "Copiar TODO" que aplanan a la raíz del hijo. El mapa
+      // condiciones_por_ot conserva las keys por-OT (norma_ensayo_ot, etc.).
+      var OVERRIDE_RAIZ_KEYS_Q = [
+        'variante', 'temperatura', 'patron', 'patron_chk',
+        'norma_itm054', 'norma_itm057', 'norma_itm058', 'norma_itm091', 'norma_itqb068',
+        'norma_e663', 'norma_e415', 'norma_e634', 'norma_e1086', 'norma_e1251',
+        'norma_e1999', 'norma_e2209', 'norma_e2994', 'norma_e3047', 'norma_e1019',
+        'norma_a751', 'norma_e1024', 'norma_otra_chk', 'norma_otra',
+        'estado_electrodo', 'estado_muestra', 'estado_equipo',
+        'calibracion_chk', 'calibracion', 'seleccion_base_chk', 'seleccion_base',
+        'zona_evaluacion', 'cantidad_determinaciones',
+        'equipamiento', 'equipamiento_tags', 'otros_equipos',
+      ];
+      // Suffix _year de todas las normas conocidas.
+      ['norma_itm054','norma_itm057','norma_itm058','norma_itm091','norma_itqb068',
+       'norma_e663','norma_e415','norma_e634','norma_e1086','norma_e1251',
+       'norma_e1999','norma_e2209','norma_e2994','norma_e3047','norma_e1019',
+       'norma_a751','norma_e1024'].forEach(function (k) { OVERRIDE_RAIZ_KEYS_Q.push(k + '_year'); });
+
+      function condsMapPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var soloMap = {};
+        Object.keys(m).forEach(function (k) {
+          if (OVERRIDE_RAIZ_KEYS_Q.indexOf(k) < 0) soloMap[k] = m[k];
+        });
+        return Object.keys(soloMap).length > 0
+          ? { condiciones_por_ot: { [nroOt]: soloMap } }
+          : {};
+      }
+      function overridesRaizPara(nroOt) {
+        var m = mapaCond[nroOt];
+        if (!m) return {};
+        var out = {};
+        OVERRIDE_RAIZ_KEYS_Q.forEach(function (k) {
+          if (m[k] !== undefined) {
+            out[k] = (typeof m[k] === 'object' && m[k] !== null && !Array.isArray(m[k]))
+              ? Object.assign({}, m[k])
+              : (Array.isArray(m[k]) ? m[k].slice() : m[k]);
+          }
+        });
+        return out;
+      }
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
+
+      var idxActual = grupos[otActualStr] || [];
+      var subActual = extraerGrupo(idxActual);
+      var datosActual = Object.assign({}, datos, condsMapPara(otActualStr));
+      datosActual.muestras = subActual.muestras;
+      datosActual.muestras_on = subActual.muestras_on;
+      datosActual.ot_numeros = subActual.ot_numeros;
+      if (!datosActual.condiciones_por_ot) delete datosActual.condiciones_por_ot;
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'quimicos', datosActual, existingId || null);
+
+      var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var sub = grupos[nroY] ? extraerGrupo(grupos[nroY]) : { muestras: [], muestras_on: [], ot_numeros: [] };
+        var existente = _db.ensayos.find(function (e) {
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'quimicos';
+        });
+        var overrideRaiz = overridesRaizPara(nroY);
+        var accion, datosY, existingIdY;
+        if (existente) {
+          accion = 'actualizado';
+          existingIdY = existente.id;
+          var datosPrev = {};
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          datosY = Object.assign({}, datosPrev, condsMapPara(nroY));
+          // Reemplazar muestras del hermano con las del split (no concat: cada
+          // muestra pertenece a una sola OT, no queremos duplicar).
+          if (sub.muestras.length > 0) {
+            datosY.muestras = sub.muestras;
+            datosY.muestras_on = sub.muestras_on;
+            datosY.ot_numeros = sub.ot_numeros;
+          }
+          Object.assign(datosY, overrideRaiz);
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        } else {
+          accion = 'creado';
+          // Condiciones globales copiadas al hijo nuevo. patrones + espec y
+          // otros catálogos también se comparten (no dependen de la muestra).
+          var CONDICIONES_GLOBALES_Q = OVERRIDE_RAIZ_KEYS_Q.concat([
+            'patrones', 'espec', 'evaluacion_texto', 'material_tipo',
+            'tiene_evaluacion', 'observaciones_libres',
+          ]);
+          datosY = Object.assign({}, condsMapPara(nroY), {
+            muestras: sub.muestras, muestras_on: sub.muestras_on, ot_numeros: sub.ot_numeros,
+          });
+          CONDICIONES_GLOBALES_Q.forEach(function (k) {
+            if (datos[k] !== undefined) datosY[k] = datos[k];
+          });
+          Object.assign(datosY, overrideRaiz);
+          if (!datosY.condiciones_por_ot) delete datosY.condiciones_por_ot;
+        }
+        return self.saveEnsayoAsync(nroY, 'quimicos', datosY, existingIdY).then(function (row) {
+          return { nro_ot: nroY, accion: accion, cantidad: sub.muestras.length, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: idxActual.length },
+          otsHermanas: results.slice(1),
+        };
+      });
+    },
+
     // Split multi-OT para metalografía general y anexo metalográfico.
     // A diferencia de tracción/plegado/impacto (que dividen por FILAS), acá
     // se dividen las IMÁGENES: cada imagen tiene su propio `nro_ot_override`.
