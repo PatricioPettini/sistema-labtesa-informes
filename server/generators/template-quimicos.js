@@ -385,15 +385,21 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
     });
   }
 
-  // Evaluación / Notas
-  // La evaluación se emite si `tiene_evaluacion !== false` Y hay texto o
-  // material_tipo cargado. Si el usuario desmarca "Incluir evaluación" en el
-  // form, `tiene_evaluacion` se guarda como false y la sección se oculta
-  // aunque haya datos residuales.
+  // Observaciones / Evaluación
+  // El form tiene dos sub-bloques dentro de la sección 1.5:
+  //   - Observaciones (`observaciones_libres`): texto suelto, se emite arriba.
+  //   - Evaluación (`evaluacion_texto` + `material_tipo`): sólo si
+  //     `tiene_evaluacion !== false`. Si el usuario desmarca "Incluir
+  //     evaluación", la evaluación NO se emite aunque haya texto residual.
+  // Se ocultan sólo si NINGUNO de los dos sub-bloques tiene contenido.
   const lineasObs = [];
-  const evalText = (datos.evaluacion_texto || '').trim();
+  const obsLibres    = (datos.observaciones_libres || '').trim();
+  const evalText     = (datos.evaluacion_texto || '').trim();
   const materialTipo = (datos.material_tipo || '').trim();
   const evalHabilitada = datos.tiene_evaluacion !== false;
+  if (obsLibres) {
+    obsLibres.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasObs.push(l));
+  }
   if (evalHabilitada && (evalText || materialTipo)) {
     let linea = evalText || 'La muestra analizada satisface los requerimientos de composición química de un material tipo:';
     if (materialTipo) {
