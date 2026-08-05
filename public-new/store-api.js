@@ -733,16 +733,29 @@
       });
     },
 
-    // Propagación multi-OT para brinell: brinell NO divide `mediciones` por OT
-    // (esas filas quedan enteras en la OT actual — la columna "OT" es texto
-    // libre para el docx). Este saver solo replica normas / condiciones /
-    // equipamiento a los ensayos brinell de las OTs hermanas listadas en
-    // `datos.condiciones_por_ot`. Si la hermana no tiene un ensayo brinell,
-    // se crea con esos overrides + condiciones globales. Si ya lo tiene, se
-    // pisan los campos overrideados (no toca sus mediciones).
+    // Multi-OT para brinell: divide `mediciones[]` por `nro_ot_override` — cada
+    // OT hermana recibe SUS mediciones + condiciones globales. También replica
+    // los overrides raíz (normas / condiciones / equipamiento) de las hermanas
+    // listadas en `datos.condiciones_por_ot` (botón "Copiar TODO").
     saveEnsayoBrinellMultiOt: function (nro_ot_actual, datos, existingId) {
       var self = this;
+      var mediciones = Array.isArray(datos.mediciones) ? datos.mediciones : [];
       var otActualStr = String(nro_ot_actual);
+      // Agrupar mediciones por OT destino.
+      var grupos = {};
+      mediciones.forEach(function (m, i) {
+        var over = String((m && m.nro_ot_override) || '').trim();
+        var dest = over || otActualStr;
+        (grupos[dest] = grupos[dest] || []).push(i);
+      });
+      function extraerGrupo(idxs) {
+        return idxs.map(function (oldIdx) {
+          var m = Object.assign({}, mediciones[oldIdx] || {});
+          delete m.nro_ot_override;
+          // También ajustamos m.ot al string del nroOt destino (para el docx).
+          return m;
+        });
+      }
       var mapaCond = (datos && datos.condiciones_por_ot) || {};
       // Todo lo que puede propagarse a la raíz del hijo (unión de los 3 subsets
       // del form: normas 1.1, condiciones 1.2, equipamiento 1.3).
@@ -767,12 +780,22 @@
         });
         return out;
       }
-      // OT actual: guardar tal cual (sin el mapa condiciones_por_ot).
+      // Destinos: grupos por medición + OTs mencionadas en condiciones_por_ot.
+      var otsDestSet = {};
+      Object.keys(grupos).forEach(function (n) { otsDestSet[n] = true; });
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDestSet[n] = true; });
+      var otsDest = Object.keys(otsDestSet);
+
+      // OT actual: solo sus mediciones + resto de campos.
+      var idxActual = grupos[otActualStr] || [];
       var datosActual = Object.assign({}, datos);
+      datosActual.mediciones = extraerGrupo(idxActual);
       delete datosActual.condiciones_por_ot;
       var promActual = self.saveEnsayoAsync(nro_ot_actual, 'dureza-brinell', datosActual, existingId || null);
-      var hermanas = Object.keys(mapaCond).filter(function (n) { return n && n !== otActualStr; });
+
+      var hermanas = otsDest.filter(function (n) { return n !== otActualStr; });
       var promsHermanas = hermanas.map(function (nroY) {
+        var subMediciones = grupos[nroY] ? extraerGrupo(grupos[nroY]) : [];
         var overrideRaiz = overridesRaizPara(nroY);
         var existente = _db.ensayos.find(function (e) {
           return String(e.nro_ot) === String(nroY) && e.tipo === 'dureza-brinell';
@@ -783,7 +806,11 @@
           existingIdY = existente.id;
           var datosPrev = {};
           try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+          // Si hay mediciones nuevas para esta hermana, reemplazan las viejas
+          // (el técnico está haciendo el split desde la OT origen — es el
+          // "source of truth" actual). Si no, se preservan las que había.
           datosY = Object.assign({}, datosPrev, overrideRaiz);
+          if (subMediciones.length > 0) datosY.mediciones = subMediciones;
           delete datosY.condiciones_por_ot;
         } else {
           accion = 'creado';
@@ -796,7 +823,7 @@
             'mapa_microdurezas', 'evaluacion_texto',
             'incluir_espesor', 'incluir_diametro_impronta',
           ];
-          datosY = { mediciones: [] };
+          datosY = { mediciones: subMediciones };
           CONDICIONES_GLOBALES.forEach(function (k) {
             if (datos[k] !== undefined) datosY[k] = datos[k];
           });
@@ -804,13 +831,13 @@
           delete datosY.condiciones_por_ot;
         }
         return self.saveEnsayoAsync(nroY, 'dureza-brinell', datosY, existingIdY).then(function (row) {
-          return { nro_ot: nroY, accion: accion, id: row && row.id };
+          return { nro_ot: nroY, accion: accion, cantidad: subMediciones.length, id: row && row.id };
         });
       });
       return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
         var actualRow = results[0];
         return {
-          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id },
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: idxActual.length },
           otsHermanas: results.slice(1),
         };
       });

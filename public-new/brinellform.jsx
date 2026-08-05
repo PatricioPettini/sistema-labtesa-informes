@@ -358,10 +358,42 @@ function BrinellForm(props) {
         _r('tbody', null,
           mediciones.map(function (r, i) {
             r = r || {};
+            var over = String(r.nro_ot_override || '').trim();
+            var otEff = over || String(r.ot || '') || otNroActualStrBr;
+            var esOtra = over && over !== otNroActualStrBr;
             return _r('tr', { key: i },
-              _r('td', { style: { border: '1px solid #333', padding: 0 } },
-                _r('input', { style: Object.assign({}, S.input, S.num, { border: 'none', width: '100%' }),
-                  value: r.ot || '', onChange: function (e) { setRow(i, 'ot', e.target.value); } })),
+              // Columna OT — cuando hay OTs hermanas, es un SELECT con las
+              // OTs disponibles (fila se asigna a esa OT y al guardar se
+              // transfiere al ensayo brinell de la hermana). Sin hermanas
+              // (single-OT) es un input libre por retrocompat.
+              _r('td', { style: { border: '1px solid #333', padding: 0, background: esOtra ? '#fff8e5' : '#fff' } },
+                multiOtBr
+                  ? _r('select', {
+                      value: otEff,
+                      onChange: function (e) {
+                        var v = String(e.target.value || '').trim();
+                        var next = mediciones.slice();
+                        next[i] = Object.assign({}, next[i] || {}, {
+                          ot: v,
+                          nro_ot_override: v === otNroActualStrBr ? '' : v,
+                        });
+                        set('mediciones', next);
+                      },
+                      title: 'OT destino de esta medición',
+                      style: {
+                        border: 'none', outline: 'none', width: '100%',
+                        padding: '4px 6px', fontSize: 10, background: 'transparent',
+                        color: esOtra ? '#8a5a00' : '#24292f',
+                        fontWeight: esOtra ? 700 : 400,
+                        fontFamily: 'ui-monospace, Consolas, monospace',
+                      },
+                    },
+                      otsDisponibles.map(function (o) {
+                        var lbl = o.nro_ot + (String(o.nro_ot) === otNroActualStrBr ? ' (esta)' : '');
+                        return _r('option', { key: o.nro_ot, value: o.nro_ot }, lbl);
+                      }))
+                  : _r('input', { style: Object.assign({}, S.input, S.num, { border: 'none', width: '100%' }),
+                      value: r.ot || '', onChange: function (e) { setRow(i, 'ot', e.target.value); } })),
               _r('td', { style: { border: '1px solid #333', padding: 0 } },
                 _r('input', { style: Object.assign({}, S.input, S.num, { border: 'none', width: '100%' }),
                   value: r.impronta || '', onChange: function (e) { setRow(i, 'impronta', e.target.value); } })),

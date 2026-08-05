@@ -418,21 +418,24 @@ function EnsayoForm(props) {
         return;
       }
     }
-    // Propagación multi-OT en brinell: no divide mediciones, solo replica
-    // normas / condiciones / equipamiento a las hermanas listadas en
-    // condiciones_por_ot.
+    // Multi-OT en brinell: divide mediciones por nro_ot_override + replica
+    // condiciones globales a las hermanas listadas en condiciones_por_ot.
     if (tipo === 'dureza-brinell') {
+      var hayOverrideBr = Array.isArray(clean.mediciones) && clean.mediciones.some(function (m) {
+        var over = String((m && m.nro_ot_override) || '').trim();
+        return over && over !== String(ot.nro_ot);
+      });
       var hayCondsOtrasBr = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
         if (n === String(ot.nro_ot)) return false;
         var m = clean.condiciones_por_ot[n] || {};
         return Object.keys(m).length > 0;
       });
-      if (hayCondsOtrasBr && typeof window.LabStore.saveEnsayoBrinellMultiOt === 'function') {
+      if ((hayOverrideBr || hayCondsOtrasBr) && typeof window.LabStore.saveEnsayoBrinellMultiOt === 'function') {
         window.LabStore.saveEnsayoBrinellMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
           .then(function (resumen) {
-            var msg = 'Brinell guardado en OT ' + resumen.otActual.nro_ot;
+            var msg = 'Brinell guardado · ' + (resumen.otActual.cantidad || 0) + ' medición(es) en OT ' + resumen.otActual.nro_ot;
             resumen.otsHermanas.forEach(function (h) {
-              msg += ' · ' + h.accion + ' en OT ' + h.nro_ot;
+              msg += ' · ' + (h.cantidad || 0) + ' ' + h.accion + ' en OT ' + h.nro_ot;
             });
             toast(msg, 'success');
             nav('#/ot/' + ot.nro_ot);
