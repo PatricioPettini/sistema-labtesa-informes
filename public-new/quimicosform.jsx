@@ -419,8 +419,8 @@ function QuimicosForm(props) {
     'zona_evaluacion', 'cantidad_determinaciones',
     // Equipamiento
     'equipamiento', 'equipamiento_tags', 'otros_equipos',
-    // Observaciones / Evaluación (1.5)
-    'observaciones_libres', 'tiene_evaluacion', 'material_tipo', 'evaluacion_texto',
+    // Sección 1.5: Observaciones y Evaluación NO se incluyen — cada una tiene
+    // su propio botón "Copiar a otras OT" porque pueden variar por OT.
   ];
   // Años de las normas (dinámico).
   QUIMICOS_NORMAS.forEach(function (n) { CAMPOS_TODO_Q.push(n.key + '_year'); });
@@ -840,34 +840,113 @@ function QuimicosForm(props) {
   );
 
   // ── 1.5 OBSERVACIONES / EVALUACIÓN ────────────────────────────────────
+  // Observaciones y Evaluación son textos que pueden variar entre OTs de una
+  // misma solicitud → NO se incluyen en "Copiar TODO". Cada uno tiene su
+  // propio botón "📋 Copiar a otras OT" para replicar solo esos campos.
   var evalActiva = datos.tiene_evaluacion !== false;
+  var _copyOpenSubK = React.useState('');
+  var copyOpenSubK = _copyOpenSubK[0], setCopyOpenSubK = _copyOpenSubK[1];
+  var _copyDestSub = React.useState([]);
+  var copyDestSub = _copyDestSub[0], setCopyDestSub = _copyDestSub[1];
+  function copiarSubsetQ(destinos, campos) {
+    if (!destinos || destinos.length === 0) return;
+    var mapa = Object.assign({}, condPorOt);
+    destinos.forEach(function (nroOt) {
+      var entry = Object.assign({}, mapa[nroOt] || {});
+      campos.forEach(function (k) {
+        if (datos[k] !== undefined) entry[k] = datos[k];
+      });
+      mapa[nroOt] = entry;
+    });
+    set('condiciones_por_ot', mapa);
+    if (window._labToastOk) window._labToastOk('Copiado a OT ' + destinos.join(', ') + ' — se aplica al guardar');
+  }
+  function botonCopiarSubsetQ(clave, etiqueta, campos) {
+    if (otsHermanasQ.length === 0) return null;
+    var abierto = copyOpenSubK === clave;
+    return _r('div', { style: { position: 'relative', display: 'inline-block' } },
+      _r('button', {
+        type: 'button',
+        onClick: function () { setCopyDestSub([]); setCopyOpenSubK(abierto ? '' : clave); },
+        style: {
+          border: '1px solid #0969da', background: '#fff', color: '#0969da',
+          padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+          fontWeight: 600, whiteSpace: 'nowrap',
+        },
+      }, '📋 ' + etiqueta),
+      abierto ? _r('div', {
+        style: {
+          position: 'absolute', zIndex: 30, top: '100%', right: 0, marginTop: 4,
+          background: '#fff', border: '1px solid var(--border)', borderRadius: 6,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: 10, minWidth: 240, fontSize: 11, color: 'var(--text)',
+        },
+      },
+        _r('div', { style: { fontWeight: 700, marginBottom: 6 } }, etiqueta + ' a:'),
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 } },
+          otsHermanasQ.map(function (o) {
+            var nro = String(o.nro_ot);
+            var checked = copyDestSub.indexOf(nro) >= 0;
+            return _r('label', { key: nro, style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+              _r('input', { type: 'checkbox', checked: checked,
+                onChange: function () {
+                  setCopyDestSub(checked ? copyDestSub.filter(function (n) { return n !== nro; }) : copyDestSub.concat([nro]));
+                } }),
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace' } }, nro));
+          })),
+        _r('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+          _r('button', { type: 'button', onClick: function () { setCopyOpenSubK(''); },
+            style: { border: '1px solid var(--border)', background: 'var(--surface)', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', color: 'var(--text)' } }, 'Cancelar'),
+          _r('button', { type: 'button',
+            onClick: function () {
+              var destinos = copyDestSub.slice();
+              if (destinos.length === 0) destinos = otsHermanasQ.map(function (o) { return String(o.nro_ot); });
+              copiarSubsetQ(destinos, campos);
+              setCopyOpenSubK(''); setCopyDestSub([]);
+            },
+            style: { border: '1px solid #0969da', background: '#0969da', color: '#fff', padding: '3px 10px', fontSize: 11, borderRadius: 3, cursor: 'pointer', fontWeight: 600 } }, 'Copiar'))
+      ) : null
+    );
+  }
+
   var block15 = _r('div', null,
     _r('div', { style: S.head }, '1.5  OBSERVACIONES / EVALUACION'),
-    _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 8 } },
-      // Textarea de observaciones libres (línea de puntos de la planilla)
+    _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 12 } },
+      // ── Sub-bloque OBSERVACIONES ─────────────────────────────────────
       _r('div', null,
-        _r('div', { style: { fontSize: 10, color: 'var(--text-3)', marginBottom: 3 } }, 'Observaciones (línea libre — se informa como texto suelto):'),
+        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
+          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Observaciones (línea libre — se informa como texto suelto):'),
+          _r('span', { style: { flex: 1 } }, ''),
+          botonCopiarSubsetQ('obs', 'Copiar a otras OT', ['observaciones_libres'])
+        ),
         _r('textarea', { style: Object.assign({}, S.textarea, { minHeight: 45 }),
           value: datos.observaciones_libres || '',
           placeholder: '……………………………………………………………………',
-          onChange: function (e) { upd('observaciones_libres', e.target.value); } })),
-      // Checkbox "material satisface" (idéntico a la planilla).
-      _r('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-        _r('input', { type: 'checkbox', checked: evalActiva,
-          onChange: function (e) {
-            var ch = e.target.checked;
-            upd('tiene_evaluacion', ch);
-            if (!ch) { upd('material_tipo', ''); }
-          } }),
-        _r('span', null, 'Incluir evaluación de resultados en el informe')),
-      evalActiva
-        ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
-            _r('span', { style: { fontWeight: 600 } }, 'La muestra analizada satisface los requerimientos de composición química de un material tipo:'),
-            _r('input', { style: Object.assign({}, S.input, { flex: 1, minWidth: 200 }),
-              value: datos.material_tipo || '',
-              placeholder: '……………………………………',
-              onChange: function (e) { upd('material_tipo', e.target.value); } }))
-        : null,
+          onChange: function (e) { upd('observaciones_libres', e.target.value); } })
+      ),
+      // ── Sub-bloque EVALUACIÓN ────────────────────────────────────────
+      _r('div', null,
+        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
+          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Evaluación:'),
+          _r('span', { style: { flex: 1 } }, ''),
+          botonCopiarSubsetQ('eval', 'Copiar a otras OT', ['tiene_evaluacion', 'material_tipo', 'evaluacion_texto'])
+        ),
+        _r('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+          _r('input', { type: 'checkbox', checked: evalActiva,
+            onChange: function (e) {
+              var ch = e.target.checked;
+              upd('tiene_evaluacion', ch);
+              if (!ch) { upd('material_tipo', ''); }
+            } }),
+          _r('span', null, 'Incluir evaluación de resultados en el informe')),
+        evalActiva
+          ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 } },
+              _r('span', { style: { fontWeight: 600 } }, 'La muestra analizada satisface los requerimientos de composición química de un material tipo:'),
+              _r('input', { style: Object.assign({}, S.input, { flex: 1, minWidth: 200 }),
+                value: datos.material_tipo || '',
+                placeholder: '……………………………………',
+                onChange: function (e) { upd('material_tipo', e.target.value); } }))
+          : null
+      ),
       // Nota al pie de la planilla
       _r('div', { style: { fontSize: 9, color: 'var(--text-3)', marginTop: 4, borderTop: '1px dashed var(--border)', paddingTop: 4 } },
         '*PARÁMETROS A INFORMAR    ·    FM-033 Rev 03')

@@ -1193,7 +1193,9 @@
         'calibracion_chk', 'calibracion', 'seleccion_base_chk', 'seleccion_base',
         'zona_evaluacion', 'cantidad_determinaciones',
         'equipamiento', 'equipamiento_tags', 'otros_equipos',
-        // Sección 1.5 OBSERVACIONES / EVALUACIÓN
+        // Sección 1.5 OBSERVACIONES / EVALUACIÓN — aplanan al hermano cuando
+        // el técnico usa el botón "Copiar a otras OT" del textarea (por
+        // separado, no incluidos en "Copiar TODO").
         'observaciones_libres', 'tiene_evaluacion', 'material_tipo', 'evaluacion_texto',
       ];
       // Suffix _year de todas las normas conocidas.
