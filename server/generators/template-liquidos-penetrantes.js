@@ -120,9 +120,25 @@ function construirBloqueEnsayo(datos) {
   // ── 1. CONDICIONES DE ENSAYO ──────────────────────────────────────────
   const lineasCond = [];
   if (normas.length) lineasCond.push('Norma de ensayo: ' + unirNatural(normas));
+  // Keys que representan una temperatura — se les agrega "°C" al final si el
+  // valor no trae ya la unidad. El técnico puede cargar "18", "18 °C" o
+  // "Ambiente" — solo agregamos °C si termina en dígito o dígito seguido de
+  // separador decimal (para no ensuciar "Ambiente" con °C).
+  const TEMP_KEYS = new Set(['temperatura_ensayo', 'temperatura_agua', 'temperatura_secado']);
+  function formatearValor(key, val) {
+    if (!TEMP_KEYS.has(key)) return val;
+    const s = String(val).trim();
+    if (!s) return s;
+    // Ya trae °C / grados: respetar.
+    if (/°\s*C\b/i.test(s) || /grados?/i.test(s)) return s;
+    // Solo numérico (con o sin coma/punto): agregar " °C".
+    if (/^\d+([.,]\d+)?$/.test(s)) return s + ' °C';
+    // Texto libre (ej. "Ambiente"): no tocar.
+    return s;
+  }
   CONDICIONES.forEach(([key, label]) => {
     const val = (datos[key] || '').toString().trim();
-    if (val) lineasCond.push(`${label}: ${val}`);
+    if (val) lineasCond.push(`${label}: ${formatearValor(key, val)}`);
   });
   if (lineasCond.length) {
     partes.push(pHeading('CONDICIONES DE ENSAYO'));
