@@ -93,6 +93,11 @@ function parsearOtsDeDesc(desc) {
 
   const OT_INLINE_PAREN     = /\(\s*O\.?T\.?\s*:?\s*(\d+)\s*\)/i;
   const OT_INLINE_SIN_PAREN = /^\s*O\.?T\.?\s*:?\s*(\d+)\b/i;
+  // "OT: NNNNN" en CUALQUIER posición de la línea (no anclado al inicio).
+  // Requiere 5+ dígitos para evitar falsos positivos ("OT: 12" en un texto
+  // random no es una OT real; las OT del laboratorio son de 6 dígitos).
+  // Debe venir precedido por inicio de línea o separador (espacio, ":", "-").
+  const OT_INLINE_MEDIO     = /(?:^|[\s:\-|(])O\.?T\.?\s*:?\s*(\d{5,})\b/i;
   // Formatos históricos que el parser viejo aceptaba:
   //   "OT1 (534355): SEPARADOR SB-807"  → muestra 1, ot 534355
   //   "OT12 (534355): xxx"              → muestra 12, ot 534355
@@ -130,6 +135,13 @@ function parsearOtsDeDesc(desc) {
       const mSin = trim.match(OT_INLINE_SIN_PAREN);
       if (mSin) otEnLinea = mSin[1];
     }
+    // Fallback: "OT: NNNNN" en medio de la línea (ej. "M4: OT: 539500 - ...").
+    // Solo activo cuando la línea tiene un prefijo "M<n>" — evita capturar
+    // referencias sueltas como "código OT: 1234" en textos random.
+    if (!otEnLinea && /^\s*(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+/i.test(trim)) {
+      const mMedio = trim.match(OT_INLINE_MEDIO);
+      if (mMedio) otEnLinea = mMedio[1];
+    }
 
     const mm = trim.match(M_PREFIX);
     const muestrasEnLinea = [];
@@ -157,6 +169,9 @@ function parsearOtsDeDesc(desc) {
       .replace(/^\s*(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+(?:\s+y\s+(?:M|Muestra)\s*(?:N\s*[°ºoO]?\s*)?\d+)?\s*/i, '')
       .replace(/^\s*:\s*/, '')
       .replace(/^\s*ID:\s*/i, '')
+      // "OT: NNNNN" o "OT NNNNN" al inicio (después de sacar el prefijo M<n>)
+      // — se elimina para que no quede duplicado en la descripción del ensayo.
+      .replace(/^\s*O\.?T\.?\s*:?\s*\d{5,}\s*[:\-]?\s*/i, '')
       .replace(/\s+/g, ' ')
       .trim();
 
