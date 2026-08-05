@@ -41,6 +41,7 @@ var MG_EQUIPOS = [
   { key: 'olympus_016', nombre: 'MICROSCOPIO OLYMPUS',       tagDefault: 'MM-016' },
   { key: 'leica_378',   nombre: 'MICROSCOPIO LEICA DM 750',  tagDefault: 'MM-378' },
   { key: 'termo_700',   nombre: 'TERMOHIGRÓMETRO',           tagDefault: 'MM-700' },
+  { key: 'termo_pcal_545', nombre: 'TERMOHIGRÓMETRO',        tagDefault: 'PCAL-545' },
 ];
 
 var MG_AUMENTOS = [

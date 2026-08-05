@@ -40,9 +40,10 @@ const REACTIVOS = [
 // equipo pero no editó el input de TAG en el form (equipamiento_tags[key]
 // queda undefined). Debe coincidir con el catálogo MG_EQUIPOS del front.
 const EQUIPOS = [
-  ['olympus_016', 'Microscopio Olympus',      'MM-016'],
-  ['leica_378',   'Microscopio Leica DM 750', 'MM-378'],
-  ['termo_700',   'Termohigrómetro',          'MM-700'],
+  ['olympus_016',     'Microscopio Olympus',      'MM-016'],
+  ['leica_378',       'Microscopio Leica DM 750', 'MM-378'],
+  ['termo_700',       'Termohigrómetro',          'MM-700'],
+  ['termo_pcal_545',  'Termohigrómetro',          'PCAL-545'],
 ];
 
 const AUMENTOS = [
