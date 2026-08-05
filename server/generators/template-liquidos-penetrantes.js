@@ -25,6 +25,7 @@ const CONDICIONES = [
   ['temperatura_ensayo',        'Temperatura de ensayo'],
   ['intensidad_luz_blanca',     'Intensidad de luz blanca'],
   ['potencia_luz_uv',           'Potencia de luz UV'],
+  ['limpieza_previa',           'Limpieza previa'],
   ['presion_aire',              'Presión de aire'],
   ['presion_agua',              'Presión de agua'],
   ['penetrante',                'Penetrante'],
@@ -126,9 +127,9 @@ function construirBloqueEnsayo(datos) {
   }
 
   // ── CONDICIONES DE ENSAYO ─────────────────────────────────────────────
+  // "Limpieza previa" está dentro del array CONDICIONES (después de "Potencia
+  // de luz UV") — respeta el orden definido en el form.
   const lineasCond = [];
-  const limpieza = (datos.limpieza_previa || '').trim();
-  if (limpieza) lineasCond.push(`Limpieza previa: ${limpieza}`);
   CONDICIONES.forEach(([key, label]) => {
     const val = (datos[key] || '').toString().trim();
     if (val) lineasCond.push(`${label}: ${val}`);

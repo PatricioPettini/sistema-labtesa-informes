@@ -44,7 +44,16 @@ function normalizar(s) {
 }
 
 function tokensSignificativos(s) {
-  const norm = normalizar(s).replace(FORMAS_JURIDICAS_RE, ' ');
+  let norm = normalizar(s).replace(FORMAS_JURIDICAS_RE, ' ');
+  // Concatenar secuencias de letras sueltas consecutivas como una sigla.
+  // Ej: "VALVULAS L V M SOC AN COM IND" → "VALVULAS LVM SOC AN COM IND"
+  //     "MARCA L.V.M."                   → "MARCA LVM"
+  // Sin esto, "L V M" se descarta por el filtro length>=3 y no matchea la
+  // carpeta "VALVULAS LVM" del drive (bug reportado: gana "VALVULAS BURZAN"
+  // por empate a 1 en "VALVULAS" resuelto alfabéticamente).
+  norm = norm.replace(/\b[A-Z](?:[.\s]+[A-Z])+\b/g, function (match) {
+    return match.replace(/[.\s]+/g, '');
+  });
   return norm
     .split(/[\s.\-]+/)
     .map(t => t.trim())

@@ -36,10 +36,10 @@ var LP_INSTRUMENTOS = [
 ];
 
 var LP_CONDICIONES = [
-  { key: 'limpieza_previa',          label: 'LIMPIEZA PREVIA:' },
   { key: 'temperatura_ensayo',       label: 'TEMPERATURA DE ENSAYO:' },
   { key: 'intensidad_luz_blanca',    label: 'INTENSIDAD DE LUZ BLANCA:' },
   { key: 'potencia_luz_uv',          label: 'POTENCIA DE LUZ UV:' },
+  { key: 'limpieza_previa',          label: 'LIMPIEZA PREVIA:' },
   { key: 'presion_aire',             label: 'PRESIÓN DE AIRE:' },
   { key: 'presion_agua',             label: 'PRESIÓN DE AGUA:' },
   { key: 'penetrante',               label: 'PENETRANTE:' },
