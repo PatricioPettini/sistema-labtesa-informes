@@ -39,13 +39,17 @@ const CONDICIONES = [
 ];
 
 // Instrumentos default con sus etiquetas humanas.
+// Orden fijo pedido por el laboratorio (matchea el modelo FM-043 en el drive).
+// Cuando un instrumento no está tildado en el form, se omite su línea — pero
+// el orden relativo de los que sí van se preserva.
 const INSTRUMENTOS = [
-  ['lampara',      'Lámpara'],
-  ['microwatt',    'Microwattímetro'],
-  ['refractometro','Refractómetro'],
-  ['manometro',    'Manómetro'],
-  ['patron',       'Patrón'],
-  ['luxometro',    'Luxómetro'],
+  ['luxometro',      'Luxómetro'],
+  ['lampara',        'Lámpara'],
+  ['microwatt',      'Microwattímetro'],
+  ['refractometro',  'Refractómetro'],
+  ['manometro',      'Manómetro'],
+  ['patron',         'Patrón'],
+  ['termohigrometro','Termohigrómetro'],
 ];
 
 function esc(s) {

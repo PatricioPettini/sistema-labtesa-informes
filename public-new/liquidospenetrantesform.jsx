@@ -26,13 +26,15 @@
 
 var _r = React.createElement;
 
+// Orden fijo del laboratorio (matchea el modelo FM-043 y el generator).
 var LP_INSTRUMENTOS = [
-  { key: 'lampara',       nombre: 'LÁMPARA' },
-  { key: 'microwatt',     nombre: 'MICROWATTÍMETRO' },
-  { key: 'refractometro', nombre: 'REFRACTÓMETRO' },
-  { key: 'manometro',     nombre: 'MANÓMETRO' },
-  { key: 'patron',        nombre: 'PATRÓN' },
-  { key: 'luxometro',     nombre: 'LUXÓMETRO' },
+  { key: 'luxometro',       nombre: 'LUXÓMETRO' },
+  { key: 'lampara',         nombre: 'LÁMPARA' },
+  { key: 'microwatt',       nombre: 'MICROWATTÍMETRO' },
+  { key: 'refractometro',   nombre: 'REFRACTÓMETRO' },
+  { key: 'manometro',       nombre: 'MANÓMETRO' },
+  { key: 'patron',          nombre: 'PATRÓN' },
+  { key: 'termohigrometro', nombre: 'TERMOHIGRÓMETRO' },
 ];
 
 var LP_CONDICIONES = [
