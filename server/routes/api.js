@@ -1698,6 +1698,48 @@ function buscarInformesPorSolicitud(nroSolicitud) {
   return xlsm;
 }
 
+// Lista los .xlsm que hay en la carpeta de una solicitud (para que el modal
+// del frontend permita PREVISUALIZAR y SELECCIONAR cuáles usar antes de
+// generar el AS400). Cada archivo tiene { name, path, size, mtime }.
+router.get('/as400/listar', (req, res) => {
+  try {
+    const nroSol = String((req.query && req.query.nro_solicitud) || '').trim();
+    if (!nroSol) return res.status(400).json({ error: 'Falta nro_solicitud' });
+    const paths = buscarInformesPorSolicitud(nroSol);
+    if (paths.length === 0) {
+      return res.status(404).json({
+        error: 'No se encontraron .xlsm para la solicitud ' + nroSol + ' en ' + AS400_CARPETA_SOL_BASE,
+        carpeta_base: AS400_CARPETA_SOL_BASE,
+      });
+    }
+    const informes = paths.map(p => {
+      let size = 0, mtime = null;
+      try {
+        const st = fsMod.statSync(p);
+        size = st.size;
+        mtime = st.mtime.toISOString();
+      } catch (e) {}
+      return {
+        name: pathMod.basename(p),
+        path: p,
+        size: size,
+        mtime: mtime,
+      };
+    });
+    // Carpeta destino (para preview del nombre final).
+    const carpetaPadre = pathMod.dirname(paths[0]);
+    res.json({
+      ok: true,
+      nro_solicitud: nroSol,
+      carpeta: carpetaPadre,
+      informes: informes,
+    });
+  } catch (err) {
+    console.error('[as400/listar]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint de diagnóstico: recibe un .xlsm y devuelve el contenido leído
 // (columna C rows 1..59) para ver exactamente qué valor lee el parser.
 // Con ?full=1 devuelve TODAS las celdas de TODOS los sheets — útil para
