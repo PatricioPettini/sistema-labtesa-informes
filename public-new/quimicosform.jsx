@@ -237,47 +237,114 @@ function QuimicosForm(props) {
     ),
     selectorOtCond,
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 } },
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Norma de ensayo:'),
-        // Input LIBRE de la norma + input separado de año opcional. Al hacer
-        // blur (perder foco) se normaliza al formato "<norma>-<AA>" (ej.
-        // "ASTM E415-23"). El año se persiste dentro del mismo string
-        // norma_ensayo_ot para que el generator lo emita tal cual sin cambios.
-        (function () {
-          // Separar el valor actual en norma + año (regex al final -N | -NN | -NNNN | :YYYY).
-          var raw = String(getCondOt(otActivaCond, 'norma_ensayo_ot') || '').trim();
-          var mYear = raw.match(/^(.+?)[\s]*[-:]\s*(\d{2,4})$/);
-          var normaBase = mYear ? mYear[1].trim() : raw;
-          var yearVal   = mYear ? mYear[2] : '';
-          function guardar(nBase, y) {
-            var b = String(nBase || '').trim();
-            var yy = String(y || '').trim();
-            var out = yy ? (b + '-' + yy) : b;
-            setCondOt(otActivaCond, 'norma_ensayo_ot', out);
+      // Normas de ensayo — array editable. Cada entrada es un input libre +
+      // input separado de año. Se puede agregar/quitar filas. Al guardar se
+      // persiste como array de strings "<norma>-<year>" en
+      // condiciones_por_ot[<OT>].normas_ensayo_ot (nuevo).
+      //
+      // Retrocompat: si el ensayo viene del formato viejo con `norma_ensayo_ot`
+      // (string único), se convierte a array de 1 entrada al leer. Al guardar
+      // se actualizan AMBAS keys: `normas_ensayo_ot` (array) es la fuente y
+      // `norma_ensayo_ot` (string) se sincroniza con la primera para que el
+      // generator legacy siga funcionando.
+      (function () {
+        var mapaCond = condPorOt[otActivaCond] || {};
+        var arr = Array.isArray(mapaCond.normas_ensayo_ot) ? mapaCond.normas_ensayo_ot.slice() : null;
+        if (!arr) {
+          // Legacy: string único → array de 1 entrada (con año detectado).
+          var raw = String(mapaCond.norma_ensayo_ot || '').trim();
+          arr = raw ? [raw] : [];
+        }
+        if (arr.length === 0) arr = [''];
+
+        // Regex más tolerante: detecta año al final con o sin paréntesis.
+        //   "ASTM E415-17"        → norma="ASTM E415",    year="17"
+        //   "ASTM E415-17 (2017)" → norma="ASTM E415-17", year="2017"
+        //   "ASTM E415 (2017)"    → norma="ASTM E415",    year="2017"
+        //   "ASTM E415:2017"      → norma="ASTM E415",    year="2017"
+        function splitAnio(s) {
+          var raw = String(s || '').trim();
+          var m = raw.match(/^(.+?)\s*(?:[-:]\s*)?\(?\s*(\d{2,4})\s*\)?\s*$/);
+          if (m) return { norma: m[1].trim(), year: m[2] };
+          return { norma: raw, year: '' };
+        }
+        function joinNorma(n, y) {
+          var b = String(n || '').trim();
+          var yy = String(y || '').trim();
+          return yy ? (b + '-' + yy) : b;
+        }
+        function commit(nextArr) {
+          var mapa = Object.assign({}, condPorOt);
+          var entry = Object.assign({}, mapa[otActivaCond] || {});
+          entry.normas_ensayo_ot = nextArr;
+          // Sincronizar el string legacy con TODAS las normas unidas con "; "
+          // (retrocompat: el generator antiguo leía solo un string). El
+          // generator nuevo prefiere el array; si no hay array, cae al string.
+          var strLegacy = nextArr.filter(function (x) { return String(x || '').trim(); }).join('; ');
+          if (strLegacy) entry.norma_ensayo_ot = strLegacy;
+          else delete entry.norma_ensayo_ot;
+          if (nextArr.length === 0 || (nextArr.length === 1 && !nextArr[0])) {
+            delete entry.normas_ensayo_ot;
           }
-          return _r('div', { style: { display: 'flex', gap: 6, flex: 1, alignItems: 'center' } },
-            typeof window.NormaInput === 'function'
-              ? _r(window.NormaInput, {
-                  tipo: 'quimicos', categoria: 'ensayo',
-                  style: Object.assign({}, S.input, { flex: 1 }),
-                  value: normaBase,
-                  placeholder: 'Ej: ASTM E415 · ASTM A751',
-                  onChange: function (e) { guardar(e.target.value, yearVal); },
-                })
-              : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
-                  value: normaBase, placeholder: 'Ej: ASTM E415',
-                  onChange: function (e) { guardar(e.target.value, yearVal); } }),
-            _r('span', { style: { color: 'var(--text-3)', fontSize: 10 } }, '-'),
-            _r('input', {
-              style: Object.assign({}, S.input, { width: 56, textAlign: 'center' }),
-              value: yearVal,
-              placeholder: 'AA',
-              title: 'Año (ej. 23 → ASTM E415-23)',
-              onChange: function (e) { guardar(normaBase, e.target.value); },
-            })
-          );
-        })()
-      ),
+          if (Object.keys(entry).length === 0) delete mapa[otActivaCond];
+          else mapa[otActivaCond] = entry;
+          set('condiciones_por_ot', mapa);
+        }
+        function setNorma(i, valNueva) {
+          var next = arr.slice();
+          next[i] = valNueva;
+          commit(next);
+        }
+        function addRow() { commit(arr.concat([''])); }
+        function delRow(i) {
+          var next = arr.filter(function (_, idx) { return idx !== i; });
+          if (next.length === 0) next = [''];
+          commit(next);
+        }
+        return _r('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 6 } },
+          _r('span', { style: { fontWeight: 600, minWidth: 160, paddingTop: 4 } }, 'Norma de ensayo:'),
+          _r('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4 } },
+            arr.map(function (valTotal, i) {
+              var parts = splitAnio(valTotal);
+              return _r('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                typeof window.NormaInput === 'function'
+                  ? _r(window.NormaInput, {
+                      tipo: 'quimicos', categoria: 'ensayo',
+                      style: Object.assign({}, S.input, { flex: 1 }),
+                      value: parts.norma,
+                      placeholder: 'Ej: ASTM E415',
+                      onChange: function (e) { setNorma(i, joinNorma(e.target.value, parts.year)); },
+                    })
+                  : _r('input', {
+                      style: Object.assign({}, S.input, { flex: 1 }),
+                      value: parts.norma, placeholder: 'Ej: ASTM E415',
+                      onChange: function (e) { setNorma(i, joinNorma(e.target.value, parts.year)); }
+                    }),
+                _r('span', { style: { color: 'var(--text-3)', fontSize: 10 } }, '-'),
+                _r('input', {
+                  style: Object.assign({}, S.input, { width: 56, textAlign: 'center' }),
+                  value: parts.year, placeholder: 'AA',
+                  title: 'Año (ej. 23 → ASTM E415-23)',
+                  onChange: function (e) { setNorma(i, joinNorma(parts.norma, e.target.value)); },
+                }),
+                arr.length > 1 ? _r('button', {
+                  type: 'button', onClick: function () { delRow(i); }, title: 'Quitar norma',
+                  style: { border: 'none', background: 'transparent', color: 'var(--danger)',
+                    cursor: 'pointer', fontSize: 13, padding: '0 4px' },
+                }, '✕') : null
+              );
+            }),
+            _r('button', {
+              type: 'button', onClick: addRow,
+              style: {
+                alignSelf: 'flex-start', border: '1px dashed var(--border)',
+                background: 'transparent', color: 'var(--accent)',
+                padding: '2px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 3,
+              },
+            }, '+ Agregar norma')
+          )
+        );
+      })(),
       // Metodología de ensayo — chips multi-select con los ITMs. El técnico
       // puede tildar varios (todos los que se aplicaron en el ensayo). Los
       // ITMs son metodologías internas Labtesa y NO llevan año.
@@ -361,7 +428,7 @@ function QuimicosForm(props) {
   // Keys por-OT (viven en condiciones_por_ot[<OT>], no en la raíz). Se leen
   // del mapa de la OT ACTIVA en 1.1 y se copian a los destinos. Actualmente
   // solo `norma_ensayo_ot` porque código de referencia no aplica a químicos.
-  var COND_OT_KEYS_COPY = ['norma_ensayo_ot'];
+  var COND_OT_KEYS_COPY = ['norma_ensayo_ot', 'normas_ensayo_ot'];
   function copiarTodoQAOts(destinos) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, condPorOt);
@@ -370,9 +437,11 @@ function QuimicosForm(props) {
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
       COND_OT_KEYS_COPY.forEach(function (k) {
-        if (condOtOrigen[k] !== undefined && condOtOrigen[k] !== '') {
-          entry[k] = condOtOrigen[k];
-        }
+        var v = condOtOrigen[k];
+        if (v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) return;
+        entry[k] = Array.isArray(v) ? v.slice()
+                : (typeof v === 'object' && v !== null) ? Object.assign({}, v)
+                : v;
       });
       CAMPOS_TODO_Q.forEach(function (k) {
         if (datos[k] !== undefined) {

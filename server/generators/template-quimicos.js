@@ -273,12 +273,25 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   if (itm && itmsInternos.length === 0) itmsInternos.push('ITM N˚' + itm);
 
   // Norma de ensayo por-OT — el form nuevo la guarda en condiciones_por_ot
-  // (sección 1.1). Se agrega al array de normas junto con las globales ASTM.
+  // (sección 1.1). Prefiere el array `normas_ensayo_ot` si existe; si no,
+  // cae al string legacy `norma_ensayo_ot` (puede tener múltiples separadas
+  // por "; ").
   if (datos.condiciones_por_ot && typeof datos.condiciones_por_ot === 'object') {
     const nroOtActualCond = String(ot.nro_ot || '');
     const condOt = datos.condiciones_por_ot[nroOtActualCond];
-    if (condOt && condOt.norma_ensayo_ot && String(condOt.norma_ensayo_ot).trim()) {
-      normasASM.push(String(condOt.norma_ensayo_ot).trim());
+    if (condOt) {
+      if (Array.isArray(condOt.normas_ensayo_ot)) {
+        condOt.normas_ensayo_ot.forEach(function (n) {
+          const v = String(n || '').trim();
+          if (v) normasASM.push(v);
+        });
+      } else if (condOt.norma_ensayo_ot && String(condOt.norma_ensayo_ot).trim()) {
+        // Legacy: string único, puede venir con "; " separando múltiples.
+        String(condOt.norma_ensayo_ot).split(/\s*;\s*/).forEach(function (n) {
+          const v = String(n || '').trim();
+          if (v) normasASM.push(v);
+        });
+      }
     }
   }
 
