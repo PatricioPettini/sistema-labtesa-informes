@@ -836,6 +836,8 @@
         'presion_aire', 'presion_agua', 'penetrante', 'revelador',
         'tipo_emulsificador', 'tiempo_penetracion_tinta', 'tiempo_revelado',
         'tiempo_emulsificacion', 'temperatura_agua', 'temperatura_secado',
+        // Resultados obtenidos (texto libre)
+        'resultado_texto',
       ];
       function overridesRaizPara(nroOt) {
         var m = mapaCond[nroOt];
