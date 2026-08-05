@@ -1168,12 +1168,20 @@ function ConfirmarRazonSocialModal(props) {
   // La razón social es dato de la solicitud: cualquier cambio propaga a todas
   // las hermanas. No hay checkbox: siempre se aplica al lote entero.
   var totalOts = props.tieneSolicitud ? (props.cantHermanas || 1) : 1;
+  // Cerrar por click en backdrop SOLO si el drag empezó Y terminó en el
+  // backdrop. Si el usuario arrastra desde adentro del input hacia afuera
+  // para seleccionar texto y suelta en el backdrop, no queremos cerrar.
+  var _dwn = React.useRef(false);
   return React.createElement('div', {
     style: {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     },
-    onClick: function (e) { if (e.target === e.currentTarget) props.onCancel(); },
+    onMouseDown: function (e) { _dwn.current = (e.target === e.currentTarget); },
+    onMouseUp: function (e) {
+      if (_dwn.current && e.target === e.currentTarget) props.onCancel();
+      _dwn.current = false;
+    },
   },
     React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(92vw, 540px)', overflow: 'hidden' } },
       React.createElement('div', { style: { background: '#e7f0ff', borderBottom: '1px solid #0969da', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
