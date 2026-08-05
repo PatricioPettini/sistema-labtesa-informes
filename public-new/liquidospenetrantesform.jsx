@@ -27,14 +27,16 @@
 var _r = React.createElement;
 
 // Orden fijo del laboratorio (matchea el modelo FM-043 y el generator).
+// tagDefault se pre-carga en el input cuando el técnico tilda el checkbox
+// y no había TAG guardado. Sigue siendo editable a mano.
 var LP_INSTRUMENTOS = [
-  { key: 'luxometro',       nombre: 'LUXÓMETRO' },
-  { key: 'lampara',         nombre: 'LÁMPARA' },
-  { key: 'microwatt',       nombre: 'MICROWATTÍMETRO' },
-  { key: 'refractometro',   nombre: 'REFRACTÓMETRO' },
-  { key: 'manometro',       nombre: 'MANÓMETRO' },
-  { key: 'patron',          nombre: 'PATRÓN' },
-  { key: 'termohigrometro', nombre: 'TERMOHIGRÓMETRO' },
+  { key: 'luxometro',       nombre: 'LUXÓMETRO',       tagDefault: 'MM-682' },
+  { key: 'lampara',         nombre: 'LÁMPARA',         tagDefault: 'MM-684' },
+  { key: 'microwatt',       nombre: 'MICROWATTÍMETRO', tagDefault: '' },
+  { key: 'refractometro',   nombre: 'REFRACTÓMETRO',   tagDefault: '' },
+  { key: 'manometro',       nombre: 'MANÓMETRO',       tagDefault: '' },
+  { key: 'patron',          nombre: 'PATRÓN',          tagDefault: 'PMM-676' },
+  { key: 'termohigrometro', nombre: 'TERMOHIGRÓMETRO', tagDefault: 'MM-686' },
 ];
 
 var LP_CONDICIONES = [
@@ -174,11 +176,21 @@ function LiquidosPenetrantesForm(props) {
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 5, fontSize: 10.5 } },
       LP_INSTRUMENTOS.map(function (e) {
         var checked = !!(datos.instrumentos && datos.instrumentos[e.key]);
-        var tagVal  = (datos.instrumentos_tags && datos.instrumentos_tags[e.key]) || '';
+        // Si no hay TAG guardado explícitamente, mostrar el tagDefault del
+        // catálogo (el técnico puede sobrescribir a mano).
+        var tagGuardado = (datos.instrumentos_tags && datos.instrumentos_tags[e.key]);
+        var tagVal = tagGuardado != null && tagGuardado !== '' ? tagGuardado : (e.tagDefault || '');
         return _r('div', { key: e.key, style: { display: 'flex', alignItems: 'center', gap: 6 } },
           _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
             _r('input', { type: 'checkbox', checked: checked,
-              onChange: function (ev) { upd('instrumentos.' + e.key, ev.target.checked); } }),
+              onChange: function (ev) {
+                var ch = ev.target.checked;
+                upd('instrumentos.' + e.key, ch);
+                // Al tildar, sembrar el tagDefault si el TAG estaba vacío.
+                if (ch && !tagGuardado && e.tagDefault) {
+                  upd('instrumentos_tags.' + e.key, e.tagDefault);
+                }
+              } }),
             _r('span', { style: { fontWeight: 600 } }, e.nombre)),
           _r('span', { style: { color: '#555' } }, 'TAG N°:'),
           _r('input', { style: Object.assign({}, S.input, { width: 84 }), value: tagVal,
