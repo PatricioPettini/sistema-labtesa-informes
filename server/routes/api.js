@@ -1879,6 +1879,7 @@ router.post('/as400/generar', upload.array('informes'), (req, res) => {
             oc: inf.oc,
             campo: a.campo,
             valor: a.valor,
+            redondeado: a.redondeado,
           });
         });
       }

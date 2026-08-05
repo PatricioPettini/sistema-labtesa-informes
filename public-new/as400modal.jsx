@@ -160,11 +160,13 @@ function AS400Modal(props) {
             _rA('div', { style: { fontWeight: 700, color: '#8a6100', marginBottom: 6 } },
               '⚠ Revisar Alargamiento — valores con 2+ decimales'),
             _rA('div', { style: { fontSize: 11, color: '#7a5a1a', marginBottom: 8 } },
-              'Un alargamiento con 2 o más decimales suele indicar un dato mal cargado en el fuente. Revisá manualmente los siguientes bloques:'),
+              'Un alargamiento con 2 o más decimales suele indicar un dato mal cargado en el fuente. Ya lo redondeamos a 1 decimal en el .xlsx, pero conviene revisar manualmente el fuente:'),
             _rA('ul', { style: { margin: 0, paddingLeft: 18, fontSize: 11, color: '#5a4008' } },
               resu.advertencias_alargamiento.map(function (a, i) {
+                var origen = a.valor + ' %';
+                var final = a.redondeado ? (' → ' + a.redondeado + ' %') : '';
                 return _rA('li', { key: i },
-                  'Bloque ' + a.bloque + (a.oc ? ' (OC ' + a.oc + ')' : '') + ' — ' + a.campo + ': ' + a.valor + ' %');
+                  'Bloque ' + a.bloque + (a.oc ? ' (OC ' + a.oc + ')' : '') + ' — ' + a.campo + ': ' + origen + final);
               })
             )
           )
