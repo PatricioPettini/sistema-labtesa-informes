@@ -262,7 +262,61 @@ function BrinellForm(props) {
         _r('span', { style: { fontWeight: 600 } }, 'ESPESOR DE PROBETA:'),
         _r('input', { style: S.inline, placeholder: '……', value: datos.espesor_probeta || '',
           onChange: function (e) { upd('espesor_probeta', e.target.value); } }),
-        _r('span', null, 'mm')),
+        _r('span', null, 'mm'),
+        multiOtBr ? _r('span', { style: { fontSize: 9, color: '#8a5a00', marginLeft: 8, fontStyle: 'italic' } },
+          '(valor de esta OT · usá "Espesor por OT" abajo para cada hermana)') : null),
+      // Espesor por OT — solo en multi-OT. Cada hermana puede tener su propio
+      // valor de espesor de probeta. El valor de la OT ACTUAL se sigue
+      // guardando en datos.espesor_probeta (arriba); las hermanas guardan en
+      // condiciones_por_ot[<OT>].espesor_probeta. El saver aplana a la raíz
+      // del hijo (OVERRIDE_RAIZ_KEYS ya incluye 'espesor_probeta').
+      multiOtBr ? _r('div', { style: { padding: '6px 0 0', display: 'flex', flexDirection: 'column', gap: 4 } },
+        _r('div', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.3px' } }, 'ESPESOR POR OT:'),
+        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+          otsDisponibles.map(function (o) {
+            var nro = String(o.nro_ot);
+            var esActual = nro === otNroActualStrBr;
+            var val;
+            if (esActual) {
+              val = datos.espesor_probeta || '';
+            } else {
+              var m = (datos.condiciones_por_ot && datos.condiciones_por_ot[nro]) || {};
+              val = m.espesor_probeta || '';
+            }
+            return _r('label', {
+              key: nro,
+              style: {
+                display: 'flex', alignItems: 'center', gap: 4,
+                border: '1px solid ' + (esActual ? '#0969da' : '#d0d7de'),
+                borderRadius: 4, padding: '2px 6px', fontSize: 10,
+                background: esActual ? '#e7f0ff' : '#fff',
+              },
+            },
+              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 700,
+                color: esActual ? '#0550ae' : 'var(--text-2)' } }, nro + (esActual ? ' (esta)' : '')),
+              _r('input', {
+                style: Object.assign({}, S.input, S.num, { width: 60, fontSize: 10 }),
+                value: val, placeholder: '…',
+                onChange: function (e) {
+                  var v = e.target.value;
+                  if (esActual) {
+                    upd('espesor_probeta', v);
+                  } else {
+                    var mapa = Object.assign({}, datos.condiciones_por_ot || {});
+                    var entry = Object.assign({}, mapa[nro] || {});
+                    if (v === '' || v == null) delete entry.espesor_probeta;
+                    else entry.espesor_probeta = v;
+                    if (Object.keys(entry).length === 0) delete mapa[nro];
+                    else mapa[nro] = entry;
+                    set('condiciones_por_ot', mapa);
+                  }
+                },
+              }),
+              _r('span', { style: { color: '#666', fontSize: 9 } }, 'mm')
+            );
+          })
+        )
+      ) : null,
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'DIÁM. IMP.:'),
         _r('input', { style: S.inline, placeholder: '……', value: datos.diametro_impronta || '',
