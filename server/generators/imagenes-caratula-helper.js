@@ -543,6 +543,10 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
     const N = items.length;
     const filasCount = Math.ceil(N / MAX_POR_FILA);
     const porFila = Math.ceil(N / filasCount);
+    // Espaciado: PBLANK antes de la PRIMERA fila (separación del contenido
+    // previo) y después de CADA fila. Entre filas queda un solo PBLANK — sino
+    // se acumulaban dos y aparecían dos enters visibles.
+    let filaIdx = 0;
     for (let ini = 0; ini < N; ini += porFila) {
       const fila = items.slice(ini, ini + porFila);
       // Distribución proporcional al ancho original de cada imagen (aspect > 1 = panorámica).
@@ -562,16 +566,18 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
         const cap = armarCaption(it.f, it.indice);
         celdas.push(celdaConImagen(it.rId, it.imgName, cx, cy, parrafoCaption(cap), wDxa));
       });
-      bloque += PBLANK;
+      if (filaIdx === 0) bloque += PBLANK;
       bloque += tablaSinBordes(gridCols, [`<w:tr>${celdas.join('')}</w:tr>`]);
       bloque += PBLANK;
+      filaIdx++;
     }
   } else if (layout === 'vertical') {
     // Apiladas: cada imagen ocupa maxAltoCm/N cm de alto, ancho proporcional
-    // (con tope maxAnchoCm cm).
+    // (con tope maxAnchoCm cm). PBLANK solo antes de la primera; entre las
+    // demás alcanza con el PBLANK "después" de la anterior.
     const N = items.length;
     const altoCadaCm = maxAltoCm / N;
-    items.forEach(it => {
+    items.forEach((it, idx) => {
       let cy = Math.round(altoCadaCm * 360000);
       let cx = Math.round(cy * it.aspect);
       const maxAnchoEmu = Math.round(maxAnchoCm * 360000);
@@ -580,15 +586,16 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
         cy = Math.round(cx / it.aspect);
       }
       ({ cx, cy } = capImagen(cx, cy, it.aspect));
-      bloque += PBLANK;
+      if (idx === 0) bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
       if (!sinCaption) bloque += parrafoCaption(armarCaption(it.f, it.indice));
       bloque += PBLANK;
     });
   } else {
     // Legacy: alto fijo 8 cm, apiladas, ancho proporcional (cap a 10 cm).
+    // Mismo criterio de PBLANK: solo antes de la primera imagen.
     const ALTO_EMU = 8 * 360000;
-    items.forEach(it => {
+    items.forEach((it, idx) => {
       let cy = ALTO_EMU;
       let cx = Math.round(cy * it.aspect);
       if (cx > MAX_ANCHO_EMU_DEFAULT) {
@@ -596,7 +603,7 @@ function insertarImagenesEnsayo(processedZip, outXml, fotos, tipoPrefix, marker,
         cy = Math.round(cx / it.aspect);
       }
       ({ cx, cy } = capImagen(cx, cy, it.aspect));
-      bloque += PBLANK;
+      if (idx === 0) bloque += PBLANK;
       bloque += paraGraphImagen(it.rId, it.imgName, cx, cy);
       if (!sinCaption) bloque += parrafoCaption(armarCaption(it.f, it.indice));
       bloque += PBLANK;

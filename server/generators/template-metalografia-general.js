@@ -133,12 +133,19 @@ function construirBloqueEnsayo(datos) {
     equiposLineasGlobal.push(tag ? `${nombre} TAG N°${tag}` : nombre);
   });
   // Aumento: texto libre si está, si no listado de checkboxes.
+  // Formato "X y Y" cuando son dos, "X, Y y Z" cuando son 3+.
+  function _joinConY(arr) {
+    const a = arr.filter(Boolean);
+    if (a.length <= 1) return a.join('');
+    if (a.length === 2) return `${a[0]} y ${a[1]}`;
+    return `${a.slice(0, -1).join(', ')} y ${a[a.length - 1]}`;
+  }
   const aumentoTextoLibre = String(datos.aumento_texto || '').trim();
   if (aumentoTextoLibre) {
     equiposLineasGlobal.push(`Aumento utilizado: ${aumentoTextoLibre}`);
   } else {
     const aumentosActivos = AUMENTOS.filter(([k]) => datos.aumentos && datos.aumentos[k]).map(([, l]) => l);
-    if (aumentosActivos.length) equiposLineasGlobal.push(`Aumento utilizado: ${aumentosActivos.join(', ')}`);
+    if (aumentosActivos.length) equiposLineasGlobal.push(`Aumento utilizado: ${_joinConY(aumentosActivos)}`);
   }
   // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
   formatearOtrosEquipos(datos).forEach(l => equiposLineasGlobal.push(l));
