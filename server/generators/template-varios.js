@@ -64,6 +64,16 @@ function pBlanco() {
     '<w:ind w:left="851"/></w:pPr></w:p>';
 }
 
+// Pie de tabla estilo "Tabla N°1 - <descripción>", cursiva y centrado.
+// El "1" es placeholder — `renumerarTablas` de word-generator.js lo reemplaza
+// por el número correcto según orden de aparición en el documento combinado.
+function pTablaCaption(descripcion) {
+  return '<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="120" w:before="80"/>' +
+    '<w:jc w:val="center"/></w:pPr>' +
+    `<w:r><w:rPr>${FONTS}<w:i/><w:iCs/>${SZ}</w:rPr>` +
+    `<w:t xml:space="preserve">Tabla N°1 - ${esc(descripcion)}</w:t></w:r></w:p>`;
+}
+
 function celdaTabla(texto, ancho, isHeader) {
   const fill = isHeader ? '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>' : '';
   const b    = isHeader ? '<w:b/><w:bCs/>' : '';
@@ -199,6 +209,7 @@ function construirBloqueEnsayo(datos) {
     if (hayTabla) {
       partes.push(pBlanco());
       partes.push(construirTablaResultados(headersFinal, filas));
+      partes.push(pTablaCaption('Resultados obtenidos'));
     }
     partes.push(pBlanco());
   }
