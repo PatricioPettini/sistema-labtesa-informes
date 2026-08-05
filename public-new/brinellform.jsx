@@ -214,6 +214,48 @@ function BrinellForm(props) {
   );
 
   // ── 1.2 VERIFICACIONES Y CONDICIONES ──────────────────────────────────
+  // Helpers para leer/escribir un campo por OT. El valor de la OT actual sigue
+  // en datos.<k>; las hermanas guardan en condiciones_por_ot[<OT>].<k>. El saver
+  // ya aplana esos campos a la raíz del hijo (OVERRIDE_RAIZ_KEYS_BR).
+  function getValOt(nro, k) {
+    if (nro === otNroActualStrBr) return datos[k] || '';
+    var m = (datos.condiciones_por_ot && datos.condiciones_por_ot[nro]) || {};
+    return m[k] || '';
+  }
+  function setValOt(nro, k, v) {
+    if (nro === otNroActualStrBr) {
+      upd(k, v);
+      return;
+    }
+    var mapa = Object.assign({}, datos.condiciones_por_ot || {});
+    var entry = Object.assign({}, mapa[nro] || {});
+    if (v === '' || v == null) delete entry[k];
+    else entry[k] = v;
+    if (Object.keys(entry).length === 0) delete mapa[nro];
+    else mapa[nro] = entry;
+    set('condiciones_por_ot', mapa);
+  }
+
+  // Estilos reusables para el bloque.
+  var subheadStyle = {
+    fontSize: 10, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.4px',
+    textTransform: 'uppercase', marginBottom: 6, paddingBottom: 3,
+    borderBottom: '1px solid var(--border, #e3e5ea)',
+  };
+  var chipCheck = function (k, label) {
+    return _r('label', { style: {
+      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px',
+      border: '1px solid ' + (datos[k] ? '#0969da' : '#d0d7de'),
+      borderRadius: 5, background: datos[k] ? '#e7f0ff' : '#fff',
+      cursor: 'pointer', fontSize: 10.5, transition: 'all .15s',
+    } },
+      _r('input', { type: 'checkbox', checked: !!datos[k],
+        onChange: function (e) { updBool(k, e.target.checked); } }),
+      _r('span', { style: { fontWeight: 600, color: datos[k] ? '#0550ae' : 'var(--text)' } }, label),
+      _r('span', { style: { color: datos[k] ? '#0550ae' : '#999', fontWeight: 500 } }, 'OK'));
+  };
+  var filaPorOt = otsDisponibles && otsDisponibles.length > 0 ? otsDisponibles : [{ nro_ot: otNroActualStrBr }];
+
   var block12 = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
       _r('span', null, '1.2  VERIFICACIONES Y CONDICIONES DE ENSAYO'),
@@ -221,146 +263,150 @@ function BrinellForm(props) {
         CAMPOS_CONDICIONES_BR,
         'Copia estado sup, paralelismo, temp, tiempo, carga, bolilla, etc.')
     ),
-    _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 10.5 } },
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.sup_muestra,
-          onChange: function (e) { updBool('sup_muestra', e.target.checked); } }),
-        _r('span', { style: { fontWeight: 600 } }, 'ESTADO SUP. MUESTRA:'), ' OK'),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.sup_equipo,
-          onChange: function (e) { updBool('sup_equipo', e.target.checked); } }),
-        _r('span', { style: { fontWeight: 600 } }, 'ESTADO SUP. EQUIPO:'), ' OK'),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.paralelismo,
-          onChange: function (e) { updBool('paralelismo', e.target.checked); } }),
-        _r('span', { style: { fontWeight: 600 } }, 'PARALELISMO:'), ' OK'),
-      _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.verif_patron,
-          onChange: function (e) { updBool('verif_patron', e.target.checked); } }),
-        _r('span', { style: { fontWeight: 600 } }, 'VERIF. CONTRA PATRÓN:'), ' OK'),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA:'),
-        _r('input', { style: Object.assign({}, S.input, S.num, { width: 56 }), value: datos.temperatura || '',
-          onChange: function (e) { upd('temperatura', e.target.value); } }),
-        _r('span', null, '°C')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'TIEMPO DE APLICACIÓN:'),
-        _r('input', { style: Object.assign({}, S.input, { width: 70 }), value: datos.tiempo_aplicacion || '',
-          onChange: function (e) { upd('tiempo_aplicacion', e.target.value); } }),
-        _r('span', null, 'seg')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'BOLILLA DIÁMETRO:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.bolilla_diametro || '',
-          onChange: function (e) { upd('bolilla_diametro', e.target.value); } }),
-        _r('span', null, 'mm')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'CARGA APLICADA:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.carga_aplicada || '',
-          onChange: function (e) { upd('carga_aplicada', e.target.value); } }),
-        _r('span', null, 'kgf')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'ESPESOR DE PROBETA:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.espesor_probeta || '',
-          onChange: function (e) { upd('espesor_probeta', e.target.value); } }),
-        _r('span', null, 'mm'),
-        multiOtBr ? _r('span', { style: { fontSize: 9, color: '#8a5a00', marginLeft: 8, fontStyle: 'italic' } },
-          '(valor de esta OT · usá "Espesor por OT" abajo para cada hermana)') : null),
-      // Espesor por OT — solo en multi-OT. Cada hermana puede tener su propio
-      // valor de espesor de probeta. El valor de la OT ACTUAL se sigue
-      // guardando en datos.espesor_probeta (arriba); las hermanas guardan en
-      // condiciones_por_ot[<OT>].espesor_probeta. El saver aplana a la raíz
-      // del hijo (OVERRIDE_RAIZ_KEYS ya incluye 'espesor_probeta').
-      multiOtBr ? _r('div', { style: { padding: '6px 0 0', display: 'flex', flexDirection: 'column', gap: 4 } },
-        _r('div', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.3px' } }, 'ESPESOR POR OT:'),
+    _r('div', { style: { padding: 12, display: 'flex', flexDirection: 'column', gap: 14 } },
+      // Verificaciones — chips
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Verificaciones'),
         _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
-          otsDisponibles.map(function (o) {
-            var nro = String(o.nro_ot);
-            var esActual = nro === otNroActualStrBr;
-            var val;
-            if (esActual) {
-              val = datos.espesor_probeta || '';
-            } else {
-              var m = (datos.condiciones_por_ot && datos.condiciones_por_ot[nro]) || {};
-              val = m.espesor_probeta || '';
-            }
-            return _r('label', {
-              key: nro,
-              style: {
-                display: 'flex', alignItems: 'center', gap: 4,
-                border: '1px solid ' + (esActual ? '#0969da' : '#d0d7de'),
-                borderRadius: 4, padding: '2px 6px', fontSize: 10,
-                background: esActual ? '#e7f0ff' : '#fff',
-              },
-            },
-              _r('span', { style: { fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 700,
-                color: esActual ? '#0550ae' : 'var(--text-2)' } }, nro + (esActual ? ' (esta)' : '')),
-              _r('input', {
-                style: Object.assign({}, S.input, S.num, { width: 60, fontSize: 10 }),
-                value: val, placeholder: '…',
-                onChange: function (e) {
-                  var v = e.target.value;
-                  if (esActual) {
-                    upd('espesor_probeta', v);
-                  } else {
-                    var mapa = Object.assign({}, datos.condiciones_por_ot || {});
-                    var entry = Object.assign({}, mapa[nro] || {});
-                    if (v === '' || v == null) delete entry.espesor_probeta;
-                    else entry.espesor_probeta = v;
-                    if (Object.keys(entry).length === 0) delete mapa[nro];
-                    else mapa[nro] = entry;
-                    set('condiciones_por_ot', mapa);
-                  }
-                },
-              }),
-              _r('span', { style: { color: '#666', fontSize: 9 } }, 'mm')
-            );
-          })
+          chipCheck('sup_muestra',  'Estado sup. muestra'),
+          chipCheck('sup_equipo',   'Estado sup. equipo'),
+          chipCheck('paralelismo',  'Paralelismo'),
+          chipCheck('verif_patron', 'Verif. contra patrón'))
+      ),
+      // Condiciones ambientales
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Condiciones ambientales'),
+        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', fontSize: 11 } },
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Temperatura:'),
+            _r('input', { style: Object.assign({}, S.input, S.num, { width: 60 }), value: datos.temperatura || '',
+              onChange: function (e) { upd('temperatura', e.target.value); } }),
+            _r('span', { style: { color: '#666' } }, '°C')),
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Tiempo de aplicación:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 70 }), value: datos.tiempo_aplicacion || '',
+              onChange: function (e) { upd('tiempo_aplicacion', e.target.value); } }),
+            _r('span', { style: { color: '#666' } }, 'seg')))
+      ),
+      // Parámetros del ensayo — tabla por OT (Bolilla | Carga | Espesor)
+      _r('div', null,
+        _r('div', { style: subheadStyle },
+          multiOtBr ? 'Parámetros del ensayo por OT' : 'Parámetros del ensayo'),
+        _r('div', { style: { border: '1px solid var(--border, #e3e5ea)', borderRadius: 5, overflow: 'hidden' } },
+          _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10.5 } },
+            _r('thead', null,
+              _r('tr', { style: { background: 'var(--surface-2, #f5f7fa)' } },
+                multiOtBr ? _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'left', fontWeight: 700, width: 90 } }, 'OT') : null,
+                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Bolilla diámetro (mm)'),
+                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Carga aplicada (kgf)'),
+                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Espesor probeta (mm)'))
+            ),
+            _r('tbody', null,
+              filaPorOt.map(function (o) {
+                var nro = String(o.nro_ot);
+                var esActual = nro === otNroActualStrBr;
+                return _r('tr', { key: nro,
+                  style: { background: esActual ? '#f4f8ff' : '#fff' } },
+                  multiOtBr ? _r('td', { style: { border: '1px solid var(--border)', padding: '4px 8px', fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 700, color: esActual ? '#0550ae' : 'var(--text-2)' } },
+                    nro + (esActual ? ' · esta' : '')) : null,
+                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
+                    _r('input', {
+                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
+                      value: getValOt(nro, 'bolilla_diametro'), placeholder: '…',
+                      onChange: function (e) { setValOt(nro, 'bolilla_diametro', e.target.value); },
+                    })),
+                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
+                    _r('input', {
+                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
+                      value: getValOt(nro, 'carga_aplicada'), placeholder: '…',
+                      onChange: function (e) { setValOt(nro, 'carga_aplicada', e.target.value); },
+                    })),
+                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
+                    _r('input', {
+                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
+                      value: getValOt(nro, 'espesor_probeta'), placeholder: '…',
+                      onChange: function (e) { setValOt(nro, 'espesor_probeta', e.target.value); },
+                    }))
+                );
+              })
+            )
+          )
         )
-      ) : null,
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'DIÁM. IMP.:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.diametro_impronta || '',
-          onChange: function (e) { upd('diametro_impronta', e.target.value); } }),
-        _r('span', null, 'mm')),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'DUREZA HB:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.dureza_hb || '',
-          onChange: function (e) { upd('dureza_hb', e.target.value); } })),
-      _r('div', { style: { gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'ZONA DE ENSAYO:'),
-        _r(window.ZonaInput, { tipo: 'dureza-brinell', style: S.inline, placeholder: 'Ej: Superficie, Núcleo, Zona…',
+      ),
+      // Resultado global (opcional) — se emite en el Word como línea informativa
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Resultado global (opcional)'),
+        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', fontSize: 11 } },
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Diám. impronta:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 80, textAlign: 'center' }),
+              placeholder: '…', value: datos.diametro_impronta || '',
+              onChange: function (e) { upd('diametro_impronta', e.target.value); } }),
+            _r('span', { style: { color: '#666' } }, 'mm')),
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Dureza HB:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 80, textAlign: 'center' }),
+              placeholder: '…', value: datos.dureza_hb || '',
+              onChange: function (e) { upd('dureza_hb', e.target.value); } })))
+      ),
+      // Zona de ensayo
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Zona de ensayo'),
+        _r(window.ZonaInput, {
+          tipo: 'dureza-brinell',
+          style: Object.assign({}, S.inline, { width: '100%' }),
+          placeholder: 'Ej: Superficie, Núcleo, Zona de soldadura, …',
           value: datos.zona_ensayo || '',
-          onChange: function (e) { upd('zona_ensayo', e.target.value); } }))
+          onChange: function (e) { upd('zona_ensayo', e.target.value); },
+        })
+      )
     )
   );
 
   // ── MEMORIA ANALÍTICA (interno) ────────────────────────────────────────
   // Registro trazabilidad del patrón usado para verificar el durómetro.
-  // Campos según FM-134 Rev 00: TAG, valor, diámetro impronta patrón, dureza
-  // HB patrón. El archivo_ref (path) se mantiene por retrocompat.
+  // Campos según FM-134 Rev 00: patrón (TAG + valor) y mediciones de
+  // verificación del patrón (diámetro impronta + dureza HB obtenidos al medir
+  // el patrón). No se emiten en el Word — quedan en el sistema como trazabilidad.
   var blockMem = _r('div', null,
-    _r('div', { style: S.subhead }, 'MEMORIA ANALÍTICA (interno)'),
-    _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 10.5 } },
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'PATRÓN UTILIZADO — TAG:'),
-        _r('input', { style: Object.assign({}, S.input, { width: 110 }), value: datos.patron_tag || datos.patron || '',
-          onChange: function (e) { upd('patron_tag', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'VALOR:'),
-        _r('input', { style: S.inline, placeholder: '………………', value: datos.patron_valor || '',
-          onChange: function (e) { upd('patron_valor', e.target.value); } })),
-      // Nuevas 2 filas: verificación del patrón (medición de diám. impronta
-      // y dureza HB del patrón usado para chequear el durómetro).
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'DIÁM. IMP. (mm):'),
-        _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
-          placeholder: '…', value: datos.patron_diam_imp || '',
-          onChange: function (e) { upd('patron_diam_imp', e.target.value); } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        _r('span', { style: { fontWeight: 600 } }, 'DUREZA HB:'),
-        _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
-          placeholder: '…', value: datos.patron_dureza_hb || '',
-          onChange: function (e) { upd('patron_dureza_hb', e.target.value); } }))
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', gap: 8 }) },
+      _r('span', null, 'MEMORIA ANALÍTICA'),
+      _r('span', { style: { fontSize: 9, fontWeight: 500, color: 'var(--text-3)', fontStyle: 'italic' } }, '(uso interno — trazabilidad del patrón)')
+    ),
+    _r('div', { style: { padding: 12, display: 'flex', flexDirection: 'column', gap: 14 } },
+      // Patrón utilizado
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Patrón utilizado'),
+        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', fontSize: 11 } },
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'TAG:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 130 }),
+              placeholder: 'Ej: MM-XXX',
+              value: datos.patron_tag || datos.patron || '',
+              onChange: function (e) { upd('patron_tag', e.target.value); } })),
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 200 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Valor:'),
+            _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
+              placeholder: 'Ej: 200 HB',
+              value: datos.patron_valor || '',
+              onChange: function (e) { upd('patron_valor', e.target.value); } })))
+      ),
+      // Verificación (medición del patrón)
+      _r('div', null,
+        _r('div', { style: subheadStyle }, 'Verificación (medición del patrón)'),
+        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', fontSize: 11 } },
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Diám. impronta:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
+              placeholder: '…', value: datos.patron_diam_imp || '',
+              onChange: function (e) { upd('patron_diam_imp', e.target.value); } }),
+            _r('span', { style: { color: '#666' } }, 'mm')),
+          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            _r('span', { style: { fontWeight: 600 } }, 'Dureza HB:'),
+            _r('input', { style: Object.assign({}, S.input, { width: 90, textAlign: 'center' }),
+              placeholder: '…', value: datos.patron_dureza_hb || '',
+              onChange: function (e) { upd('patron_dureza_hb', e.target.value); } })))
+      )
     )
   );
 
