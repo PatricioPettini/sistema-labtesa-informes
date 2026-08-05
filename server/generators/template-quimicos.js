@@ -417,7 +417,19 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   const textosOAA = [];
   if (datos.oaa) textosOAA.push('"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."');
 
+  // Bloque NOTAS: checkboxes fijos (mismos textos que impacto/tracción) +
+  // texto libre. Cada nota tildada emite su línea; la libre va al final.
+  // Compat legacy: `tiene_nota` + `nota_texto` seguían funcionando en ensayos
+  // viejos, se preservan.
   const lineasNotas = [];
+  if (datos.nota_evaluaciones)  lineasNotas.push('Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA.');
+  if (datos.nota_no_conforme)   lineasNotas.push('El ítem marcado con (**) corresponde a un trabajo no conforme.');
+  if (datos.nota_incertidumbre) lineasNotas.push('El cliente desea incorporar el dato de incertidumbre.');
+  if (datos.nota_externo)       lineasNotas.push('Los resultados marcados con (***) provienen de proveedor externo.');
+  const notasLibres = String(datos.notas_texto || '').trim();
+  if (notasLibres) {
+    notasLibres.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasNotas.push(l));
+  }
   if (datos.tiene_nota && datos.nota_texto) lineasNotas.push(datos.nota_texto);
   const notas_seleccionadas = lineasNotas.length ? lineasNotas.join('\n') : '__SECTION_HIDE__';
 

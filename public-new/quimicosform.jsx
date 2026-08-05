@@ -947,6 +947,42 @@ function QuimicosForm(props) {
                 onChange: function (e) { upd('material_tipo', e.target.value); } }))
           : null
       ),
+      // ── Sub-bloque NOTAS ─────────────────────────────────────────────
+      // Checkboxes con textos fijos (mismos que impacto/tracción) + textarea
+      // libre. Cada nota tildada se emite como una línea en la sección NOTAS
+      // del Word; la textarea agrega una línea más al final.
+      _r('div', { style: { borderTop: '1px dashed var(--border)', paddingTop: 8 } },
+        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
+          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Notas:'),
+          _r('span', { style: { flex: 1 } }, ''),
+          botonCopiarSubsetQ('notas', 'Copiar a otras OT',
+            ['nota_evaluaciones', 'nota_no_conforme', 'nota_incertidumbre', 'nota_externo', 'notas_texto'])
+        ),
+        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, lineHeight: 1.4 } },
+          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_evaluaciones,
+              onChange: function (e) { upd('nota_evaluaciones', e.target.checked); } }),
+            _r('span', null, 'Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA.')),
+          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_no_conforme,
+              onChange: function (e) { upd('nota_no_conforme', e.target.checked); } }),
+            _r('span', null, 'El ítem marcado con (**) corresponde a un trabajo no conforme.')),
+          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_incertidumbre,
+              onChange: function (e) { upd('nota_incertidumbre', e.target.checked); } }),
+            _r('span', null, 'El cliente desea incorporar el dato de incertidumbre.')),
+          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_externo,
+              onChange: function (e) { upd('nota_externo', e.target.checked); } }),
+            _r('span', null, 'Los resultados marcados con (***) provienen de proveedor externo.')),
+          _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 } },
+            _r('span', { style: { fontWeight: 600, fontSize: 10 } }, 'Nota libre (opcional):'),
+            _r('textarea', { style: Object.assign({}, S.textarea, { minHeight: 45 }),
+              value: datos.notas_texto || '',
+              placeholder: 'Agregá una nota adicional que se emite al final del informe…',
+              onChange: function (e) { upd('notas_texto', e.target.value); } }))
+        )
+      ),
       // Nota al pie de la planilla
       _r('div', { style: { fontSize: 9, color: 'var(--text-3)', marginTop: 4, borderTop: '1px dashed var(--border)', paddingTop: 4 } },
         '*PARÁMETROS A INFORMAR    ·    FM-033 Rev 03')

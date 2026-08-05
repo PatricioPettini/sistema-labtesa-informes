@@ -1222,10 +1222,12 @@
         'calibracion_chk', 'calibracion', 'seleccion_base_chk', 'seleccion_base',
         'zona_evaluacion', 'cantidad_determinaciones',
         'equipamiento', 'equipamiento_tags', 'otros_equipos',
-        // Sección 1.5 OBSERVACIONES / EVALUACIÓN — aplanan al hermano cuando
-        // el técnico usa el botón "Copiar a otras OT" del textarea (por
-        // separado, no incluidos en "Copiar TODO").
+        // Sección 1.5 OBSERVACIONES / EVALUACIÓN / NOTAS — aplanan al hermano
+        // cuando el técnico usa el botón "Copiar a otras OT" del sub-bloque
+        // correspondiente (por separado, no incluidos en "Copiar TODO").
         'observaciones_libres', 'tiene_evaluacion', 'material_tipo', 'evaluacion_texto',
+        'nota_evaluaciones', 'nota_no_conforme', 'nota_incertidumbre', 'nota_externo',
+        'notas_texto',
       ];
       // Suffix _year de todas las normas conocidas.
       ['norma_itm054','norma_itm057','norma_itm058','norma_itm091','norma_itqb068',
