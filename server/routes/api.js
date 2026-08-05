@@ -530,6 +530,48 @@ router.delete('/ensayo/:id', (req, res) => {
 
 // ─── Generación Word ──────────────────────────────────────────────────────────
 
+// POST /api/ot/:nro_ot/renombrar
+//   Body: { nro_ot: <nuevo> }
+//   Uso típico: el bot Trello importa OTs con placeholder "PEND-<sol>-M<n>"
+//   cuando falta el número real. Cuando la secretaría carga el número, el
+//   técnico lo edita en el form → este endpoint renombra en TODAS las tablas
+//   relacionadas atómicamente (transacción).
+router.post('/ot/:nro_ot/renombrar', (req, res) => {
+  try {
+    const antiguo = String(req.params.nro_ot || '').trim();
+    const nuevo   = String((req.body && req.body.nro_ot) || '').trim();
+    if (!antiguo || !nuevo) return res.status(400).json({ error: 'Faltan nro_ot antiguo o nuevo' });
+    if (antiguo === nuevo) return res.status(400).json({ error: 'El número es el mismo' });
+    const otFull = db.prepare('SELECT nro_ot FROM ots WHERE nro_ot = ?').get(antiguo);
+    if (!otFull) return res.status(404).json({ error: 'OT ' + antiguo + ' no encontrada' });
+    const yaExiste = db.prepare('SELECT nro_ot FROM ots WHERE nro_ot = ?').get(nuevo);
+    if (yaExiste) return res.status(409).json({ error: 'Ya existe una OT con número ' + nuevo, code: 'DUPLICADO' });
+
+    // Tablas con nro_ot que hay que renombrar en cadena. La lista completa
+    // está en db.js; agregar acá si se crea una tabla nueva.
+    const TABLAS = [
+      'ots', 'ensayos', 'eventos', 'ensayos_historial', 'ots_historial',
+      'informes_emitidos', 'firmas', 'guardados_pendientes',
+    ];
+    const trx = db.transaction(() => {
+      for (const t of TABLAS) {
+        try {
+          db.prepare('UPDATE ' + t + ' SET nro_ot = ? WHERE nro_ot = ?').run(nuevo, antiguo);
+        } catch (e) {
+          // Tabla puede no existir en instalaciones viejas — no es fatal.
+          if (!/no such table/i.test(e.message)) throw e;
+        }
+      }
+    });
+    trx();
+    try { registrarEvento(nuevo, `OT renombrada: ${antiguo} → ${nuevo}`, 'edit'); } catch {}
+    res.json({ ok: true, nro_ot: nuevo, anterior: antiguo });
+  } catch (err) {
+    console.error('[ot/renombrar]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/ot/:nro_ot', (req, res) => {
   try {
     const { nro_ot } = req.params;

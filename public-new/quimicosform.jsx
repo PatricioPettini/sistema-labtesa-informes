@@ -239,17 +239,45 @@ function QuimicosForm(props) {
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 } },
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600, minWidth: 160 } }, 'Norma de ensayo:'),
-        typeof window.NormaInput === 'function'
-          ? _r(window.NormaInput, {
-              tipo: 'quimicos', categoria: 'ensayo',
-              style: Object.assign({}, S.input, { flex: 1 }),
-              value: getCondOt(otActivaCond, 'norma_ensayo_ot') || '',
-              placeholder: 'Ej: ASTM E415 · ASTM A751',
-              onChange: function (e) { setCondOt(otActivaCond, 'norma_ensayo_ot', e.target.value); },
+        // Input LIBRE de la norma + input separado de año opcional. Al hacer
+        // blur (perder foco) se normaliza al formato "<norma>-<AA>" (ej.
+        // "ASTM E415-23"). El año se persiste dentro del mismo string
+        // norma_ensayo_ot para que el generator lo emita tal cual sin cambios.
+        (function () {
+          // Separar el valor actual en norma + año (regex al final -N | -NN | -NNNN | :YYYY).
+          var raw = String(getCondOt(otActivaCond, 'norma_ensayo_ot') || '').trim();
+          var mYear = raw.match(/^(.+?)[\s]*[-:]\s*(\d{2,4})$/);
+          var normaBase = mYear ? mYear[1].trim() : raw;
+          var yearVal   = mYear ? mYear[2] : '';
+          function guardar(nBase, y) {
+            var b = String(nBase || '').trim();
+            var yy = String(y || '').trim();
+            var out = yy ? (b + '-' + yy) : b;
+            setCondOt(otActivaCond, 'norma_ensayo_ot', out);
+          }
+          return _r('div', { style: { display: 'flex', gap: 6, flex: 1, alignItems: 'center' } },
+            typeof window.NormaInput === 'function'
+              ? _r(window.NormaInput, {
+                  tipo: 'quimicos', categoria: 'ensayo',
+                  style: Object.assign({}, S.input, { flex: 1 }),
+                  value: normaBase,
+                  placeholder: 'Ej: ASTM E415 · ASTM A751',
+                  onChange: function (e) { guardar(e.target.value, yearVal); },
+                })
+              : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
+                  value: normaBase, placeholder: 'Ej: ASTM E415',
+                  onChange: function (e) { guardar(e.target.value, yearVal); } }),
+            _r('span', { style: { color: 'var(--text-3)', fontSize: 10 } }, '-'),
+            _r('input', {
+              style: Object.assign({}, S.input, { width: 56, textAlign: 'center' }),
+              value: yearVal,
+              placeholder: 'AA',
+              title: 'Año (ej. 23 → ASTM E415-23)',
+              onChange: function (e) { guardar(normaBase, e.target.value); },
             })
-          : _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
-              value: getCondOt(otActivaCond, 'norma_ensayo_ot') || '',
-              onChange: function (e) { setCondOt(otActivaCond, 'norma_ensayo_ot', e.target.value); } })),
+          );
+        })()
+      ),
       // Metodología de ensayo — chips multi-select con los ITMs. El técnico
       // puede tildar varios (todos los que se aplicaron en el ensayo). Los
       // ITMs son metodologías internas Labtesa y NO llevan año.
