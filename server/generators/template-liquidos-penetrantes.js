@@ -93,43 +93,33 @@ function construirBloqueEnsayo(datos) {
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     `<w:t xml:space="preserve">ENSAYO DE LÍQUIDOS PENETRANTES${asterisco}</w:t></w:r></w:p>`);
 
-  // ── ENSAYO SEGÚN ──────────────────────────────────────────────────────
-  const normas = [];
+  // Estructura del informe (según modelo de referencia FM-043):
+  //   1. CONDICIONES DE ENSAYO   ← incluye "Norma de ensayo: ..." al inicio
+  //   2. EQUIPAMIENTO UTILIZADO  ← era "INSTRUMENTOS"
+  //   3. RESULTADOS OBTENIDOS
   const anioSuf = (v, sep) => {
     const s = String(v || '').trim();
     return s ? (sep || '-') + s : '';
   };
+  // Normas del ensayo — se agregan como líneas al inicio de CONDICIONES.
+  const normas = [];
   if (datos.norma_astm_e165) normas.push('ASTM E165' + anioSuf(datos.norma_astm_e165_year, '-'));
   if (datos.norma_asme_v)    normas.push('ASME BPVC Sección V' + (datos.norma_asme_v_year ? ` Ed. ${String(datos.norma_asme_v_year).trim()}` : ''));
   // "Otra norma": SÓLO si el checkbox está tildado. Texto residual sin
   // checkbox activo NO va al Word.
   if (datos.norma_otra_chk && (datos.norma_otra || '').trim()) normas.push(datos.norma_otra.trim());
-  if (normas.length) {
-    partes.push(pHeading('ENSAYO SEGÚN'));
-    normas.forEach(n => partes.push(pLinea(n)));
-    partes.push(pBlanco());
+  // Une múltiples normas en una sola línea con formato natural (X, Y y Z).
+  function unirNatural(arr) {
+    if (arr.length === 0) return '';
+    if (arr.length === 1) return arr[0];
+    if (arr.length === 2) return arr[0] + ' y ' + arr[1];
+    const last = arr[arr.length - 1];
+    return arr.slice(0, -1).join(', ') + ' y ' + last;
   }
 
-  // ── INSTRUMENTOS ──────────────────────────────────────────────────────
-  const instrumentos = [];
-  INSTRUMENTOS.forEach(([key, label]) => {
-    const on = !!(datos.instrumentos && datos.instrumentos[key]);
-    if (!on) return;
-    const tag = (datos.instrumentos_tags && datos.instrumentos_tags[key] || '').trim();
-    instrumentos.push(tag ? `${label} TAG N°${tag}` : label);
-  });
-  // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
-  formatearOtrosEquipos(datos).forEach(l => instrumentos.push(l));
-  if (instrumentos.length) {
-    partes.push(pHeading('INSTRUMENTOS'));
-    instrumentos.forEach(l => partes.push(pLinea(l)));
-    partes.push(pBlanco());
-  }
-
-  // ── CONDICIONES DE ENSAYO ─────────────────────────────────────────────
-  // "Limpieza previa" está dentro del array CONDICIONES (después de "Potencia
-  // de luz UV") — respeta el orden definido en el form.
+  // ── 1. CONDICIONES DE ENSAYO ──────────────────────────────────────────
   const lineasCond = [];
+  if (normas.length) lineasCond.push('Norma de ensayo: ' + unirNatural(normas));
   CONDICIONES.forEach(([key, label]) => {
     const val = (datos[key] || '').toString().trim();
     if (val) lineasCond.push(`${label}: ${val}`);
@@ -140,7 +130,24 @@ function construirBloqueEnsayo(datos) {
     partes.push(pBlanco());
   }
 
-  // ── RESULTADOS OBTENIDOS ──────────────────────────────────────────────
+  // ── 2. EQUIPAMIENTO UTILIZADO ─────────────────────────────────────────
+  // (Antes "INSTRUMENTOS" — mismo contenido, título nuevo según el modelo.)
+  const instrumentos = [];
+  INSTRUMENTOS.forEach(([key, label]) => {
+    const on = !!(datos.instrumentos && datos.instrumentos[key]);
+    if (!on) return;
+    const tag = (datos.instrumentos_tags && datos.instrumentos_tags[key] || '').trim();
+    instrumentos.push(tag ? `${label} TAG N°${tag}` : label);
+  });
+  // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
+  formatearOtrosEquipos(datos).forEach(l => instrumentos.push(l));
+  if (instrumentos.length) {
+    partes.push(pHeading('EQUIPAMIENTO UTILIZADO'));
+    instrumentos.forEach(l => partes.push(pLinea(l)));
+    partes.push(pBlanco());
+  }
+
+  // ── 3. RESULTADOS OBTENIDOS ───────────────────────────────────────────
   const resultadoTxt = sentenceCase((datos.resultado_texto || '').trim());
   if (resultadoTxt) {
     partes.push(pHeading('RESULTADOS OBTENIDOS'));
