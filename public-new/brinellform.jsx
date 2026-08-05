@@ -288,51 +288,144 @@ function BrinellForm(props) {
               onChange: function (e) { upd('tiempo_aplicacion', e.target.value); } }),
             _r('span', { style: { color: '#666' } }, 'seg')))
       ),
-      // Parámetros del ensayo — tabla por OT (Bolilla | Carga | Espesor)
-      _r('div', null,
-        _r('div', { style: subheadStyle },
-          multiOtBr ? 'Parámetros del ensayo por OT' : 'Parámetros del ensayo'),
-        _r('div', { style: { border: '1px solid var(--border, #e3e5ea)', borderRadius: 5, overflow: 'hidden' } },
-          _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 10.5 } },
-            _r('thead', null,
-              _r('tr', { style: { background: 'var(--surface-2, #f5f7fa)' } },
-                multiOtBr ? _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'left', fontWeight: 700, width: 90 } }, 'OT') : null,
-                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Bolilla diámetro (mm)'),
-                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Carga aplicada (kgf)'),
-                _r('th', { style: { border: '1px solid var(--border)', padding: '5px 8px', textAlign: 'center', fontWeight: 700 } }, 'Espesor probeta (mm)'))
+      // Parámetros del ensayo — tabla por OT (Bolilla | Carga | Espesor).
+      // Al elegir una bolilla estándar (2.5 / 5 / 10) se autocompleta la carga
+      // Brinell correspondiente (187.5 / 750 / 3000 kgf) SI la carga está vacía.
+      // El técnico puede editarla manualmente después. Cargas escaladas 2.5D²:
+      //   1 → 30, 2 → 120, 2.5 → 187.5, 5 → 750, 10 → 3000
+      (function () {
+        var CARGA_BRINELL = { '1': '30', '2': '120', '2.5': '187.5', '5': '750', '10': '3000' };
+        function contarMed(nro) {
+          if (!Array.isArray(mediciones)) return 0;
+          return mediciones.filter(function (m) {
+            var ov = String((m && m.nro_ot_override) || '').trim();
+            var dest = ov || otNroActualStrBr;
+            return dest === nro;
+          }).length;
+        }
+        function setBolillaConAuto(nro, v) {
+          setValOt(nro, 'bolilla_diametro', v);
+          var normal = String(v).replace(',', '.').trim();
+          if (CARGA_BRINELL[normal] && !getValOt(nro, 'carga_aplicada')) {
+            setValOt(nro, 'carga_aplicada', CARGA_BRINELL[normal]);
+          }
+        }
+        var cellStyle = {
+          border: '1px solid var(--border, #e3e5ea)',
+          padding: 0, position: 'relative',
+        };
+        var inputCellStyle = {
+          border: 'none', width: '100%', fontSize: 11, padding: '7px 10px',
+          outline: 'none', background: 'transparent', textAlign: 'center',
+          fontVariantNumeric: 'tabular-nums', fontFamily: 'inherit',
+        };
+        var thStyle = {
+          border: '1px solid var(--border)', padding: '7px 10px',
+          fontWeight: 700, fontSize: 10.5, letterSpacing: '.2px',
+          color: 'var(--text-2)',
+        };
+        return _r('div', null,
+          _r('div', { style: Object.assign({}, subheadStyle,
+            { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+            _r('span', null, multiOtBr ? 'Parámetros del ensayo por OT' : 'Parámetros del ensayo'),
+            _r('span', { style: { fontSize: 9, fontWeight: 500, color: 'var(--text-3)', fontStyle: 'italic', textTransform: 'none', letterSpacing: 0 } },
+              'Al elegir bolilla estándar (1 / 2 / 2.5 / 5 / 10), autocompleta la carga si está vacía')
+          ),
+          _r('div', { style: {
+            border: '1px solid var(--border, #e3e5ea)',
+            borderRadius: 6, overflow: 'hidden',
+            boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(20,30,50,.06))',
+          } },
+            _r('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: 11 } },
+              _r('thead', null,
+                _r('tr', { style: { background: 'var(--surface-2, #f5f7fa)' } },
+                  multiOtBr ? _r('th', { style: Object.assign({}, thStyle, { textAlign: 'left', width: 130 }) }, 'OT') : null,
+                  _r('th', { style: Object.assign({}, thStyle, { textAlign: 'center' }) },
+                    _r('span', null, '⌀ Bolilla '),
+                    _r('span', { style: { fontWeight: 400, color: 'var(--text-3)' } }, '(mm)')),
+                  _r('th', { style: Object.assign({}, thStyle, { textAlign: 'center' }) },
+                    _r('span', null, 'Carga aplicada '),
+                    _r('span', { style: { fontWeight: 400, color: 'var(--text-3)' } }, '(kgf)')),
+                  _r('th', { style: Object.assign({}, thStyle, { textAlign: 'center' }) },
+                    _r('span', null, 'Espesor probeta '),
+                    _r('span', { style: { fontWeight: 400, color: 'var(--text-3)' } }, '(mm)')))
+              ),
+              _r('tbody', null,
+                filaPorOt.map(function (o, idx) {
+                  var nro = String(o.nro_ot);
+                  var esActual = nro === otNroActualStrBr;
+                  var zebra = idx % 2 === 1 ? 'var(--surface-2, #fafbfc)' : 'transparent';
+                  var bgFila = esActual ? 'var(--accent-soft, #e7f0ff)' : zebra;
+                  var cantMed = contarMed(nro);
+                  return _r('tr', { key: nro, style: {
+                    background: bgFila,
+                    transition: 'background .1s',
+                  } },
+                    multiOtBr ? _r('td', { style: Object.assign({}, cellStyle, { padding: '7px 10px' }) },
+                      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+                        _r('span', { style: {
+                          fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 700,
+                          color: esActual ? 'var(--accent, #0550ae)' : 'var(--text-2)',
+                          fontSize: 11,
+                        } }, nro),
+                        esActual ? _r('span', { style: {
+                          fontSize: 8.5, fontWeight: 600, color: 'var(--accent, #0550ae)',
+                          background: '#fff', border: '1px solid var(--accent, #0969da)',
+                          borderRadius: 3, padding: '1px 5px', letterSpacing: '.3px',
+                          textTransform: 'uppercase',
+                        } }, 'esta') : null,
+                        cantMed > 0 ? _r('span', { style: {
+                          fontSize: 9, fontWeight: 500, color: 'var(--text-3)',
+                          background: 'var(--surface, #fff)', border: '1px solid var(--border, #d0d7de)',
+                          borderRadius: 10, padding: '1px 6px',
+                        } }, cantMed + ' med.') : null
+                      )
+                    ) : null,
+                    // Bolilla ø con datalist de valores estándar
+                    _r('td', { style: cellStyle },
+                      _r('input', {
+                        style: inputCellStyle,
+                        list: 'brinell_bolilla_std',
+                        value: getValOt(nro, 'bolilla_diametro'), placeholder: '…',
+                        onChange: function (e) { setBolillaConAuto(nro, e.target.value); },
+                        onFocus: function (e) { e.target.parentNode.style.boxShadow = 'inset 0 0 0 2px var(--accent, #0969da)'; },
+                        onBlur:  function (e) { e.target.parentNode.style.boxShadow = ''; },
+                      })
+                    ),
+                    // Carga aplicada
+                    _r('td', { style: cellStyle },
+                      _r('input', {
+                        style: inputCellStyle,
+                        value: getValOt(nro, 'carga_aplicada'), placeholder: '…',
+                        onChange: function (e) { setValOt(nro, 'carga_aplicada', e.target.value); },
+                        onFocus: function (e) { e.target.parentNode.style.boxShadow = 'inset 0 0 0 2px var(--accent, #0969da)'; },
+                        onBlur:  function (e) { e.target.parentNode.style.boxShadow = ''; },
+                      })
+                    ),
+                    // Espesor probeta
+                    _r('td', { style: cellStyle },
+                      _r('input', {
+                        style: inputCellStyle,
+                        value: getValOt(nro, 'espesor_probeta'), placeholder: '…',
+                        onChange: function (e) { setValOt(nro, 'espesor_probeta', e.target.value); },
+                        onFocus: function (e) { e.target.parentNode.style.boxShadow = 'inset 0 0 0 2px var(--accent, #0969da)'; },
+                        onBlur:  function (e) { e.target.parentNode.style.boxShadow = ''; },
+                      })
+                    )
+                  );
+                })
+              )
             ),
-            _r('tbody', null,
-              filaPorOt.map(function (o) {
-                var nro = String(o.nro_ot);
-                var esActual = nro === otNroActualStrBr;
-                return _r('tr', { key: nro,
-                  style: { background: esActual ? '#f4f8ff' : '#fff' } },
-                  multiOtBr ? _r('td', { style: { border: '1px solid var(--border)', padding: '4px 8px', fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 700, color: esActual ? '#0550ae' : 'var(--text-2)' } },
-                    nro + (esActual ? ' · esta' : '')) : null,
-                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
-                    _r('input', {
-                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
-                      value: getValOt(nro, 'bolilla_diametro'), placeholder: '…',
-                      onChange: function (e) { setValOt(nro, 'bolilla_diametro', e.target.value); },
-                    })),
-                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
-                    _r('input', {
-                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
-                      value: getValOt(nro, 'carga_aplicada'), placeholder: '…',
-                      onChange: function (e) { setValOt(nro, 'carga_aplicada', e.target.value); },
-                    })),
-                  _r('td', { style: { border: '1px solid var(--border)', padding: 0 } },
-                    _r('input', {
-                      style: { border: 'none', width: '100%', fontSize: 11, padding: '5px 8px', outline: 'none', background: 'transparent', textAlign: 'center' },
-                      value: getValOt(nro, 'espesor_probeta'), placeholder: '…',
-                      onChange: function (e) { setValOt(nro, 'espesor_probeta', e.target.value); },
-                    }))
-                );
-              })
+            _r('datalist', { id: 'brinell_bolilla_std' },
+              _r('option', { value: '1' }),
+              _r('option', { value: '2' }),
+              _r('option', { value: '2.5' }),
+              _r('option', { value: '5' }),
+              _r('option', { value: '10' })
             )
           )
-        )
-      ),
+        );
+      })(),
       // Resultado global (opcional) — se emite en el Word como línea informativa
       _r('div', null,
         _r('div', { style: subheadStyle }, 'Resultado global (opcional)'),
