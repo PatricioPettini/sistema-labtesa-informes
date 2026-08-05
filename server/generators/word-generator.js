@@ -21,6 +21,7 @@ const { generarTratamientosTermicosDesdeTemplate } = require('./template-tratami
 const { generarLiquidosPenetrantesDesdeTemplate } = require('./template-liquidos-penetrantes');
 const { generarMetalografiaGeneralDesdeTemplate } = require('./template-metalografia-general');
 const { generarAnexoMetalograficoDesdeTemplate }  = require('./template-anexo-metalografico');
+const { generarEspesorRecubrimientoDesdeTemplate } = require('./template-espesor-recubrimiento');
 const { generarImpacto } = require('./impacto');
 const { finDeInforme } = require('./estilos');
 
@@ -49,6 +50,7 @@ const GENERADORES_TEMPLATE = {
   'liquidos-penetrantes': generarLiquidosPenetrantesDesdeTemplate,
   'metalografia-general': generarMetalografiaGeneralDesdeTemplate,
   'anexo-metalografico':  generarAnexoMetalograficoDesdeTemplate,
+  'espesor-recubrimiento': generarEspesorRecubrimientoDesdeTemplate,
 };
 for (const t of TIPOS_METALOGRAFIA) {
   GENERADORES_TEMPLATE[t] = (ot, datos, fotos) => generarMetalografiaDesdeTemplate(ot, datos, fotos, t);
@@ -530,7 +532,7 @@ async function generarWordCompleto(ot, ensayos, fotosCaratula) {
         const d = typeof e.datos_json === 'string' ? JSON.parse(e.datos_json) : e.datos_json;
         // Macrografía y varios son OAA por default (los demás dependen del flag).
         if (d && d.oaa === false) return false;
-        if (e.tipo === 'macrografia' || e.tipo === 'varios' || e.tipo === 'liquidos-penetrantes' || e.tipo === 'metalografia-general' || e.tipo === 'anexo-metalografico') return true;
+        if (e.tipo === 'macrografia' || e.tipo === 'varios' || e.tipo === 'liquidos-penetrantes' || e.tipo === 'metalografia-general' || e.tipo === 'anexo-metalografico' || e.tipo === 'espesor-recubrimiento') return true;
         return !!(d && d.oaa);
       } catch { return false; }
     });

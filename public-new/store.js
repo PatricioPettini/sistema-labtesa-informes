@@ -46,6 +46,7 @@
     'metalografia-general':   'Análisis Metalográfico General',
     'anexo-metalografico':    'Anexo Metalográfico',
     'tratamientos-termicos':  'Tratamientos Térmicos',
+    'espesor-recubrimiento':  'Espesor de Recubrimiento Metalográfico',
   };
 
   var ENSAYO_ABBR = {
@@ -73,6 +74,7 @@
     'metalografia-general': 'MET',
     'anexo-metalografico':  'AME',
     'tratamientos-termicos':'TT',
+    'espesor-recubrimiento':'ESP',
   };
 
   // ---- Datos semilla ----

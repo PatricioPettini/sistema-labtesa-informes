@@ -88,6 +88,7 @@ var ENSAYO_ICON = {
   'metalografia-general': 'microscope',
   'anexo-metalografico':  'microscope',
   'tratamientos-termicos': 'flask',
+  'espesor-recubrimiento': 'microscope',
 };
 
 /* ============ BOTÓN ============ */

@@ -20,6 +20,7 @@ var ENSAYO_INFO_BANNER = {
   'nick-break':            { label: 'Nick Break',  bg: '#fef3c7', color: '#92400e' },
   'metalografia-general':  { label: 'Metalografía',bg: '#dcfce7', color: '#166534' },
   'anexo-metalografico':   { label: 'Anexo Met.',  bg: '#dcfce7', color: '#166534' },
+  'espesor-recubrimiento': { label: 'Espesor Rec.',bg: '#dcfce7', color: '#166534' },
   'macrografia':           { label: 'Macrografía', bg: '#dcfce7', color: '#166534' },
   'ferrita-delta':         { label: 'Ferrita δ',   bg: '#dcfce7', color: '#166534' },
   'rugosidad':             { label: 'Rugosidad',   bg: '#e0f2fe', color: '#075985' },

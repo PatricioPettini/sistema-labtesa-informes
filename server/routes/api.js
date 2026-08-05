@@ -806,6 +806,7 @@ const _REGLAS_FOTOS_AUTO = {
   'liquidos-penetrantes': [{ campo: 'imagenes_resultado', re: /liquid|penetrant|revelador|indicaci[oó]n|lp\b|pt\b/i }],
   'ferrita-delta':        [{ campo: 'imagenes',           re: /ferrita|delta|leica|microscop/i }],
   'varios':               [{ campo: 'imagenes_resultado', re: /./ }],
+  'espesor-recubrimiento':[{ campo: 'imagenes_resultado', re: /espesor|recubrimiento|capa\b|microestructura/i }],
   'microestructura':         [{ campo: 'imagenes_resultado', re: /microestructura|microestrutura|^micro$/i }],
   'tamano-grano':            [{ campo: 'imagenes_resultado', re: /grano|tama[nñ]o[_\s]*de[_\s]*grano/i }],
   'inclusiones':             [{ campo: 'imagenes_resultado', re: /inclusion|inclusi[oó]n|sulfuro|aluminato|silicato|oxido|óxido/i }],

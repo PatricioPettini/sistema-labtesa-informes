@@ -34,6 +34,7 @@ const GENERATORS = {
   'liquidos-penetrantes':     require('../server/generators/template-liquidos-penetrantes.js').generarLiquidosPenetrantesDesdeTemplate,
   'metalografia-general':     require('../server/generators/template-metalografia-general.js').generarMetalografiaGeneralDesdeTemplate,
   'anexo-metalografico':      require('../server/generators/template-anexo-metalografico.js').generarAnexoMetalograficoDesdeTemplate,
+  'espesor-recubrimiento':    require('../server/generators/template-espesor-recubrimiento.js').generarEspesorRecubrimientoDesdeTemplate,
 };
 
 const OT_BASE = cargarFixture('ot-base');

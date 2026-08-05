@@ -53,6 +53,7 @@
     'metalografia-general': 'Análisis Metalográfico General',
     'anexo-metalografico':  'Anexo Metalográfico',
     'tratamientos-termicos':'Tratamientos Térmicos',
+    'espesor-recubrimiento':'Espesor de Recubrimiento Metalográfico',
   };
   var ENSAYO_ABBR = {
     traccion: 'TRACC', impacto: 'IMP', 'dureza-brinell': 'HB',
@@ -68,6 +69,7 @@
     'metalografia-general': 'MET',
     'anexo-metalografico':  'AME',
     'tratamientos-termicos':'TT',
+    'espesor-recubrimiento':'ESP',
   };
 
   // ── API fetch helper ────────────────────────────────────────────────────────
@@ -1489,6 +1491,81 @@
         ],
         nro_ot_actual, datos, existingId
       );
+    },
+
+    // ── Espesor de recubrimiento metalográfico (FM-074) ──────────────────
+    // Multi-OT: cada OT hermana recibe sus propias mediciones + sector desde
+    // `datos.mediciones_por_ot[<nroOt>]` (que el form llena por OT). Las
+    // condiciones globales (norma, metodología, aumento, equipamiento) se
+    // replican a cada hermana. `condiciones_por_ot` sigue funcionando para
+    // overrides por OT del resto de campos.
+    saveEnsayoEspesorRecubrimientoMultiOt: function (nro_ot_actual, datos, existingId) {
+      var self = this;
+      var otActualStr = String(nro_ot_actual);
+      var medPorOt = (datos && datos.mediciones_por_ot) || {};
+      // Destinos: keys de mediciones_por_ot + condiciones_por_ot + OT actual.
+      var otsDest = {}; otsDest[otActualStr] = true;
+      Object.keys(medPorOt).forEach(function (n) { if (n) otsDest[n] = true; });
+      var mapaCond = (datos && datos.condiciones_por_ot) || {};
+      Object.keys(mapaCond).forEach(function (n) { if (n) otsDest[n] = true; });
+      function armarDatosPara(nroOt, datosPrev) {
+        var out = datosPrev ? Object.assign({}, datosPrev) : {};
+        // Copiar condiciones globales del ensayo base.
+        var CONDICIONES = [
+          'oaa', 'norma', 'norma_astm_b487',
+          'metodologia', 'aumento_texto', 'temperatura',
+          'equipamiento', 'equipamiento_tags', 'otros_equipos',
+          'notas_texto', 'evaluacion_texto',
+          'nota_evaluaciones', 'nota_no_conforme',
+          'nota_incertidumbre', 'nota_externo',
+        ];
+        CONDICIONES.forEach(function (k) {
+          if (datos[k] !== undefined) out[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
+            ? Object.assign({}, datos[k])
+            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        });
+        // Aplicar overrides por OT (condiciones_por_ot[nroOt] pisa raíz).
+        var cpo = mapaCond[nroOt];
+        if (cpo && Object.keys(cpo).length > 0) {
+          Object.keys(cpo).forEach(function (k) { out[k] = cpo[k]; });
+        }
+        // Mediciones específicas de esta OT (o vacío si no cargó).
+        var med = medPorOt[nroOt] || { sector: '', valores: [] };
+        out.mediciones = Array.isArray(med.valores) ? med.valores.slice() : [];
+        out.sector_ensayado = String(med.sector || '').trim();
+        // No propagamos el mapa completo a los hijos — cada hijo tiene lo suyo.
+        delete out.mediciones_por_ot;
+        delete out.condiciones_por_ot;
+        return out;
+      }
+      var datosActual = armarDatosPara(otActualStr, datos);
+      var promActual = self.saveEnsayoAsync(nro_ot_actual, 'espesor-recubrimiento', datosActual, existingId || null);
+      var hermanas = Object.keys(otsDest).filter(function (n) { return n !== otActualStr; });
+      var promsHermanas = hermanas.map(function (nroY) {
+        var existente = _db.ensayos.find(function (e) {
+          return String(e.nro_ot) === String(nroY) && e.tipo === 'espesor-recubrimiento';
+        });
+        var accion = existente ? 'actualizado' : 'creado';
+        var datosPrev = {};
+        if (existente) {
+          try { datosPrev = JSON.parse(existente.datos_json || '{}'); } catch (e) {}
+        }
+        var datosY = armarDatosPara(nroY, datosPrev);
+        var cantidad = (medPorOt[nroY] && Array.isArray(medPorOt[nroY].valores))
+          ? medPorOt[nroY].valores.filter(function (v) { return String(v || '').trim() !== ''; }).length : 0;
+        return self.saveEnsayoAsync(nroY, 'espesor-recubrimiento', datosY, existente ? existente.id : null).then(function (row) {
+          return { nro_ot: nroY, accion: accion, cantidad: cantidad, id: row && row.id };
+        });
+      });
+      return Promise.all([promActual].concat(promsHermanas)).then(function (results) {
+        var actualRow = results[0];
+        var cantActual = (medPorOt[otActualStr] && Array.isArray(medPorOt[otActualStr].valores))
+          ? medPorOt[otActualStr].valores.filter(function (v) { return String(v || '').trim() !== ''; }).length : 0;
+        return {
+          otActual: { nro_ot: otActualStr, id: actualRow && actualRow.id, cantidad: cantActual },
+          otsHermanas: results.slice(1),
+        };
+      });
     },
 
     // ── Anexo metalográfico ──────────────────────────────────────────────

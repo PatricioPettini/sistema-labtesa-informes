@@ -529,6 +529,39 @@ function EnsayoForm(props) {
         return;
       }
     }
+    // Split multi-OT en espesor de recubrimiento. Se dispara si hay mediciones
+    // cargadas para alguna OT hermana O si hay `condiciones_por_ot` para
+    // alguna hermana. El saver aplana `mediciones_por_ot[<OT>]` a cada hijo
+    // (cada OT recibe SUS mediciones + sector).
+    if (tipo === 'espesor-recubrimiento') {
+      var otActualStrEsp = String(ot.nro_ot);
+      var hayMedOtras = clean.mediciones_por_ot && Object.keys(clean.mediciones_por_ot).some(function (n) {
+        if (!n || n === otActualStrEsp) return false;
+        var m = clean.mediciones_por_ot[n] || {};
+        var tieneSector = String(m.sector || '').trim() !== '';
+        var tieneVal = Array.isArray(m.valores) && m.valores.some(function (v) { return String(v || '').trim() !== ''; });
+        return tieneSector || tieneVal;
+      });
+      var hayCondsOtrasEsp = clean.condiciones_por_ot && Object.keys(clean.condiciones_por_ot).some(function (n) {
+        return n !== otActualStrEsp && Object.keys(clean.condiciones_por_ot[n] || {}).length > 0;
+      });
+      if ((hayMedOtras || hayCondsOtrasEsp) && typeof window.LabStore.saveEnsayoEspesorRecubrimientoMultiOt === 'function') {
+        window.LabStore.saveEnsayoEspesorRecubrimientoMultiOt(ot.nro_ot, clean, existing ? existing.id : null)
+          .then(function (resumen) {
+            var msg = 'Espesor de recubrimiento guardado · ' + resumen.otActual.cantidad + ' mediciones en OT ' + resumen.otActual.nro_ot;
+            resumen.otsHermanas.forEach(function (h) {
+              msg += ' · ' + h.cantidad + ' ' + h.accion + ' en OT ' + h.nro_ot;
+            });
+            toast(msg, 'success');
+            nav('#/ot/' + ot.nro_ot);
+          })
+          .catch(function (e) {
+            if (manejarErrorFirma(e, save)) return;
+            toast('Error al sincronizar multi-OT: ' + e.message, 'danger');
+          });
+        return;
+      }
+    }
     window.LabStore.saveEnsayo(ot.nro_ot, tipo, clean, existing ? existing.id : null, {
       onError: function (er) { return manejarErrorFirma(er, save); },
     });
@@ -695,7 +728,10 @@ function EnsayoForm(props) {
       tipo === 'tratamientos-termicos' && typeof window.TratamientosTermicosForm === 'function'
         ? React.createElement(window.TratamientosTermicosForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
         : null,
-      (tipo === 'impacto' || tipo === 'traccion' || tipo === 'plegado' || tipo === 'quimicos' || tipo === 'dureza-brinell' || tipo === 'varios' || tipo === 'dureza-vickers' || tipo === 'dureza-rockwell' || tipo === 'nick-break' || tipo === 'macrografia' || tipo === 'rugosidad' || tipo === 'liquidos-penetrantes' || tipo === 'metalografia-general' || tipo === 'anexo-metalografico' || tipo === 'tratamientos-termicos' || (tipo === 'ferrita-delta' && (datos.variante || 'fischer') !== 'microscopio')) ? null : sections.map(function (sec, si) {
+      tipo === 'espesor-recubrimiento' && typeof window.EspesorRecubrimientoForm === 'function'
+        ? React.createElement(window.EspesorRecubrimientoForm, { datos: datos, set: set, ensayoId: existing ? existing.id : null, nroOt: props.nro_ot, tipo: tipo })
+        : null,
+      (tipo === 'impacto' || tipo === 'traccion' || tipo === 'plegado' || tipo === 'quimicos' || tipo === 'dureza-brinell' || tipo === 'varios' || tipo === 'dureza-vickers' || tipo === 'dureza-rockwell' || tipo === 'nick-break' || tipo === 'macrografia' || tipo === 'rugosidad' || tipo === 'liquidos-penetrantes' || tipo === 'metalografia-general' || tipo === 'anexo-metalografico' || tipo === 'tratamientos-termicos' || tipo === 'espesor-recubrimiento' || (tipo === 'ferrita-delta' && (datos.variante || 'fischer') !== 'microscopio')) ? null : sections.map(function (sec, si) {
         var sectionContent;
         if (sec.type === 'equipoBoxes') {
           sectionContent = React.createElement(EquipoBoxes, {

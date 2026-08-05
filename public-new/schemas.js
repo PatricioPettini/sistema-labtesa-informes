@@ -1393,6 +1393,27 @@
     sections: function () { return []; },
   };
 
+  // ─── ESPESOR DE RECUBRIMIENTO METALOGRÁFICO (FM-074) ────────────────────
+  // Multi-OT. Cada OT tiene sus mediciones (N configurable) + sector, y el
+  // Word muestra la tabla min/max/promedio (calculados) con una columna por OT.
+  // Form custom EspesorRecubrimientoForm. Generator dedicado
+  // template-espesor-recubrimiento.js. Metodología ITM-084 por default.
+  SCHEMAS['espesor-recubrimiento'] = {
+    icon: 'microscope',
+    descr: 'Espesor de recubrimiento metalográfico (modelo FM-074). Metodología ITM-084 con mediciones por OT.',
+    defaults: function () {
+      return {
+        oaa: true,
+        metodologia: 'ITM N°084',
+        aumento_texto: '100 a 1000 X',
+        equipamiento: { leica_378: true, termo_700: true },
+        equipamiento_tags: { leica_378: 'MM-378', termo_700: 'MM-700' },
+        mediciones_por_ot: {},  // { '<nro_ot>': { sector: '', valores: ['', '', ...] } }
+      };
+    },
+    sections: function () { return []; },
+  };
+
   // ─── ANEXO METALOGRÁFICO (FM-080) ────────────────────────────────────────
   // Versión reducida enfocada en TAMAÑO DE GRANO y TENOR INCLUSIONARIO.
   SCHEMAS['anexo-metalografico'] = {
