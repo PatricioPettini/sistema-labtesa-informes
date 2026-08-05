@@ -240,16 +240,73 @@ function MetalografiaGeneralForm(props) {
   }
   var _copyOpenKey = React.useState(''); var copyOpenKey = _copyOpenKey[0], setCopyOpenKey = _copyOpenKey[1];
   var _copyDestGen = React.useState([]); var copyDestGen = _copyDestGen[0], setCopyDestGen = _copyDestGen[1];
+
+  // ── Getters/setters por OT para campos "por-OT" (normas, zona, reactivos,
+  // equipamiento…). Fuente de verdad: `condiciones_por_ot[<nroOt>]`. La OT
+  // actual usa `datos[k]` como base y espeja el cambio en la raíz para el
+  // guardado. Las hermanas escriben SOLO en el mapa (sin tocar la raíz), y su
+  // saver aplana el override al datos_json de esa OT al persistir.
+  // Dot-notation soportada: getCond('analisis.micro.on'), setCond('reactivos.nital2', true), etc.
+  function _dotGet(obj, k) {
+    if (obj == null) return undefined;
+    var parts = String(k).split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null) return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+  function getCond(k) {
+    var top = String(k).split('.')[0];
+    if (multiOtMg) {
+      var m = (datos.condiciones_por_ot || {})[otActivaMg];
+      if (m && m[top] !== undefined) return _dotGet(m, k);
+    }
+    return _dotGet(datos, k);
+  }
+  function _cloneShallow(v) {
+    if (Array.isArray(v)) return v.slice();
+    if (v && typeof v === 'object') return Object.assign({}, v);
+    return v;
+  }
+  function setCond(k, v) {
+    if (!multiOtMg) { set(k, v); return; }
+    var mapa = Object.assign({}, datos.condiciones_por_ot || {});
+    var m = Object.assign({}, mapa[otActivaMg] || {});
+    var top = String(k).split('.')[0];
+    // Si esta OT nunca overrode el top-level, sembrar el override con el valor
+    // actual de datos[top] para no perder los otros sub-campos al escribir uno.
+    if (m[top] === undefined) m[top] = _cloneShallow(datos[top]);
+    var parts = String(k).split('.');
+    var cur = m;
+    for (var i = 0; i < parts.length - 1; i++) {
+      cur[parts[i]] = _cloneShallow(cur[parts[i]]) || {};
+      cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = v;
+    mapa[otActivaMg] = m;
+    if (otActivaMg === otNroActualMg) {
+      // OT actual: también actualizar la raíz para que se persista tal cual.
+      var patch = { condiciones_por_ot: mapa };
+      patch[top] = m[top];
+      set(patch);
+    } else {
+      set('condiciones_por_ot', mapa);
+    }
+  }
+  function setCondBool(k, checked) { setCond(k, !!checked); }
   function copiarCamposAOts(destinos, campos) {
     if (!destinos || destinos.length === 0) return;
     var mapaCond = Object.assign({}, datos.condiciones_por_ot || {});
+    // Origen: la OT actualmente activa (respeta overrides de esa OT si los hay,
+    // sino fallback a la raíz).
     destinos.forEach(function (nroOt) {
       var entry = Object.assign({}, mapaCond[nroOt] || {});
       campos.forEach(function (k) {
-        if (datos[k] !== undefined) {
-          entry[k] = (typeof datos[k] === 'object' && datos[k] !== null && !Array.isArray(datos[k]))
-            ? Object.assign({}, datos[k])
-            : (Array.isArray(datos[k]) ? datos[k].slice() : datos[k]);
+        var val = getCond(k);
+        if (val !== undefined) {
+          entry[k] = _cloneShallow(val);
         }
       });
       mapaCond[nroOt] = entry;
@@ -321,11 +378,12 @@ function MetalografiaGeneralForm(props) {
     ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 10.5 } },
       MG_ANALISIS.map(function (n) {
-        var d = (datos.analisis && datos.analisis[n.key]) || { on: false, ref: n.defRef };
+        var analisisOt = getCond('analisis') || {};
+        var d = analisisOt[n.key] || { on: false, ref: n.defRef };
         return _r('div', { key: n.key, style: { display: 'flex', flexDirection: 'column', gap: 3 } },
           _r('label', { style: Object.assign({}, S.label, { fontWeight: 700 }) },
             _r('input', { type: 'checkbox', checked: !!d.on,
-              onChange: function (e) { upd('analisis.' + n.key + '.on', e.target.checked); } }),
+              onChange: function (e) { setCond('analisis.' + n.key + '.on', e.target.checked); } }),
             n.label),
           // Nombre custom del análisis (solo para 1.1.5 OTRO). Lo que se
           // ingrese acá reemplaza "OTRO" en el título "DETERMINACIÓN DE X" del Word.
@@ -336,7 +394,7 @@ function MetalografiaGeneralForm(props) {
                   style: S.inline,
                   placeholder: 'Ej: DUREZA SUPERFICIAL',
                   value: d.nombre || '',
-                  onChange: function (e) { upd('analisis.' + n.key + '.nombre', e.target.value); },
+                  onChange: function (e) { setCond('analisis.' + n.key + '.nombre', e.target.value); },
                 }))
             : null,
           // Norma de ensayo — texto libre con datalist opcional para sugerencias.
@@ -347,7 +405,7 @@ function MetalografiaGeneralForm(props) {
               placeholder: n.placeholder || '……',
               value: d.ref || '',
               list: n.opciones && n.opciones.length ? 'mg-norm-' + n.key : undefined,
-              onChange: function (e) { upd('analisis.' + n.key + '.ref', e.target.value); },
+              onChange: function (e) { setCond('analisis.' + n.key + '.ref', e.target.value); },
             }),
             n.opciones && n.opciones.length
               ? _r('datalist', { id: 'mg-norm-' + n.key },
@@ -362,7 +420,7 @@ function MetalografiaGeneralForm(props) {
               style: S.inline,
               placeholder: 'Opcional — Ej: ASTM E407',
               value: d.ref_otra || '',
-              onChange: function (e) { upd('analisis.' + n.key + '.ref_otra', e.target.value); },
+              onChange: function (e) { setCond('analisis.' + n.key + '.ref_otra', e.target.value); },
             })),
           // Metodología de ensayo — segundo campo separado. El generator ya lo
           // soporta (line "Metodología de ensayo: ${metod}").
@@ -372,7 +430,7 @@ function MetalografiaGeneralForm(props) {
               style: S.inline,
               placeholder: n.metodologiaPlaceholder || 'ITM N°…',
               value: d.metodologia || '',
-              onChange: function (e) { upd('analisis.' + n.key + '.metodologia', e.target.value); },
+              onChange: function (e) { setCond('analisis.' + n.key + '.metodologia', e.target.value); },
             }))
         );
       })
@@ -391,31 +449,31 @@ function MetalografiaGeneralForm(props) {
     ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px', fontSize: 10.5 } },
       _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.sup_muestra,
-          onChange: function (e) { updBool('sup_muestra', e.target.checked); } }),
+        _r('input', { type: 'checkbox', checked: !!getCond('sup_muestra'),
+          onChange: function (e) { setCondBool('sup_muestra', e.target.checked); } }),
         _r('span', { style: { fontWeight: 600 } }, 'ESTADO DE SUPERFICIE:'), ' OK'),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'TEMPERATURA DE ENSAYO:'),
-        _r('input', { style: Object.assign({}, S.input, S.num, { width: 56 }), value: datos.temperatura || '',
-          onChange: function (e) { upd('temperatura', e.target.value); } }),
+        _r('input', { style: Object.assign({}, S.input, S.num, { width: 56 }), value: getCond('temperatura') || '',
+          onChange: function (e) { setCond('temperatura', e.target.value); } }),
         _r('span', null, '°C')),
       _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.sup_equipo,
-          onChange: function (e) { updBool('sup_equipo', e.target.checked); } }),
+        _r('input', { type: 'checkbox', checked: !!getCond('sup_equipo'),
+          onChange: function (e) { setCondBool('sup_equipo', e.target.checked); } }),
         _r('span', { style: { fontWeight: 600 } }, 'ESTADO DE EQUIPO:'), ' OK'),
       _r('label', { style: S.label },
-        _r('input', { type: 'checkbox', checked: !!datos.sup_reactivo,
-          onChange: function (e) { updBool('sup_reactivo', e.target.checked); } }),
+        _r('input', { type: 'checkbox', checked: !!getCond('sup_reactivo'),
+          onChange: function (e) { setCondBool('sup_reactivo', e.target.checked); } }),
         _r('span', { style: { fontWeight: 600 } }, 'ESTADO DE REACTIVO:'), ' OK'),
       _r('div', { style: { gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'ZONA DE ENSAYO:'),
         _r(window.ZonaInput, { tipo: 'metalografia-general', style: S.inline, placeholder: 'Ej: Núcleo, Superficie…',
-          value: datos.zona_ensayo || '',
-          onChange: function (e) { upd('zona_ensayo', e.target.value); } })),
+          value: getCond('zona_ensayo') || '',
+          onChange: function (e) { setCond('zona_ensayo', e.target.value); } })),
       _r('div', { style: { gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6 } },
         _r('span', { style: { fontWeight: 600 } }, 'MUESTRA ENSAYADA:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.muestra_ensayada || '',
-          onChange: function (e) { upd('muestra_ensayada', e.target.value); } }))
+        _r('input', { style: S.inline, placeholder: '……', value: getCond('muestra_ensayada') || '',
+          onChange: function (e) { setCond('muestra_ensayada', e.target.value); } }))
     ),
     _r('div', { style: Object.assign({}, S.subhead, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
       _r('span', null, '1.2.1  REACTIVO UTILIZADO'),
@@ -425,15 +483,16 @@ function MetalografiaGeneralForm(props) {
     ),
     _r('div', { style: { padding: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px 16px', fontSize: 10.5 } },
       MG_REACTIVOS.map(function (r) {
+        var reactivosOt = getCond('reactivos') || {};
         return _r('label', { key: r.key, style: S.label },
-          _r('input', { type: 'checkbox', checked: !!(datos.reactivos && datos.reactivos[r.key]),
-            onChange: function (e) { upd('reactivos.' + r.key, e.target.checked); } }),
+          _r('input', { type: 'checkbox', checked: !!reactivosOt[r.key],
+            onChange: function (e) { setCond('reactivos.' + r.key, e.target.checked); } }),
           r.label);
       }),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, gridColumn: '1 / -1' } },
         _r('span', { style: { fontWeight: 600 } }, 'Otro:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.reactivo_otro || '',
-          onChange: function (e) { upd('reactivo_otro', e.target.value); } }))
+        _r('input', { style: S.inline, placeholder: '……', value: getCond('reactivo_otro') || '',
+          onChange: function (e) { setCond('reactivo_otro', e.target.value); } }))
     )
   );
 
@@ -447,31 +506,33 @@ function MetalografiaGeneralForm(props) {
     ),
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 10.5 } },
       MG_EQUIPOS.map(function (e) {
-        var checked = !!(datos.equipamiento && datos.equipamiento[e.key]);
-        var tagVal  = (datos.equipamiento_tags && datos.equipamiento_tags[e.key]) != null
-          ? datos.equipamiento_tags[e.key] : e.tagDefault;
+        var equipOt = getCond('equipamiento') || {};
+        var tagsOt  = getCond('equipamiento_tags') || {};
+        var checked = !!equipOt[e.key];
+        var tagVal  = tagsOt[e.key] != null ? tagsOt[e.key] : e.tagDefault;
         return _r('div', { key: e.key, style: { display: 'flex', alignItems: 'center', gap: 6 } },
           _r('label', { style: Object.assign({}, S.label, { flex: 1 }) },
             _r('input', { type: 'checkbox', checked: checked,
-              onChange: function (ev) { upd('equipamiento.' + e.key, ev.target.checked); } }),
+              onChange: function (ev) { setCond('equipamiento.' + e.key, ev.target.checked); } }),
             _r('span', { style: { fontWeight: 600 } }, e.nombre)),
           _r('span', { style: { color: '#555' } }, 'TAG N°:'),
           _r('input', { style: Object.assign({}, S.input, { width: 80 }), value: tagVal,
-            onChange: function (ev) { upd('equipamiento_tags.' + e.key, ev.target.value); } }));
+            onChange: function (ev) { setCond('equipamiento_tags.' + e.key, ev.target.value); } }));
       }),
       _r('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 } },
         _r('span', { style: { fontWeight: 600 } }, 'AUMENTO UTILIZADO:'),
         MG_AUMENTOS.map(function (a) {
+          var aumentosOt = getCond('aumentos') || {};
           return _r('label', { key: a.key, style: { display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', checked: !!(datos.aumentos && datos.aumentos[a.key]),
-              onChange: function (e) { upd('aumentos.' + a.key, e.target.checked); } }),
+            _r('input', { type: 'checkbox', checked: !!aumentosOt[a.key],
+              onChange: function (e) { setCond('aumentos.' + a.key, e.target.checked); } }),
             a.label);
         })
       ),
       typeof window.OtrosEquiposBlock === 'function'
         ? _r(window.OtrosEquiposBlock, { embed: true,
-            value: datos.otros_equipos || [],
-            onChange: function (arr) { upd('otros_equipos', arr); } })
+            value: getCond('otros_equipos') || [],
+            onChange: function (arr) { setCond('otros_equipos', arr); } })
         : null
     )
   );
@@ -506,12 +567,11 @@ function MetalografiaGeneralForm(props) {
           },
         }, nro, esActual ? ' · actual' : '');
       })),
-    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener textos distintos.')
+    _r('span', { style: { fontSize: 10, color: '#8a5a00' } }, 'Cada OT puede tener normas, condiciones, equipamiento y resultados distintos.')
   ) : null;
 
   var block14 = _r('div', null,
     _r('div', { style: S.head }, '1.4  RESULTADOS OBTENIDOS'),
-    tabsOtMg,
     _r('div', { style: { padding: 8, display: 'flex', flexDirection: 'column', gap: 10 } },
       MG_RESULTADOS.map(function (r) {
         return _r('div', { key: r.key },
@@ -660,6 +720,7 @@ function MetalografiaGeneralForm(props) {
   ) : null;
 
   return _r('div', { style: S.sheet },
+    tabsOtMg,
     barraCopiarTodoMg,
     block11, block12, block13, block14, block15, block16
   );

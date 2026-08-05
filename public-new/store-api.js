@@ -1477,7 +1477,9 @@
         'metalografia-general',
         ['imagenes_micro', 'imagenes_espesor', 'imagenes_grafito', 'imagenes_decarb'],
         [
-          'oaa', 'temperatura', 'zona_ensayo', 'muestra_ensayada',
+          'oaa', 'analisis',
+          'temperatura', 'zona_ensayo', 'muestra_ensayada',
+          'sup_muestra', 'sup_equipo', 'sup_reactivo',
           'reactivos', 'reactivo_otro', 'aumentos',
           'equipamiento', 'equipamiento_tags', 'otros_equipos',
           'observaciones_evaluacion', 'observaciones_extra',
