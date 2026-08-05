@@ -36,6 +36,7 @@ var LP_INSTRUMENTOS = [
 ];
 
 var LP_CONDICIONES = [
+  { key: 'limpieza_previa',          label: 'LIMPIEZA PREVIA:' },
   { key: 'temperatura_ensayo',       label: 'TEMPERATURA DE ENSAYO:' },
   { key: 'intensidad_luz_blanca',    label: 'INTENSIDAD DE LUZ BLANCA:' },
   { key: 'potencia_luz_uv',          label: 'POTENCIA DE LUZ UV:' },
@@ -225,10 +226,8 @@ function LiquidosPenetrantesForm(props) {
             upd('norma_otra', val);
             if (val && val.trim() && !datos.norma_otra_chk) upd('norma_otra_chk', true);
           } })),
-      _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 } },
-        _r('span', { style: { fontWeight: 600 } }, 'LIMPIEZA PREVIA:'),
-        _r('input', { style: S.inline, placeholder: '……', value: datos.limpieza_previa || '',
-          onChange: function (e) { upd('limpieza_previa', e.target.value); } }))
+      // "Limpieza previa" se movió a la sección CONDICIONES DE ENSAYO (primer
+      // item del grid), donde queda al lado de las temperaturas / tiempos.
     )
   );
 
