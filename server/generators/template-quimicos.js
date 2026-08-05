@@ -411,13 +411,19 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   const observacionesOculta = observaciones_evaluacion === '__SECTION_HIDE__';
 
   // Contenido de la sección "EVALUACION" (líneas — se inyectan como XML aparte).
+  // Formato: "…material tipo <MATERIAL>." (sin dos puntos antes del material,
+  // punto final agregado si el usuario no lo puso).
   const lineasEvaluacion = [];
   if (evalHabilitada && (evalText || materialTipo)) {
     let linea = evalText || 'La muestra analizada satisface los requerimientos de composición química de un material tipo:';
     if (materialTipo) {
-      if (/:\s*$/.test(linea)) linea = linea.replace(/:\s*$/, ': ' + materialTipo);
+      // Sacar ":" (con o sin espacio) al final del prefijo y pegar el material.
+      if (/:\s*$/.test(linea)) linea = linea.replace(/:\s*$/, ' ' + materialTipo);
       else if (linea.indexOf(materialTipo) === -1) linea = linea + ' ' + materialTipo;
     }
+    // Punto final si el usuario no lo agregó (ignorando espacios trailing).
+    linea = linea.replace(/\s+$/, '');
+    if (!/[.!?…]$/.test(linea)) linea = linea + '.';
     linea.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasEvaluacion.push(l));
   }
   const evaluacionOculta = lineasEvaluacion.length === 0;

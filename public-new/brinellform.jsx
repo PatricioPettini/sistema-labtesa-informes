@@ -365,31 +365,25 @@ function BrinellForm(props) {
 
   // ── MEMORIA ANALÍTICA (interno) ────────────────────────────────────────
   // Registro trazabilidad del patrón usado para verificar el durómetro.
-  // Campos según FM-134 Rev 00: patrón (TAG + valor) y mediciones de
-  // verificación del patrón (diámetro impronta + dureza HB obtenidos al medir
-  // el patrón). No se emiten en el Word — quedan en el sistema como trazabilidad.
+  // El TAG del patrón se carga arriba en 1.3 EQUIPAMIENTO (última fila). Acá
+  // sólo van los datos de verificación: valor de referencia + medición
+  // (diámetro impronta + dureza HB obtenidos al medir el patrón). No se emiten
+  // en el Word — quedan en el sistema como trazabilidad.
   var blockMem = _r('div', null,
     _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', gap: 8 }) },
       _r('span', null, 'MEMORIA ANALÍTICA'),
       _r('span', { style: { fontSize: 9, fontWeight: 500, color: 'var(--text-3)', fontStyle: 'italic' } }, '(uso interno — trazabilidad del patrón)')
     ),
     _r('div', { style: { padding: 12, display: 'flex', flexDirection: 'column', gap: 14 } },
-      // Patrón utilizado
+      // Valor de referencia
       _r('div', null,
-        _r('div', { style: subheadStyle }, 'Patrón utilizado'),
-        _r('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', fontSize: 11 } },
-          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-            _r('span', { style: { fontWeight: 600 } }, 'TAG:'),
-            _r('input', { style: Object.assign({}, S.input, { width: 130 }),
-              placeholder: 'Ej: MM-XXX',
-              value: datos.patron_tag || datos.patron || '',
-              onChange: function (e) { upd('patron_tag', e.target.value); } })),
-          _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 200 } },
-            _r('span', { style: { fontWeight: 600 } }, 'Valor:'),
-            _r('input', { style: Object.assign({}, S.input, { flex: 1 }),
-              placeholder: 'Ej: 200 HB',
-              value: datos.patron_valor || '',
-              onChange: function (e) { upd('patron_valor', e.target.value); } })))
+        _r('div', { style: subheadStyle }, 'Valor de referencia'),
+        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 } },
+          _r('span', { style: { fontWeight: 600 } }, 'Valor:'),
+          _r('input', { style: Object.assign({}, S.input, { flex: 1, maxWidth: 260 }),
+            placeholder: 'Ej: 200 HB',
+            value: datos.patron_valor || '',
+            onChange: function (e) { upd('patron_valor', e.target.value); } }))
       ),
       // Verificación (medición del patrón)
       _r('div', null,
@@ -437,7 +431,24 @@ function BrinellForm(props) {
           _r(window.OtrosEquiposBlock, { embed: true,
             value: datos.otros_equipos || [],
             onChange: function (arr) { upd('otros_equipos', arr); } }))
-      : null
+      : null,
+    // Patrón utilizado — SIEMPRE al final del bloque equipamiento (mismo orden
+    // que en el Word). El TAG se guarda en datos.patron_tag y el generator lo
+    // emite en la línea "Patrón utilizado TAG N°PMM-XXX" (última del equipamiento).
+    _r('div', { style: {
+      padding: '8px 10px', borderTop: '1px dashed var(--border, #e3e5ea)',
+      display: 'flex', alignItems: 'center', gap: 8, fontSize: 11,
+      background: 'var(--surface-2, #f5f7fa)',
+    } },
+      _r('span', { style: { fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.3px' } }, 'PATRÓN UTILIZADO'),
+      _r('span', { style: { color: '#666' } }, 'TAG N°'),
+      _r('input', {
+        style: Object.assign({}, S.input, { width: 160 }),
+        placeholder: 'Ej: PMM-716',
+        value: datos.patron_tag || datos.patron || '',
+        onChange: function (e) { upd('patron_tag', e.target.value); },
+      })
+    )
   );
 
   // ── 1.4 RESULTADOS ────────────────────────────────────────────────────

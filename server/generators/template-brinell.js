@@ -163,9 +163,20 @@ function generarBrinellDesdeTemplate(ot, datos, fotosCaratula) {
   }
   // "OTROS EQUIPOS" del form (datos.otros_equipos = [{nombre, tag}])
   formatearOtrosEquipos(datos).forEach(l => listaEquipos.push(l));
+  // Filtro de seguridad: si el técnico agregó un "Patrón utilizado …" o algo
+  // con "PMM-" en OtrosEquipos / equipamiento_extra, lo sacamos de la lista de
+  // slots — el patrón se emite SIEMPRE en la última línea del bloque
+  // "EQUIPAMIENTO UTILIZADO" del template (línea "Patrón utilizado TAG N°PMM-…"),
+  // y no debe duplicarse ni aparecer antes de otros equipos.
+  const listaEquiposFiltrada = listaEquipos.filter(l => {
+    const s = String(l || '').toLowerCase();
+    if (/patr[oó]n\s+utilizado/i.test(s)) return false;
+    if (/\bpmm\s*[-–]/i.test(s)) return false;
+    return true;
+  });
   const equipSlots = {};
   for (let i = 1; i <= 5; i++) {
-    equipSlots[`equipamiento_${i}`] = listaEquipos[i - 1] || '__SECTION_HIDE__';
+    equipSlots[`equipamiento_${i}`] = listaEquiposFiltrada[i - 1] || '__SECTION_HIDE__';
   }
 
   // ── Resultados: hasta 6 filas con dureza; impronta se autonumera (1..N) ──
