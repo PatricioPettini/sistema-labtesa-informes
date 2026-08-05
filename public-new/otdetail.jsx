@@ -101,6 +101,10 @@ function OTDetail(props) {
   // Modal "Confirmar razón social" antes de generar (single o batch).
   //   { modo: 'single' | 'batch' }
   var _razonDlg = React.useState(null); var razonDlg = _razonDlg[0], setRazonDlg = _razonDlg[1];
+  // Modal "Falta fecha de aprobación" — permite cargarla in-place con date
+  // picker + botón "Guardar y generar" (sin necesidad de ir a "Editar solicitud").
+  //   { onGuardar: fn(fechaISO), initial?: 'YYYY-MM-DD', propagar: bool }
+  var _faDlg = React.useState(null); var faDlg = _faDlg[0], setFaDlg = _faDlg[1];
   // Modal específico para colisión de nombre de archivo con 3 opciones.
   // { filename, carpeta, opts }  → sobrescribir / -1 / renombrar.
   var _arch = React.useState(null); var archExiste = _arch[0], setArchExiste = _arch[1];
@@ -372,23 +376,35 @@ function OTDetail(props) {
           return;
         }
         // Falta fecha de aprobación: el bot creó la OT sin ella (Trello sin
-        // custom field) y el admin no la cargó todavía. Mostramos modal con
-        // atajo para abrir "Editar solicitud" (aplica a las OTs hermanas).
+        // custom field) y el admin no la cargó todavía. Abrimos un modal con
+        // date picker in-place — al guardar, propaga a las OTs hermanas via
+        // updateSolicitud (si tiene solicitud) y reintenta la generación.
         if (r.status === 422 && r.d && r.d.code === 'FALTA_FECHA_APROBACION') {
           setGen('');
-          setMdl({
-            title: 'Falta la fecha de aprobación',
-            message: (r.d.error || 'No se puede generar el informe: falta la fecha de aprobación.') +
-                     '\n\n' + (r.d.hint || 'Cargá la fecha desde "Editar solicitud" en la barra de OTs hermanas.'),
-            tone: 'warning',
-            confirmLabel: otsHermanas.length > 1 ? 'Editar solicitud' : 'Editar OT',
-            onConfirm: function () {
-              setMdl(null);
-              if (otsHermanas.length > 1) setEditSol(true);
-              else nav('#/ot/' + ot.nro_ot + '/editar');
+          setFaDlg({
+            initial: ot.fecha_aprobacion || '',
+            propagar: !!ot.nro_solicitud,
+            cantHermanas: otsHermanas.length + 1,
+            onGuardar: function (fechaISO) {
+              // Persistir (a la solicitud entera si hay hermanas, o solo a
+              // la OT si no) y luego reintentar la generación.
+              var prom;
+              if (ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
+                prom = window.LabStore.updateSolicitud(ot.nro_solicitud, { fecha_aprobacion: fechaISO });
+              } else {
+                window.LabStore.updateOt(ot.nro_ot, { fecha_aprobacion: fechaISO });
+                prom = Promise.resolve();
+              }
+              Promise.resolve(prom).then(function () {
+                ot.fecha_aprobacion = fechaISO;
+                setFaDlg(null);
+                // Reintentar la generación con los mismos parámetros.
+                ejecutarGenerarWord(carpetaDestino, filename, opts);
+              }).catch(function (e) {
+                toast('No se pudo guardar la fecha: ' + (e && e.message ? e.message : e), 'danger');
+              });
             },
-            cancelLabel: 'Cerrar',
-            onCancel: function () { setMdl(null); },
+            onCancel: function () { setFaDlg(null); },
           });
           return;
         }
@@ -1079,6 +1095,8 @@ function OTDetail(props) {
     }) : null,
     // Modal "Motivo del cambio" para reemisión OAA acreditada (versión > 1).
     motivoDlg ? React.createElement(MotivoCambioModal, motivoDlg) : null,
+    // Modal "Falta fecha de aprobación" con date picker in-place.
+    faDlg ? React.createElement(FaltaFechaAprobacionModal, faDlg) : null,
     // Modal "Confirmar razón social" antes de generar informe (single o batch).
     razonDlg ? React.createElement(ConfirmarRazonSocialModal, {
       razonActual: ot.razon_social || '',
@@ -1160,6 +1178,57 @@ function OTDetail(props) {
 // OT antes de continuar con la generación (la carpeta destino en el drive se
 // resuelve por razón social — evita informes en carpeta equivocada por typo
 // del bot). Opción para propagar el cambio a todas las OTs de la solicitud.
+// Modal "Falta fecha de aprobación" — se abre cuando el endpoint /generate
+// devuelve 422 con code=FALTA_FECHA_APROBACION. Permite cargar la fecha con
+// un date picker in-place y guardarla + reintentar la generación sin salir
+// del modal actual.
+function FaltaFechaAprobacionModal(props) {
+  var _f = React.useState(props.initial || ''); var fecha = _f[0], setFecha = _f[1];
+  var puedeConfirmar = /^\d{4}-\d{2}-\d{2}$/.test(fecha);
+  var _dwn = React.useRef(false);
+  return React.createElement('div', {
+    style: {
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    },
+    onMouseDown: function (e) { _dwn.current = (e.target === e.currentTarget); },
+    onMouseUp: function (e) {
+      if (_dwn.current && e.target === e.currentTarget) props.onCancel();
+      _dwn.current = false;
+    },
+  },
+    React.createElement('div', { style: { background: '#fff', borderRadius: 8, width: 'min(92vw, 480px)', overflow: 'hidden' } },
+      React.createElement('div', { style: { background: '#fff8e5', borderBottom: '1px solid #e0c060', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement(Icon, { name: 'alertTri', size: 20, style: { color: '#8a5a00' } }),
+        React.createElement('div', null,
+          React.createElement('h3', { style: { margin: 0, color: '#8a5a00', fontSize: 15 } }, 'Falta la fecha de aprobación'),
+          React.createElement('div', { style: { fontSize: 12, color: '#8a5a00c0', marginTop: 3 } },
+            props.propagar
+              ? 'La fecha de aprobación es de la solicitud: aplica a las ' + (props.cantHermanas || 1) + ' OTs hermanas'
+              : 'Cargá la fecha de aprobación de gerencia')
+        )
+      ),
+      React.createElement('div', { style: { padding: 20 } },
+        React.createElement('div', { style: { fontSize: 12, fontWeight: 600, marginBottom: 4 } }, 'Fecha de aprobación:'),
+        React.createElement('input', {
+          type: 'date', autoFocus: true, value: fecha,
+          onChange: function (e) { setFecha(e.target.value); },
+          style: { width: '100%', padding: '8px 10px', border: '1px solid ' + (puedeConfirmar ? '#0969da' : '#d0d7de'), borderRadius: 4, fontSize: 13, fontFamily: 'inherit' },
+        }),
+        React.createElement('div', { style: { fontSize: 11, color: 'var(--text-3)', marginTop: 8 } },
+          'Al confirmar, se guarda la fecha y se genera el informe automáticamente.')
+      ),
+      React.createElement('div', { style: { padding: '12px 16px', borderTop: '1px solid #d0d7de', display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+        React.createElement(Button, { variant: 'ghost', onClick: props.onCancel }, 'Cancelar'),
+        React.createElement(Button, {
+          variant: 'primary', icon: 'check', disabled: !puedeConfirmar,
+          onClick: function () { if (puedeConfirmar) props.onGuardar(fecha); },
+        }, 'Guardar y generar')
+      )
+    )
+  );
+}
+
 function ConfirmarRazonSocialModal(props) {
   var _r2 = React.useState(props.razonActual || ''); var razon = _r2[0], setRazon = _r2[1];
   var cambio = razon.trim() !== (props.razonActual || '').trim();
