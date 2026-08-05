@@ -908,82 +908,77 @@ function QuimicosForm(props) {
     );
   }
 
+  // ── 1.5 OBSERVACIONES ─────────────────────────────────────────────────
   var block15 = _r('div', null,
-    _r('div', { style: S.head }, '1.5  OBSERVACIONES / EVALUACION'),
-    _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 12 } },
-      // ── Sub-bloque OBSERVACIONES ─────────────────────────────────────
-      _r('div', null,
-        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
-          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Observaciones (línea libre — se informa como texto suelto):'),
-          _r('span', { style: { flex: 1 } }, ''),
-          botonCopiarSubsetQ('obs', 'Copiar a otras OT', ['observaciones_libres'])
-        ),
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.5  OBSERVACIONES'),
+      botonCopiarSubsetQ('obs', 'Copiar a otras OT', ['observaciones_libres'])
+    ),
+    _r('div', { style: { padding: 8, fontSize: 11 } },
+      _r('textarea', { style: Object.assign({}, S.textarea, { minHeight: 45 }),
+        value: datos.observaciones_libres || '',
+        placeholder: 'Observaciones (línea libre — se informa como texto suelto)…',
+        onChange: function (e) { upd('observaciones_libres', e.target.value); } })
+    )
+  );
+
+  // ── 1.6 EVALUACIÓN ────────────────────────────────────────────────────
+  var block16 = _r('div', null,
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.6  EVALUACIÓN'),
+      botonCopiarSubsetQ('eval', 'Copiar a otras OT', ['tiene_evaluacion', 'material_tipo', 'evaluacion_texto'])
+    ),
+    _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 6 } },
+      _r('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
+        _r('input', { type: 'checkbox', checked: evalActiva,
+          onChange: function (e) {
+            var ch = e.target.checked;
+            upd('tiene_evaluacion', ch);
+            if (!ch) { upd('material_tipo', ''); }
+          } }),
+        _r('span', null, 'Incluir evaluación de resultados en el informe')),
+      evalActiva
+        ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+            _r('span', { style: { fontWeight: 600 } }, 'La muestra analizada satisface los requerimientos de composición química de un material tipo:'),
+            _r('input', { style: Object.assign({}, S.input, { flex: 1, minWidth: 200 }),
+              value: datos.material_tipo || '',
+              placeholder: '……………………………………',
+              onChange: function (e) { upd('material_tipo', e.target.value); } }))
+        : null
+    )
+  );
+
+  // ── 1.7 NOTAS ─────────────────────────────────────────────────────────
+  // Checkboxes con textos fijos (mismos que impacto/tracción) + textarea libre.
+  var block17 = _r('div', null,
+    _r('div', { style: Object.assign({}, S.head, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }) },
+      _r('span', null, '1.7  NOTAS'),
+      botonCopiarSubsetQ('notas', 'Copiar a otras OT',
+        ['nota_evaluaciones', 'nota_no_conforme', 'nota_incertidumbre', 'nota_externo', 'notas_texto'])
+    ),
+    _r('div', { style: { padding: 8, fontSize: 11, display: 'flex', flexDirection: 'column', gap: 6, lineHeight: 1.4 } },
+      _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+        _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_evaluaciones,
+          onChange: function (e) { upd('nota_evaluaciones', e.target.checked); } }),
+        _r('span', null, 'Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA.')),
+      _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+        _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_no_conforme,
+          onChange: function (e) { upd('nota_no_conforme', e.target.checked); } }),
+        _r('span', null, 'El ítem marcado con (**) corresponde a un trabajo no conforme.')),
+      _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+        _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_incertidumbre,
+          onChange: function (e) { upd('nota_incertidumbre', e.target.checked); } }),
+        _r('span', null, 'El cliente desea incorporar el dato de incertidumbre.')),
+      _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
+        _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_externo,
+          onChange: function (e) { upd('nota_externo', e.target.checked); } }),
+        _r('span', null, 'Los resultados marcados con (***) provienen de proveedor externo.')),
+      _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 } },
+        _r('span', { style: { fontWeight: 600, fontSize: 10 } }, 'Nota libre (opcional):'),
         _r('textarea', { style: Object.assign({}, S.textarea, { minHeight: 45 }),
-          value: datos.observaciones_libres || '',
-          placeholder: '……………………………………………………………………',
-          onChange: function (e) { upd('observaciones_libres', e.target.value); } })
-      ),
-      // ── Sub-bloque EVALUACIÓN ────────────────────────────────────────
-      _r('div', null,
-        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
-          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Evaluación:'),
-          _r('span', { style: { flex: 1 } }, ''),
-          botonCopiarSubsetQ('eval', 'Copiar a otras OT', ['tiene_evaluacion', 'material_tipo', 'evaluacion_texto'])
-        ),
-        _r('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-          _r('input', { type: 'checkbox', checked: evalActiva,
-            onChange: function (e) {
-              var ch = e.target.checked;
-              upd('tiene_evaluacion', ch);
-              if (!ch) { upd('material_tipo', ''); }
-            } }),
-          _r('span', null, 'Incluir evaluación de resultados en el informe')),
-        evalActiva
-          ? _r('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 } },
-              _r('span', { style: { fontWeight: 600 } }, 'La muestra analizada satisface los requerimientos de composición química de un material tipo:'),
-              _r('input', { style: Object.assign({}, S.input, { flex: 1, minWidth: 200 }),
-                value: datos.material_tipo || '',
-                placeholder: '……………………………………',
-                onChange: function (e) { upd('material_tipo', e.target.value); } }))
-          : null
-      ),
-      // ── Sub-bloque NOTAS ─────────────────────────────────────────────
-      // Checkboxes con textos fijos (mismos que impacto/tracción) + textarea
-      // libre. Cada nota tildada se emite como una línea en la sección NOTAS
-      // del Word; la textarea agrega una línea más al final.
-      _r('div', { style: { borderTop: '1px dashed var(--border)', paddingTop: 8 } },
-        _r('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
-          _r('span', { style: { fontSize: 10, fontWeight: 700, color: 'var(--text-2)' } }, 'Notas:'),
-          _r('span', { style: { flex: 1 } }, ''),
-          botonCopiarSubsetQ('notas', 'Copiar a otras OT',
-            ['nota_evaluaciones', 'nota_no_conforme', 'nota_incertidumbre', 'nota_externo', 'notas_texto'])
-        ),
-        _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, lineHeight: 1.4 } },
-          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_evaluaciones,
-              onChange: function (e) { upd('nota_evaluaciones', e.target.checked); } }),
-            _r('span', null, 'Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA.')),
-          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_no_conforme,
-              onChange: function (e) { upd('nota_no_conforme', e.target.checked); } }),
-            _r('span', null, 'El ítem marcado con (**) corresponde a un trabajo no conforme.')),
-          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_incertidumbre,
-              onChange: function (e) { upd('nota_incertidumbre', e.target.checked); } }),
-            _r('span', null, 'El cliente desea incorporar el dato de incertidumbre.')),
-          _r('label', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' } },
-            _r('input', { type: 'checkbox', style: { marginTop: 2 }, checked: !!datos.nota_externo,
-              onChange: function (e) { upd('nota_externo', e.target.checked); } }),
-            _r('span', null, 'Los resultados marcados con (***) provienen de proveedor externo.')),
-          _r('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 } },
-            _r('span', { style: { fontWeight: 600, fontSize: 10 } }, 'Nota libre (opcional):'),
-            _r('textarea', { style: Object.assign({}, S.textarea, { minHeight: 45 }),
-              value: datos.notas_texto || '',
-              placeholder: 'Agregá una nota adicional que se emite al final del informe…',
-              onChange: function (e) { upd('notas_texto', e.target.value); } }))
-        )
-      ),
-      // Nota al pie de la planilla
+          value: datos.notas_texto || '',
+          placeholder: 'Agregá una nota adicional que se emite al final del informe…',
+          onChange: function (e) { upd('notas_texto', e.target.value); } })),
       _r('div', { style: { fontSize: 9, color: 'var(--text-3)', marginTop: 4, borderTop: '1px dashed var(--border)', paddingTop: 4 } },
         '*PARÁMETROS A INFORMAR    ·    FM-033 Rev 03')
     )
@@ -993,7 +988,7 @@ function QuimicosForm(props) {
     barraCopiarTodoQ,
     blockCondOt,
     block12,
-    block13, block14, block15
+    block13, block14, block15, block16, block17
   );
 }
 

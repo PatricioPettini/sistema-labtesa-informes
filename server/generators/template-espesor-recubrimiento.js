@@ -11,7 +11,7 @@ const Docxtemplater = require('docxtemplater');
 const fs = require('fs');
 const path = require('path');
 const { manejarImagenesCaratula, insertarImagenesEnsayo } = require('./imagenes-caratula-helper');
-const { insertarOAAAntesDeFin } = require('./oaa-helper');
+const { insertarOAAAntesDeFin, garantizarBlancosAntesFin } = require('./oaa-helper');
 const { formatearOtrosEquipos } = require('./otros-equipos-helper');
 
 const TEMPLATE_PATH = path.join(__dirname, '../templates/varios.docx');
@@ -192,18 +192,22 @@ function construirBloqueEnsayo(ot, datos) {
   partes.push(pBlanco());
 
   // ── Notas y Evaluación (opcionales) ─────────────────────────────────────
-  const notasTxt = String(datos.notas_texto || '').trim();
-  if (notasTxt) {
-    partes.push(pHeading('NOTAS'));
-    notasTxt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => partes.push(pLinea(l)));
-    partes.push(pBlanco());
-  }
+  // No emitimos pBlanco() al final de estas secciones — el helper
+  // `garantizarBlancosAntesFin` en el post-proceso deja siempre 2 blanks
+  // justo arriba de "FIN DE INFORME".
   const evalTxt = String(datos.evaluacion_texto || '').trim();
   if (evalTxt) {
     partes.push(pHeading('EVALUACIÓN DE RESULTADOS'));
     partes.push(pLinea('"Las evaluaciones, opiniones, interpretaciones, etc, que se indican a continuación, están fuera del alcance de la acreditación del OAA"'));
     evalTxt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => partes.push(pLinea(l)));
     partes.push(pBlanco());
+  }
+  const notasTxt = String(datos.notas_texto || '').trim();
+  if (notasTxt) {
+    partes.push(pHeading('NOTAS'));
+    notasTxt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => partes.push(pLinea(l)));
+    // Sin pBlanco al final — `garantizarBlancosAntesFin` da el aire arriba de
+    // "FIN DE INFORME". Así "abajo de NOTAS" no queda un enter extra.
   }
 
   return partes.join('');
@@ -262,6 +266,8 @@ function generarEspesorRecubrimientoDesdeTemplate(ot, datos, fotosCaratula) {
   const textosOAA = [];
   if (datos.oaa !== false) textosOAA.push('"Los ensayos marcados con (*) no están incluidos en el alcance de la acreditación del OAA."');
   outXml = insertarOAAAntesDeFin(outXml, textosOAA);
+  // Deja exactamente 2 párrafos blancos arriba de "FIN DE INFORME".
+  outXml = garantizarBlancosAntesFin(outXml, 2);
 
   // Imágenes del ensayo (opcionales) — se apilan al final del bloque.
   function toFotosBuffer(arr) {

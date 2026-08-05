@@ -385,33 +385,42 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
     });
   }
 
-  // Observaciones / Evaluación
-  // El form tiene dos sub-bloques dentro de la sección 1.5:
-  //   - Observaciones (`observaciones_libres`): texto suelto, se emite arriba.
-  //   - Evaluación (`evaluacion_texto` + `material_tipo`): sólo si
-  //     `tiene_evaluacion !== false`. Si el usuario desmarca "Incluir
-  //     evaluación", la evaluación NO se emite aunque haya texto residual.
-  // Se ocultan sólo si NINGUNO de los dos sub-bloques tiene contenido.
-  const lineasObs = [];
+  // Observaciones + Evaluación (secciones separadas en el Word).
+  // El form 1.5–1.7 divide en tres sub-bloques que se emiten como secciones
+  // independientes con headings numerados propios (1.5 OBSERVACIONES,
+  // 1.6 EVALUACIÓN, 1.7 NOTAS). El template original tenía un solo bloque
+  // "EVALUACION DE RESULTADOS" con placeholder `{{observaciones_evaluacion}}`;
+  // el post-proceso a continuación (splitObsEvalEnQuimicos):
+  //   - Renombra el heading "EVALUACION DE RESULTADOS" → "OBSERVACIONES".
+  //   - El placeholder `{{observaciones_evaluacion}}` recibe SOLO las líneas
+  //     de observaciones libres.
+  //   - Inyecta un heading nuevo "EVALUACION" + contenido después del bloque
+  //     de observaciones, si hay algo que emitir.
+  //   - Inyecta un heading nuevo "NOTAS" antes del bloque de notas.
   const obsLibres    = (datos.observaciones_libres || '').trim();
   const evalText     = (datos.evaluacion_texto || '').trim();
   const materialTipo = (datos.material_tipo || '').trim();
   const evalHabilitada = datos.tiene_evaluacion !== false;
-  if (obsLibres) {
-    obsLibres.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasObs.push(l));
-  }
+
+  const lineasObsSolas = obsLibres
+    ? obsLibres.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    : [];
+  const observaciones_evaluacion = lineasObsSolas.length
+    ? lineasObsSolas.join('\n')
+    : '__SECTION_HIDE__';
+  const observacionesOculta = observaciones_evaluacion === '__SECTION_HIDE__';
+
+  // Contenido de la sección "EVALUACION" (líneas — se inyectan como XML aparte).
+  const lineasEvaluacion = [];
   if (evalHabilitada && (evalText || materialTipo)) {
     let linea = evalText || 'La muestra analizada satisface los requerimientos de composición química de un material tipo:';
     if (materialTipo) {
-      // Si la frase termina con ":" (default), pegar el material al final.
-      // Si el texto ya lo incluye, no duplicar.
       if (/:\s*$/.test(linea)) linea = linea.replace(/:\s*$/, ': ' + materialTipo);
       else if (linea.indexOf(materialTipo) === -1) linea = linea + ' ' + materialTipo;
     }
-    lineasObs.push(linea);
+    linea.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasEvaluacion.push(l));
   }
-  const observaciones_evaluacion = lineasObs.length ? lineasObs.join('\n') : '__SECTION_HIDE__';
-  const evaluacionOculta = observaciones_evaluacion === '__SECTION_HIDE__';
+  const evaluacionOculta = lineasEvaluacion.length === 0;
 
   // W5: texto OAA insertado antes de FIN DE INFORME como párrafo centrado en negrita
   const textosOAA = [];
@@ -431,7 +440,13 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
     notasLibres.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => lineasNotas.push(l));
   }
   if (datos.tiene_nota && datos.nota_texto) lineasNotas.push(datos.nota_texto);
-  const notas_seleccionadas = lineasNotas.length ? lineasNotas.join('\n') : '__SECTION_HIDE__';
+  // Marker invisible (U+2063 invisible separator) al principio para que el
+  // post-proceso pueda ubicar con certeza el párrafo de notas y meterle un
+  // heading "NOTAS" encima. El marker se remueve al final.
+  const NOTAS_MARKER = '⁣NOTAS_ANCHOR⁣';
+  const notas_seleccionadas = lineasNotas.length
+    ? NOTAS_MARKER + lineasNotas.join('\n')
+    : '__SECTION_HIDE__';
 
   // Imagen — soporte multi-imagen vía helper en post-proceso.
   const fotos = Array.isArray(fotosCaratula) ? fotosCaratula.filter(Boolean) : [];
@@ -573,10 +588,97 @@ function generarQuimicosDesdeTemplate(ot, datos, fotosCaratula) {
   outXml = eliminarSeccionesOcultas(outXml);
   outXml = colapsarBlancos(outXml);
 
-  // 3. Eliminar título "EVALUACION DE RESULTADOS" cuando el contenido está oculto
-  if (evaluacionOculta) {
-    outXml = ocultarParrafoConTexto(outXml, 'EVALUACION DE RESULTADOS');
-  }
+  // 3. Split 1.5 OBSERVACIONES / 1.6 EVALUACIÓN / 1.7 NOTAS.
+  //    El template tiene un único heading "EVALUACION DE RESULTADOS" con el
+  //    placeholder {{observaciones_evaluacion}} debajo, y {{notas_seleccionadas}}
+  //    más abajo (sin heading). Este post-proceso:
+  //      - Renombra el heading a "OBSERVACIONES" (queda como 1.5).
+  //      - Inyecta un heading "EVALUACIÓN" (1.6) + contenido después del bloque
+  //        de observaciones, si hay evaluación cargada.
+  //      - Inyecta un heading "NOTAS" (1.7) antes del bloque de notas.
+  //      - Cambia el estilo del párrafo de notas a alineado izquierda (no bold
+  //        centrado como venía del template).
+  //    Si un sub-bloque está vacío, se oculta su heading + placeholder.
+  outXml = (function splitObsEvalNotas(xml) {
+    const headingRe = /<w:p\b[^>]*>[\s\S]*?<w:t[^>]*>EVALUACION DE RESULTADOS<\/w:t>[\s\S]*?<\/w:p>/;
+    const hMatch = xml.match(headingRe);
+    if (!hMatch) return xml;
+    const headingOriginal = hMatch[0];
+    const headingPos = hMatch.index;
+    const headingEnd = headingPos + headingOriginal.length;
+
+    // El párrafo de contenido de observaciones va justo después del heading.
+    // Es el que contenía el placeholder {{observaciones_evaluacion}} y ya está
+    // renderizado con las líneas de observaciones (o vacío).
+    const nextPStart = xml.indexOf('<w:p', headingEnd);
+    if (nextPStart < 0) return xml;
+    const nextPEnd = xml.indexOf('</w:p>', nextPStart) + '</w:p>'.length;
+    const parrafoObsContenido = xml.slice(nextPStart, nextPEnd);
+    // Texto visible de ese párrafo — si está vacío, ocultamos el heading OBSERVACIONES.
+    const obsVisible = [...parrafoObsContenido.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
+      .map(m => m[1]).join('').replace(/[⁠\s]/g, '');
+    const obsVacio = observacionesOculta || obsVisible === '';
+
+    // Clonar el heading original con distinto texto (usa el mismo estilo/numPr).
+    function clonarHeading(nuevoTexto) {
+      return headingOriginal.replace(
+        /(<w:t[^>]*>)EVALUACION DE RESULTADOS(<\/w:t>)/,
+        (_, a, b) => a + String(nuevoTexto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + b);
+    }
+    // Renombrar el heading a "OBSERVACIONES".
+    const headingObs = clonarHeading('OBSERVACIONES');
+    const headingEval = clonarHeading('EVALUACIÓN');
+    const headingNotas = clonarHeading('NOTAS');
+
+    // Contenido de evaluación (líneas). Reusa el estilo del párrafo de observaciones.
+    let evalXml = '';
+    if (!evaluacionOculta) {
+      // Extraer envoltorio del párrafo de observaciones (<w:pPr>...) para reusar
+      // el mismo estilo (indentación 851, etc.). El contenido lo reemplazamos.
+      const mPr = parrafoObsContenido.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/);
+      const pPr = mPr ? mPr[0] : '<w:pPr><w:spacing w:line="276" w:lineRule="auto" w:after="0"/><w:ind w:left="851"/></w:pPr>';
+      const runProto = `<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">TEXTO</w:t></w:r>`;
+      evalXml = lineasEvaluacion.map(l =>
+        `<w:p>${pPr}${runProto.replace('TEXTO', String(l).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))}</w:p>`).join('');
+    }
+
+    // Reemplazar el bloque OBSERVACIONES (heading + párrafo de contenido)
+    let bloqueObs = '';
+    if (!obsVacio) bloqueObs = headingObs + parrafoObsContenido;
+    // Bloque EVALUACIÓN (solo si hay contenido).
+    let bloqueEval = '';
+    if (!evaluacionOculta) bloqueEval = headingEval + evalXml;
+
+    // Encontrar el párrafo de notas por el marker "NOTAS_ANCHOR" que
+    // insertamos en `notas_seleccionadas`. El marker se remueve al final del
+    // XML tras posicionar el heading.
+    let bloqueDespuesNotas = xml.slice(nextPEnd);
+    const anchor = 'NOTAS_ANCHOR';
+    const idxAnchor = bloqueDespuesNotas.indexOf(anchor);
+    if (idxAnchor >= 0) {
+      const pStart = bloqueDespuesNotas.lastIndexOf('<w:p', idxAnchor);
+      const pEnd = bloqueDespuesNotas.indexOf('</w:p>', idxAnchor) + '</w:p>'.length;
+      if (pStart >= 0 && pEnd > pStart) {
+        const parrafoNotas = bloqueDespuesNotas.slice(pStart, pEnd);
+        // Cambiar el estilo: alineado izquierda (sacar <w:jc center>), sin bold.
+        let parrafoNotasMod = parrafoNotas
+          .replace(/<w:jc w:val="center"\/>/g, '')
+          .replace(/<w:b\/>/g, '')
+          .replace(/<w:bCs\/>/g, '');
+        // Agregar indent 851 si no lo tiene ya.
+        if (!/<w:ind\b[^/]*w:left="/.test(parrafoNotasMod)) {
+          parrafoNotasMod = parrafoNotasMod.replace(/<w:pPr>/, '<w:pPr><w:ind w:left="851"/>');
+        }
+        // Sacar el marker del contenido visible.
+        parrafoNotasMod = parrafoNotasMod.replace(/[⁣]*NOTAS_ANCHOR[⁣]*/g, '');
+        const notasReemplazo = headingNotas + parrafoNotasMod;
+        bloqueDespuesNotas =
+          bloqueDespuesNotas.slice(0, pStart) + notasReemplazo + bloqueDespuesNotas.slice(pEnd);
+      }
+    }
+
+    return xml.slice(0, headingPos) + bloqueObs + bloqueEval + bloqueDespuesNotas;
+  })(outXml);
 
   // 4. Insertar salto de página antes de "ANALISIS QUIMICO"
   outXml = insertarSaltoPaginaAntes(outXml, 'ANALISIS QUIMICO');

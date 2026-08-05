@@ -45,6 +45,8 @@ const TRATAMIENTO_MAP = [
   ['TEMPLE Y REVENIDO',   'TYR'],
   ['TEMPLE REVENIDO',     'TYR'],
   ['NORMALIZADO',         'NOR'],
+  ['RESOLUBILIZADO',      'RES'],
+  ['SOLUBILIZADO',        'RES'],
   ['REVENIDO',            'REV'],
 ];
 
