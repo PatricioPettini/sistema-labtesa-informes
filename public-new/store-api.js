@@ -1193,6 +1193,8 @@
         'calibracion_chk', 'calibracion', 'seleccion_base_chk', 'seleccion_base',
         'zona_evaluacion', 'cantidad_determinaciones',
         'equipamiento', 'equipamiento_tags', 'otros_equipos',
+        // Sección 1.5 OBSERVACIONES / EVALUACIÓN
+        'observaciones_libres', 'tiene_evaluacion', 'material_tipo', 'evaluacion_texto',
       ];
       // Suffix _year de todas las normas conocidas.
       ['norma_itm054','norma_itm057','norma_itm058','norma_itm091','norma_itqb068',

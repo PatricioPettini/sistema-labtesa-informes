@@ -419,6 +419,8 @@ function QuimicosForm(props) {
     'zona_evaluacion', 'cantidad_determinaciones',
     // Equipamiento
     'equipamiento', 'equipamiento_tags', 'otros_equipos',
+    // Observaciones / Evaluación (1.5)
+    'observaciones_libres', 'tiene_evaluacion', 'material_tipo', 'evaluacion_texto',
   ];
   // Años de las normas (dinámico).
   QUIMICOS_NORMAS.forEach(function (n) { CAMPOS_TODO_Q.push(n.key + '_year'); });
