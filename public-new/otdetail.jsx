@@ -1107,21 +1107,31 @@ function OTDetail(props) {
       onCancel: function () { setRazonDlg(null); },
       onConfirm: function (razonFinal) {
         var razonCambio = razonFinal.trim() !== (ot.razon_social || '').trim();
+        var modo = razonDlg.modo;
+        // Actualizar la razón social ANTES de disparar la generación — si el
+        // update es async (updateSolicitud), esperamos a que resuelva. Sino
+        // el backend puede leer el valor viejo de la DB (race condition) y el
+        // Word sale con el nombre viejo tanto en el filename como en el
+        // encabezado "Sres…".
+        var prom;
         if (razonCambio) {
-          // La razón social es un dato de la solicitud, no de la OT: siempre
-          // propaga a todas las hermanas para mantenerlas consistentes.
           if (ot.nro_solicitud && typeof window.LabStore.updateSolicitud === 'function') {
-            window.LabStore.updateSolicitud(ot.nro_solicitud, { razon_social: razonFinal.trim() });
+            prom = window.LabStore.updateSolicitud(ot.nro_solicitud, { razon_social: razonFinal.trim() });
           } else {
-            window.LabStore.updateOt(ot.nro_ot, { razon_social: razonFinal.trim() });
+            var r = window.LabStore.updateOt(ot.nro_ot, { razon_social: razonFinal.trim() });
+            prom = (r && typeof r.then === 'function') ? r : Promise.resolve();
           }
           ot.razon_social = razonFinal.trim();
+        } else {
+          prom = Promise.resolve();
         }
-        var modo = razonDlg.modo;
         setRazonDlg(null);
-        // Continuar el flujo original.
-        if (modo === 'batch') setSaveDlg('word-batch');
-        else setSaveDlg('word');
+        Promise.resolve(prom).then(function () {
+          if (modo === 'batch') setSaveDlg('word-batch');
+          else setSaveDlg('word');
+        }).catch(function (e) {
+          toast('No se pudo actualizar la razón social: ' + (e && e.message ? e.message : e), 'danger');
+        });
       },
     }) : null,
     // Modal específico de colisión de nombre de archivo (radios + nombre editable).

@@ -219,12 +219,16 @@
       // recargarse en una actualización de un solo campo.
       var PATCH_FIELDS = ['es_preinforme', 'fecha_recepcion', 'fecha_aprobacion', 'fecha_finalizacion', 'trello_url', 'inspeccion_texto'];
       var soloParcial = Object.keys(data).every(function (k) { return PATCH_FIELDS.indexOf(k) >= 0; });
+      // Guardamos la Promise para poder devolverla — los callers que necesitan
+      // await antes de disparar acciones dependientes (ej. generar Word con
+      // razón social recién editada) pueden encadenar `.then`.
+      var promRemoto;
       if (soloParcial) {
-        apiFetch('PATCH', '/api/ot/' + encodeURIComponent(nro_ot), data)
-          .catch(function (e) { apiErr('Error al actualizar OT: ' + e.message); });
+        promRemoto = apiFetch('PATCH', '/api/ot/' + encodeURIComponent(nro_ot), data)
+          .catch(function (e) { apiErr('Error al actualizar OT: ' + e.message); throw e; });
       } else {
-        apiFetch('POST', '/api/ot', Object.assign({ nro_ot: nro_ot }, data))
-          .catch(function (e) { apiErr('Error al actualizar OT: ' + e.message); });
+        promRemoto = apiFetch('POST', '/api/ot', Object.assign({ nro_ot: nro_ot }, data))
+          .catch(function (e) { apiErr('Error al actualizar OT: ' + e.message); throw e; });
       }
       // La fecha de aprobación es una decisión de GERENCIA sobre la solicitud
       // completa, no por OT individual. Si se está actualizando, propagar a
@@ -241,7 +245,11 @@
           });
         }
       }
-      return ot;
+      // Devolvemos una Promise thenable que resuelve al `ot` local cuando el
+      // remoto confirmó. Callers que hacen fire-and-forget siguen funcionando
+      // (ignoran el return); callers que necesitan sincronizarse (ej. Confirmar
+      // razón social antes de generar Word) pueden hacer .then/.await.
+      return promRemoto.then(function () { return ot; });
     },
 
     deleteOt: function (nro_ot) {
