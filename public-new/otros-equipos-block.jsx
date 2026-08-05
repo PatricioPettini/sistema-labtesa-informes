@@ -66,10 +66,13 @@ function OtrosEquiposBlock(props) {
 
   // Parsea el valor tipeado/elegido de un datalist con formato "X · Y [sede]"
   // y devuelve solo la parte X (que es el valor real, sin metadata).
+  // NOTA: cuando el usuario escribe texto libre (sin " · "), NO se hace trim
+  // para permitir tipear espacios intermedios / nombres compuestos sin que se
+  // borren los espacios mientras se escribe.
   function parseValor(v) {
     if (!v) return '';
     var idx = String(v).indexOf(' · ');
-    return idx >= 0 ? String(v).slice(0, idx).trim() : String(v).trim();
+    return idx >= 0 ? String(v).slice(0, idx).trim() : String(v);
   }
 
   function setItems(next) {
@@ -83,8 +86,10 @@ function OtrosEquiposBlock(props) {
     var next = items.map(function (it, idx) { return idx === i ? Object.assign({}, it) : it; });
     next[i].nombre = val;
     // Si el nombre coincide EXACTO con un equipo del catálogo, actualizar el TAG
-    // (siempre — pisa el tag anterior aunque hubiera algo).
-    var match = todos.find(function (e) { return String(e.nombre || '').trim().toLowerCase() === val.toLowerCase(); });
+    // (siempre — pisa el tag anterior aunque hubiera algo). Se compara con
+    // .trim() por si el value tiene espacios trailing mientras se tipea.
+    var valNorm = val.trim().toLowerCase();
+    var match = valNorm && todos.find(function (e) { return String(e.nombre || '').trim().toLowerCase() === valNorm; });
     if (match) next[i].tag = match.id;
     setItems(next);
   }
