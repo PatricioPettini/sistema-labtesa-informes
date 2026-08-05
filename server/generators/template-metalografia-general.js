@@ -95,12 +95,15 @@ function pBlanco() {
 
 // Título de sección estilo PECOM: "DETERMINACIÓN DE X" en negrita, con numId=16
 // para tomar la numeración automática (1., 2., 3., ...).
+// Alineado con `pHeading`: número a 426 twips (851-425 hanging), texto a 851.
+// Sin esto, el "1." quedaba a 710 mientras el "1.1." aparecía a 426, dando el
+// efecto visual de que el sub-heading estaba más a la izquierda que el padre.
 function pSeccionHeading(texto) {
   return '<w:p><w:pPr><w:pStyle w:val="Textosinformato"/>' +
     '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="16"/></w:numPr>' +
-    '<w:tabs><w:tab w:val="left" w:pos="994"/></w:tabs>' +
+    '<w:tabs><w:tab w:val="left" w:pos="851"/></w:tabs>' +
     '<w:spacing w:line="300" w:lineRule="auto"/>' +
-    '<w:ind w:left="710" w:firstLine="0"/>' +
+    '<w:ind w:left="851" w:hanging="425"/>' +
     `<w:rPr>${FONTS}<w:b/>${SZ}</w:rPr></w:pPr>` +
     `<w:r><w:rPr>${FONTS}<w:b/>${SZ}</w:rPr>` +
     `<w:t xml:space="preserve">${esc(texto)}</w:t></w:r></w:p>`;
