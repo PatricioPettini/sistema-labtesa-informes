@@ -185,10 +185,12 @@ function generarVickersDesdeTemplate(ot, datos, fotosCaratula) {
   if (datos.cod_api1104) codigos.push('Código de referencia: API 1104');
   const normas_seleccionadas_linea = [...codigos, ...normas, ...metodCliente].join('\n');
 
-  // Metodología (U3): configurable. Default = ITM N°076
+  // Metodología (U3): solo se emite si el técnico la cargó. Antes caía al
+  // default "ITM N°076" aunque el campo estuviera vacío — aparecía siempre en
+  // el docx aunque el técnico no lo hubiera seleccionado (bug reportado).
   const metodologia_linea = (datos.metodologia || '').trim()
     ? `Metodología de ensayo: ${datos.metodologia.trim()}`
-    : 'Metodología de ensayo: ITM N°076';
+    : '__SECTION_HIDE__';
 
   // Tiempo de aplicación (U4): configurable. Default = 15 s.
   // Si el usuario cargó solo el número, agregar "segundos" como unidad; si ya
