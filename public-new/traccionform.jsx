@@ -886,6 +886,13 @@ function TraccionForm(props) {
                       color: esNota ? '#b02a2a' : (vieneDeCalc ? '#0a7a55' : undefined),
                       fontWeight: (esNota || vieneDeCalc) ? 800 : undefined,
                     }),
+                    // Desactivar el autocomplete del navegador (Chrome sugería
+                    // "Pato" — nombre del técnico de otros forms — en campos
+                    // libres tipo "lado_rotura" cuando el técnico apretaba
+                    // Tab/Enter con un match parcial).
+                    autoComplete: 'off',
+                    spellCheck: false,
+                    name: 'tr-cell-' + p.k + '-' + i,
                     value: val,
                     title: esNota
                       ? 'El cálculo dio negativo (dato inconsistente). Agregar una nota explicativa antes de emitir.'
