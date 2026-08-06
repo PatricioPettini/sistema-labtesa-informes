@@ -57,7 +57,20 @@ function agruparPorSolicitud(ots) {
     if (totales > 0 && finalizadas === totales) { estado = 'Finalizada'; tone = 'success'; }
     else if (enEnsayo > 0) { estado = 'En ensayo'; tone = 'info'; }
     else { estado = 'En recepción'; tone = 'neutral'; }
-    return Object.assign({}, g, { total: totales, finalizadas: finalizadas, estado: estado, tone: tone, es_preinforme: esPreliminar });
+    // Tipos de ensayo únicos que aparecen en las OTs de la solicitud
+    // (aplanados desde `ot.tipos_ensayo` que trae `listOts()`). Se usan
+    // para el filtro y los chips de tipos por fila.
+    var tiposMap = {};
+    g.ots.forEach(function (o) {
+      (o.tipos_ensayo || []).forEach(function (t) { if (t) tiposMap[t] = (tiposMap[t] || 0) + 1; });
+    });
+    var tipos_ensayo = Object.keys(tiposMap).sort();
+    return Object.assign({}, g, {
+      total: totales, finalizadas: finalizadas, estado: estado, tone: tone,
+      es_preinforme: esPreliminar,
+      tipos_ensayo: tipos_ensayo,
+      tipos_ensayo_counts: tiposMap,
+    });
   });
   // Orden descendente por nro_solicitud (más nuevo arriba).
   arr.sort(function (a, b) {
@@ -106,6 +119,28 @@ function SolicitudesScreen(props) {
   var _q = React.useState(''); var q = _q[0], setQ = _q[1];
   var _qi = React.useState(''); var qi = _qi[0], setQi = _qi[1];
   var _f = React.useState('todas'); var filtro = _f[0], setFiltro = _f[1];
+  // Filtro por tipo de ensayo (traccion, brinell, quimicos, ...). Se persiste
+  // en la URL como `#/?tipoEnsayo=quimicos` para bookmark y compartir.
+  var _fe = React.useState(function () {
+    try {
+      var qs = (location.hash.split('?')[1] || '');
+      return new URLSearchParams(qs).get('tipoEnsayo') || '';
+    } catch (e) { return ''; }
+  });
+  var tipoEns = _fe[0], setTipoEnsRaw = _fe[1];
+  function setTipoEns(v) {
+    setTipoEnsRaw(v);
+    // Sincronizar con URL (sin recargar la página).
+    try {
+      var base = location.hash.split('?')[0] || '#/';
+      var params = new URLSearchParams(location.hash.split('?')[1] || '');
+      if (v) params.set('tipoEnsayo', v);
+      else params.delete('tipoEnsayo');
+      var qsOut = params.toString();
+      var newHash = base + (qsOut ? '?' + qsOut : '');
+      if (location.hash !== newHash) history.replaceState(null, '', newHash);
+    } catch (e) {}
+  }
   var toast = useToast();
   // Modal AS400 manual — permite generar el Excel para una solicitud sin
   // depender del banner de Trello. Se abre desde el botón del header.
@@ -155,10 +190,24 @@ function SolicitudesScreen(props) {
     finalizada: solicitudes.filter(function (s) { return s.estado === 'Finalizada'; }).length,
   };
 
+  // Contadores por tipo de ensayo (para poblar el dropdown con "Químicos (12)").
+  // Se cuenta sobre las solicitudes visibles antes del filtro por tipo (o sea,
+  // las que ya pasaron el filtro de estado + búsqueda de texto).
+  var tiposCatalogo = {};
+  solicitudes.forEach(function (s) {
+    s.tipos_ensayo.forEach(function (t) { tiposCatalogo[t] = (tiposCatalogo[t] || 0) + 1; });
+  });
+  var tiposDisponibles = Object.keys(tiposCatalogo).sort(function (a, b) {
+    var la = (window.LabStore && window.LabStore.labels && window.LabStore.labels[a]) || a;
+    var lb = (window.LabStore && window.LabStore.labels && window.LabStore.labels[b]) || b;
+    return la.localeCompare(lb);
+  });
+
   var filtered = solicitudes.filter(function (s) {
     if (filtro === 'recepcion'  && s.estado !== 'En recepción') return false;
     if (filtro === 'ensayo'     && s.estado !== 'En ensayo') return false;
     if (filtro === 'finalizada' && s.estado !== 'Finalizada') return false;
+    if (tipoEns && s.tipos_ensayo.indexOf(tipoEns) < 0) return false;
     if (!q) return true;
     var qq = q.toLowerCase();
     var hay = (s.nro_solicitud + ' ' + s.razon_social + ' ' + s.nro_cliente).toLowerCase();
@@ -218,10 +267,59 @@ function SolicitudesScreen(props) {
             t.label, _rS('span', { className: 'tab-count' }, counts[t.id]));
         })
       ),
-      _rS('div', { className: 'toolbar-r' },
+      _rS('div', { className: 'toolbar-r', style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        // Filtro por tipo de ensayo — dropdown con contadores. Al elegir,
+        // sólo se muestran solicitudes cuyas OTs incluyen ese tipo.
+        _rS('select', {
+          value: tipoEns,
+          onChange: function (e) { setTipoEns(e.target.value); },
+          style: {
+            padding: '6px 10px', border: '1px solid var(--border-strong, #d0d7de)',
+            borderRadius: 5, background: tipoEns ? 'var(--accent-soft, #e7f0ff)' : 'var(--surface, #fff)',
+            color: tipoEns ? 'var(--accent, #0550ae)' : 'var(--text)',
+            fontSize: 12, fontWeight: tipoEns ? 700 : 500, cursor: 'pointer',
+            minWidth: 220,
+          },
+          title: 'Filtrar por tipo de ensayo',
+        },
+          _rS('option', { value: '' }, 'Todos los tipos de ensayo'),
+          tiposDisponibles.map(function (t) {
+            var lbl = (window.LabStore && window.LabStore.labels && window.LabStore.labels[t]) || t;
+            return _rS('option', { key: t, value: t }, lbl + ' (' + tiposCatalogo[t] + ')');
+          })
+        ),
         _rS(SearchInput, { value: qi, onChange: setQ, onChangeImmediate: setQi, placeholder: 'Buscar solicitud, cliente, OT, id muestra…' })
       )
     ),
+
+    // Banner activo cuando hay filtro por tipo — muestra qué se está viendo y
+    // permite quitar el filtro rápido.
+    tipoEns ? _rS('div', {
+      style: {
+        margin: '8px 0', padding: '8px 14px', borderRadius: 6,
+        background: 'var(--accent-soft, #e7f0ff)',
+        border: '1px solid var(--accent, #0969da)',
+        display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--accent, #0550ae)',
+      }
+    },
+      _rS('span', { style: { fontSize: 15 } }, '🔬'),
+      _rS('span', null,
+        'Mostrando sólo solicitudes con ',
+        _rS('strong', null, (window.LabStore && window.LabStore.labels && window.LabStore.labels[tipoEns]) || tipoEns),
+        ' — ',
+        _rS('strong', null, filtered.length),
+        (filtered.length === 1 ? ' solicitud' : ' solicitudes'), '.'
+      ),
+      _rS('span', { style: { flex: 1 } }),
+      _rS('button', {
+        style: {
+          border: '1px solid var(--accent, #0969da)', background: 'var(--surface, #fff)',
+          color: 'var(--accent, #0550ae)', padding: '3px 10px', borderRadius: 4,
+          cursor: 'pointer', fontSize: 11, fontWeight: 600,
+        },
+        onClick: function () { setTipoEns(''); },
+      }, '✕ Quitar filtro')
+    ) : null,
 
     _rS('div', { className: 'card table-card' },
       _rS('table', { className: 'ot-table' },
@@ -266,10 +364,53 @@ function SolicitudesScreen(props) {
                 )
               ),
               _rS('td', null,
-                _rS('span', { style: { fontWeight: 700, fontSize: 13 } }, s.total),
-                s.finalizadas > 0 && s.finalizadas < s.total
-                  ? _rS('span', { style: { fontSize: 10, color: 'var(--text-3)', marginLeft: 6 } }, s.finalizadas + '/' + s.total + ' fin.')
-                  : null
+                _rS('div', { style: { display: 'flex', flexDirection: 'column', gap: 3 } },
+                  _rS('div', null,
+                    _rS('span', { style: { fontWeight: 700, fontSize: 13 } }, s.total),
+                    s.finalizadas > 0 && s.finalizadas < s.total
+                      ? _rS('span', { style: { fontSize: 10, color: 'var(--text-3)', marginLeft: 6 } }, s.finalizadas + '/' + s.total + ' fin.')
+                      : null
+                  ),
+                  // Chips de tipos de ensayo (max 4, "+N" si hay más).
+                  // El tipo actualmente filtrado se resalta en azul.
+                  s.tipos_ensayo.length > 0
+                    ? _rS('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 3 } },
+                        s.tipos_ensayo.slice(0, 4).map(function (t) {
+                          var lblAbbr = (window.LabStore && window.LabStore.abbr && window.LabStore.abbr[t]) || t.slice(0, 3).toUpperCase();
+                          var lblFull = (window.LabStore && window.LabStore.labels && window.LabStore.labels[t]) || t;
+                          var esFiltrado = tipoEns && t === tipoEns;
+                          return _rS('span', {
+                            key: t,
+                            title: lblFull + (s.tipos_ensayo_counts && s.tipos_ensayo_counts[t] > 1 ? ' (×' + s.tipos_ensayo_counts[t] + ')' : ''),
+                            onClick: function (e) {
+                              e.stopPropagation();
+                              setTipoEns(esFiltrado ? '' : t);
+                            },
+                            style: {
+                              display: 'inline-block', padding: '1px 6px', borderRadius: 3,
+                              fontSize: 9, fontWeight: 700, letterSpacing: '.3px',
+                              background: esFiltrado ? 'var(--accent, #0969da)' : 'var(--surface-2, #f5f7fa)',
+                              color: esFiltrado ? '#fff' : 'var(--text-2)',
+                              border: '1px solid ' + (esFiltrado ? 'var(--accent, #0969da)' : 'var(--border, #e3e5ea)'),
+                              cursor: 'pointer',
+                              fontFamily: 'ui-monospace, Consolas, monospace',
+                            },
+                          }, lblAbbr);
+                        }),
+                        s.tipos_ensayo.length > 4
+                          ? _rS('span', {
+                              title: s.tipos_ensayo.slice(4).map(function (t) {
+                                return (window.LabStore && window.LabStore.labels && window.LabStore.labels[t]) || t;
+                              }).join(', '),
+                              style: {
+                                display: 'inline-block', padding: '1px 6px', borderRadius: 3,
+                                fontSize: 9, fontWeight: 600, color: 'var(--text-3)',
+                              },
+                            }, '+' + (s.tipos_ensayo.length - 4))
+                          : null
+                      )
+                    : null
+                )
               ),
               _rS('td', null,
                 _rS('div', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' } },
